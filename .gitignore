@@ -1,0 +1,17 @@
+dist/
+*.rpm
+.idea
+*.apk
+*.pub
+*.key
+oci8.pc
+*.skip
+.vscode
+**/target/
+.DS_Store
+**/.cache/
+.gocache
+
+test-coverage.out
+
+docker_images
