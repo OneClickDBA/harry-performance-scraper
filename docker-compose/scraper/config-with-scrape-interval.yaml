@@ -1,0 +1,85 @@
+# Example Oracle DB Performance Scraper Configuration file.
+# Environment variables of the form ${VAR_NAME} will be expanded.
+
+# Test with scrape interval
+
+databases:
+  ## Database connection information for the "default" database.
+  default:
+    ## Database username
+    username: pdbadmin
+    ## Database password
+    password: ${DB_PASSWORD}
+    ## Database connection url
+    url: free26ai:1521/freepdb1
+
+    ## Metrics query timeout for this database, in seconds
+    queryTimeout: 5
+
+    ## Rely on Oracle AI Database External Authentication by network or OS
+    # externalAuth: false
+    ## Database role
+    # role: SYSDBA
+    ## Path to Oracle AI Database wallet, if using wallet
+    # tnsAdmin: /path/to/database/wallet
+
+    ### Connection settings:
+    ### Either the go-sql or Oracle AI Database connection pool may be used.
+    ### To use the Oracle AI Database connection pool over the go-sql connection pool,
+    ### set maxIdleConns to zero and configure the pool* settings.
+
+    ### Connection pooling settings for the go-sql connection pool
+    ## Max open connections for this database using go-sql connection pool
+    maxOpenConns: 10
+    ## Max idle connections for this database using go-sql connection pool
+    maxIdleConns: 10
+
+    ### Connection pooling settings for the Oracle AI Database connection pool
+    ## Oracle AI Database connection pool increment.
+    # poolIncrement: 1
+    ## Oracle AI Database Connection pool maximum size
+    # poolMaxConnections: 15
+    ## Oracle AI Database Connection pool minimum size
+    # poolMinConnections: 15
+
+  second:
+    username: pdbadmin
+    password: ${DB_PASSWORD}
+    url: second26ai:1521/freepdb1
+    queryTimeout: 5
+    maxOpenConns: 10
+    maxIdleConns: 10
+
+
+metrics:
+  ## How long to wait before attempting to reconnect to an invalid database (login or locked user)
+  # connectionBackoff: 5m
+  ## How often to collect samples.
+  scrapeInterval: 15s
+  ## Path to default metrics file.
+  default: default-metrics.toml
+  ## Paths to any custom metrics files
+  custom:
+    - /scraper/txeventq-metrics.toml
+    - /scraper/more-txeventq-metrics.toml
+
+output:
+  postgresql:
+    url: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+    samplesTable: oracle_metric_samples
+    sqlSamplesTable: oracle_sql_samples
+    sessionSamplesTable: oracle_session_samples
+    blockingSessionsTable: oracle_blocking_session_samples
+    databaseActivityTable: oracle_database_activity_samples
+    autoMigrate: true
+    ## Drop daily sample partitions older than this duration. Use Go duration units, for example 720h for 30 days.
+    # retention: 720h
+    maxConns: 4
+
+log:
+  # Path of log file
+  destination: /tmp/alert.log
+  # Interval of log updates
+  interval: 15s
+  ## Set disable to 1 to disable logging
+  # disable: 0

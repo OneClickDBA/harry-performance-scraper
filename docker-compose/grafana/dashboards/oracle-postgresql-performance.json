@@ -1,0 +1,473 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_session_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database\n)\nselect\n  s.source_database,\n  s.inst_id,\n  s.sid,\n  s.serial_number,\n  s.username,\n  s.sql_id,\n  s.sql_child_number,\n  s.event,\n  s.wait_class,\n  s.state,\n  s.seconds_in_wait,\n  s.module,\n  s.action,\n  s.program,\n  s.machine,\n  s.service_name\nfrom oracle_session_samples s\njoin latest l on l.source_database = s.source_database and l.collected_at = s.collected_at\nwhere s.status = 'ACTIVE'\n  and s.sql_id is not null\norder by s.seconds_in_wait desc nulls last, s.source_database, s.inst_id, s.sid;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Current Active SQL Sessions",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_session_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database\n)\nselect\n  s.source_database,\n  coalesce(s.wait_class, 'UNKNOWN') as wait_class,\n  coalesce(s.event, 'UNKNOWN') as event,\n  count(*) as sessions,\n  count(*) filter (where s.sql_id is not null) as sql_sessions,\n  max(s.seconds_in_wait) as max_seconds_in_wait,\n  max(s.sql_id) as example_sql_id,\n  max(s.module) as example_module,\n  max(s.machine) as example_machine\nfrom oracle_session_samples s\njoin latest l on l.source_database = s.source_database and l.collected_at = s.collected_at\nwhere s.status = 'ACTIVE'\n  and coalesce(s.wait_class, 'Idle') <> 'Idle'\ngroup by s.source_database, coalesce(s.wait_class, 'UNKNOWN'), coalesce(s.event, 'UNKNOWN')\norder by sessions desc, max_seconds_in_wait desc nulls last\nlimit 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Current Waiters by Event",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_session_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database\n)\nselect\n  s.source_database,\n  s.inst_id,\n  s.sid,\n  s.serial_number,\n  s.username,\n  s.status,\n  s.sql_id,\n  s.event,\n  s.wait_class,\n  s.state,\n  s.seconds_in_wait,\n  s.blocking_instance,\n  s.blocking_session,\n  s.module,\n  s.action,\n  s.program,\n  s.machine,\n  s.logon_time\nfrom oracle_session_samples s\njoin latest l on l.source_database = s.source_database and l.collected_at = s.collected_at\nwhere s.status = 'ACTIVE'\norder by s.seconds_in_wait desc nulls last, s.logon_time asc nulls last\nlimit 100;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Long Running Active Sessions",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_blocking_session_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database\n)\nselect\n  b.source_database,\n  b.inst_id,\n  b.sid,\n  b.serial_number,\n  b.username,\n  b.sql_id,\n  b.event,\n  b.wait_class,\n  b.blocking_instance,\n  b.blocking_session,\n  b.blocking_username,\n  b.blocking_sql_id,\n  b.blocking_event\nfrom oracle_blocking_session_samples b\njoin latest l on l.source_database = b.source_database and l.collected_at = b.collected_at\norder by b.source_database, b.inst_id, b.sid;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Blocking Sessions",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 5,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_session_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database\n)\nselect\n  s.source_database,\n  coalesce(s.status, 'UNKNOWN') as status,\n  coalesce(s.username, '(background)') as username,\n  coalesce(s.module, '(unknown)') as module,\n  coalesce(s.program, '(unknown)') as program,\n  count(*) as sessions,\n  count(*) filter (where s.sql_id is not null) as sql_sessions,\n  count(distinct s.machine) filter (where s.machine is not null) as machine_count,\n  max(s.wait_class) as example_wait_class,\n  max(s.event) as example_event\nfrom oracle_session_samples s\njoin latest l on l.source_database = s.source_database and l.collected_at = s.collected_at\ngroup by s.source_database, coalesce(s.status, 'UNKNOWN'), coalesce(s.username, '(background)'), coalesce(s.module, '(unknown)'), coalesce(s.program, '(unknown)')\norder by sessions desc\nlimit 100;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Session Inventory by User, Module, Program",
+      "type": "table"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": [
+    "oracle",
+    "postgresql",
+    "sessions",
+    "blocking"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": null,
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "PostgreSQL"
+        },
+        "definition": "select distinct source_database from oracle_session_samples union select distinct source_database from oracle_blocking_session_samples order by 1;",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Source Database",
+        "multi": false,
+        "name": "source_database",
+        "options": [],
+        "query": "select distinct source_database from oracle_session_samples union select distinct source_database from oracle_blocking_session_samples order by 1;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Current Sessions and Blocking",
+  "uid": "oracle-db-performance",
+  "version": 1,
+  "weekStart": ""
+}

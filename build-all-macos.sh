@@ -1,0 +1,173 @@
+#!/bin/bash
+set -euo pipefail
+
+# This script builds release artifacts for the Oracle DB Performance Scraper.
+# You must have a working docker socket, and docker or aliased docker command.
+# It is designed to run on MacOS aarch64, creating the darwin-arm64 on the local host.
+# Artifacts for linux-arm64, linux-amd64 are built in containers.
+
+# The following artifacts are created on a successful build in the 'dist' directory for the selected database driver target (godror or goora):
+# - linux/arm64 and linux/amd64 container images
+# - linux/arm64 and linux/amd64 binary tarballs for glibc 2.28 built on OL8
+# - linux/arm64 and linux/amd64 binary tarballs built on the latest Ubuntu distribution
+# - darwin-arm64 binary tarball
+
+# Example usage:
+# ./build-all-macos.sh -v 2.4.0 -t godror -cmuo
+
+USAGE="Usage: $0 [-v VERSION] [-t TARGET] [-cmuo]"
+VERSION=""
+TARGET=""
+BUILD_CONTAINERS=""
+BUILD_DARWIN=""
+BUILD_UBUNTU=""
+BUILD_OL8=""
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+while getopts "v:t:cmuo" opt; do
+  case ${opt} in
+    v ) VERSION=$OPTARG;; # Scraper version
+    t ) TARGET=$OPTARG;;  # Target database driver, may be "godror" or "goora"
+    c ) BUILD_CONTAINERS=true;; # Build scraper containers
+    m ) BUILD_DARWIN=true;; # Build darwin/macos binary
+    u ) BUILD_UBUNTU=true;; # Build binaries on latest Ubuntu
+    o ) BUILD_OL8=true;;    # Build binaries on OL8
+    \? ) echo "$USAGE"; exit 1;;
+  esac
+done
+
+if [[ -z "$VERSION" ]] || [[ -z "$TARGET" ]]; then
+  echo "$USAGE"
+  exit 1
+fi
+
+OL_IMAGE="oraclelinux:8"
+BASE_IMAGE="ghcr.io/oracle/oraclelinux:8-slim"
+UBUNTU_IMAGE="ubuntu:24.04"
+OL8_GLIBC_VERSION="2.28"
+GO_VERSION="1.26.3"
+
+if [[ "${TARGET}" == "goora" ]]; then
+  TAGS="goora"
+  CGO_ENABLED=0
+else
+  TAGS="godror"
+  CGO_ENABLED=1
+fi
+
+copy_workspace_to_container() {
+  local container="$1"
+
+  docker exec "${container}" rm -rf /oracledb-performance-scraper
+  docker cp "${SCRIPT_DIR}/." "${container}:/oracledb-performance-scraper"
+  docker exec "${container}" rm -rf /oracledb-performance-scraper/.git
+}
+
+linux_make_target() {
+  local platform="$1"
+
+  case "${platform}" in
+    amd64) echo "go-build-linux-amd64" ;;
+    arm64) echo "go-build-linux-arm64" ;;
+    *) echo "unsupported platform: ${platform}" >&2; exit 1 ;;
+  esac
+}
+
+build_darwin_local() {
+  echo "Build darwin-arm64"
+  make go-build-darwin-arm64 VERSION="$VERSION" TAGS="$TAGS" CGO_ENABLED="$CGO_ENABLED"
+  echo "Built for darwin-arm64"
+}
+
+build_ol_platform() {
+  build_ol "$1"
+  rename_glibc "$1"
+}
+
+build_ol() {
+  local platform="$1"
+  local container="build-${platform}"
+  local filename="oracledb_performance_scraper-${VERSION}.linux-${platform}.tar.gz"
+  local make_target
+  local go_tarball="go${GO_VERSION}.linux-${platform}.tar.gz"
+
+  make_target="$(linux_make_target "${platform}")"
+
+  docker run -d --platform "linux/${platform}" --name "${container}" "${OL_IMAGE}" tail -f /dev/null
+  copy_workspace_to_container "${container}"
+  docker exec "${container}" bash -c "dnf install -y wget git make gcc jq && \
+                                    wget -q https://go.dev/dl/${go_tarball} && \
+                                    go_checksum=\"\$(wget -qO- 'https://go.dev/dl/?mode=json' | jq -r --arg version 'go${GO_VERSION}' --arg os 'linux' --arg arch '${platform}' '.[] | select(.version == \$version) | .files[] | select(.os == \$os and .arch == \$arch) | .sha256' | head -n 1)\" && \
+                                    test -n \"\${go_checksum}\" && test \"\${go_checksum}\" != \"null\" && \
+                                    printf '%s  %s\n' \"\${go_checksum}\" '${go_tarball}' | sha256sum -c - && \
+                                    rm -rf /usr/local/go && \
+                                    tar -C /usr/local -xzf ${go_tarball} && \
+                                    rm ${go_tarball} && \
+                                    export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin && \
+                                    cd oracledb-performance-scraper && \
+                                    make ${make_target} VERSION=\"${VERSION}\" TAGS=\"${TAGS}\" CGO_ENABLED=\"${CGO_ENABLED}\""
+
+  docker cp "${container}:/oracledb-performance-scraper/dist/${filename}" "dist/"
+
+  echo "Build complete for ${OL_IMAGE}-${platform}"
+  docker stop "$container"
+  docker rm "$container"
+}
+
+build_ubuntu() {
+  local container="ubuntu-build"
+  docker run -d --platform "linux/amd64" --name "${container}" "${UBUNTU_IMAGE}" tail -f /dev/null
+  copy_workspace_to_container "${container}"
+  docker exec "${container}" bash -c "apt-get update -y && \
+                                      apt-get -y install podman qemu-user-static golang gcc-aarch64-linux-gnu git make && \
+                                      cd oracledb-performance-scraper && \
+                                      make go-build-linux-amd64 VERSION=\"${VERSION}\" TAGS=\"${TAGS}\" CGO_ENABLED=\"${CGO_ENABLED}\" && \
+                                      make go-build-linux-gcc-arm64 VERSION=\"${VERSION}\" TAGS=\"${TAGS}\" CGO_ENABLED=\"${CGO_ENABLED}\""
+
+
+  docker cp "${container}:/oracledb-performance-scraper/dist/oracledb_performance_scraper-${VERSION}.linux-amd64.tar.gz" "dist/"
+  docker cp "${container}:/oracledb-performance-scraper/dist/oracledb_performance_scraper-${VERSION}.linux-arm64.tar.gz" "dist/"
+
+  docker stop "$container"
+  docker rm "$container"
+}
+
+rename_glibc() {
+  local platform="$1"
+
+  local f1="oracledb_performance_scraper-${VERSION}.linux-${platform}.tar.gz"
+  local f2="oracledb_performance_scraper-${VERSION}.linux-${platform}-glibc-${OL8_GLIBC_VERSION}.tar.gz"
+
+  mv "dist/$f1" "dist/$f2" 2>/dev/null
+}
+
+# clean dist directory before build
+rm -rf dist/*
+
+# Create darwin-arm64 artifacts on local host
+if [[ -n "$BUILD_DARWIN" ]]; then
+  build_darwin_local
+fi
+
+if [[ -n "$BUILD_OL8" ]]; then
+  echo "Building OL8 binaries"
+  # Create OL8 linux artifacts for glibc 2.28
+  build_ol_platform "arm64"
+  build_ol_platform "amd64"
+  echo "Build complete for OL8 binaries"
+fi
+
+# build containers
+if [[ -n "$BUILD_CONTAINERS" ]]; then
+  echo "Building container images"
+  make docker-arm VERSION="$VERSION"
+  make docker-amd VERSION="$VERSION"
+  echo "Build complete for container images"
+fi
+
+
+
+if [[ -n "$BUILD_UBUNTU" ]]; then
+  # Create Linux artifacts and containers
+  build_ubuntu
+fi

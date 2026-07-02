@@ -1,0 +1,725 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_text"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 560
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module,\n    max(left(sql_text, 240)) as sql_text\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  sql_text\nfrom deltas\nwhere elapsed_micro_delta > 0\norder by elapsed_micro_delta desc\nlimit 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top SQL by Elapsed Time Delta",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_text"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 560
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module,\n    max(left(sql_text, 240)) as sql_text\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  sql_text\nfrom deltas\nwhere cpu_micro_delta > 0\norder by cpu_micro_delta desc\nlimit 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top SQL by CPU Time Delta",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_text"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 560
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "id": 3,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module,\n    max(left(sql_text, 240)) as sql_text\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  sql_text\nfrom deltas\nwhere user_io_micro_delta > 0\norder by user_io_micro_delta desc\nlimit 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top SQL by User I/O Wait Delta",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_text"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 560
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(coalesce(rows_processed, 0)) - min(coalesce(rows_processed, 0)) as rows_processed_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module,\n    max(left(sql_text, 240)) as sql_text\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  executions_delta,\n  rows_processed_delta,\n  round((elapsed_micro_delta / 1000000.0) / nullif(executions_delta, 0), 6) as elapsed_seconds_per_exec,\n  round(buffer_gets_delta::numeric / nullif(rows_processed_delta, 0), 3) as buffer_gets_per_row,\n  round(disk_reads_delta::numeric / nullif(executions_delta, 0), 3) as disk_reads_per_exec,\n  parsing_schema_name,\n  module,\n  sql_text\nfrom deltas\nwhere elapsed_micro_delta > 0\norder by coalesce((elapsed_micro_delta / 1000000.0) / nullif(executions_delta, 0), 0) desc\nlimit 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "SQL Efficiency Outliers",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Delta seconds",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "with samples as (\n  select\n    collected_at,\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    coalesce(elapsed_time_micro, 0) as elapsed_time_micro,\n    coalesce(cpu_time_micro, 0) as cpu_time_micro,\n    coalesce(user_io_wait_micro, 0) as user_io_wait_micro\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and sql_id = nullif(${sql_id:sqlstring}, '')\n), deltas as (\n  select\n    collected_at,\n    greatest(elapsed_time_micro - coalesce(lag(elapsed_time_micro) over w, elapsed_time_micro), 0) / 1000000.0 as elapsed_seconds,\n    greatest(cpu_time_micro - coalesce(lag(cpu_time_micro) over w, cpu_time_micro), 0) / 1000000.0 as cpu_seconds,\n    greatest(user_io_wait_micro - coalesce(lag(user_io_wait_micro) over w, user_io_wait_micro), 0) / 1000000.0 as user_io_seconds\n  from samples\n  window w as (partition by source_database, inst_id, sql_id, child_number order by collected_at)\n)\nselect collected_at as \"time\", 'Elapsed' as metric, sum(elapsed_seconds)::double precision as value\nfrom deltas\ngroup by collected_at\nunion all\nselect collected_at as \"time\", 'CPU' as metric, sum(cpu_seconds)::double precision as value\nfrom deltas\ngroup by collected_at\nunion all\nselect collected_at as \"time\", 'User I/O Wait' as metric, sum(user_io_seconds)::double precision as value\nfrom deltas\ngroup by collected_at\norder by 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Selected SQL Time Delta",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "id": 6,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  min(collected_at) as first_seen,\n  max(collected_at) as last_seen,\n  count(*) as samples,\n  max(executions) - min(executions) as executions_delta,\n  round((max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0))) / 1000000.0, 3) as elapsed_seconds_delta,\n  round((max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0))) / 1000000.0, 3) as cpu_seconds_delta,\n  max(parsing_schema_name) as parsing_schema_name,\n  max(module) as module\nfrom oracle_sql_samples\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\n  and sql_id = nullif(${sql_id:sqlstring}, '')\ngroup by source_database, inst_id, sql_id, child_number, plan_hash_value\norder by last_seen desc, elapsed_seconds_delta desc;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Selected SQL Plan Hashes",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_text"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 560
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and (${sql_id:sqlstring} = '' or sql_id = ${sql_id:sqlstring})\n  group by source_database\n)\nselect\n  s.source_database,\n  s.inst_id,\n  s.sql_id,\n  s.child_number,\n  s.plan_hash_value,\n  s.parsing_schema_name,\n  s.module,\n  s.last_active_time,\n  s.sql_text\nfrom oracle_sql_samples s\njoin latest l on l.source_database = s.source_database and l.collected_at = s.collected_at\nwhere ${sql_id:sqlstring} = '' or s.sql_id = ${sql_id:sqlstring}\norder by s.last_active_time desc nulls last, s.sql_id\nlimit 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "SQL Text Lookup",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "oracle",
+    "postgresql",
+    "sql",
+    "performance"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "PostgreSQL"
+        },
+        "definition": "select distinct source_database from oracle_sql_samples order by 1;",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Source Database",
+        "multi": false,
+        "name": "source_database",
+        "options": [],
+        "query": "select distinct source_database from oracle_sql_samples order by 1;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "SQL_ID",
+        "name": "sql_id",
+        "options": [],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Oracle SQL Performance",
+  "uid": "oracle-sql-performance",
+  "version": 1,
+  "weekStart": ""
+}

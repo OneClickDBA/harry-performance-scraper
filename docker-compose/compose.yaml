@@ -1,0 +1,125 @@
+---
+services:
+  postgres:
+    image: postgres:18
+    container_name: postgres
+    ports:
+      - 127.0.0.1:5432:5432
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-oracledb_monitoring}
+      - POSTGRES_USER=${POSTGRES_USER:-oracledb_monitoring}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-oracledb_monitoring}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  grafana:
+    image: grafana/grafana@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
+    container_name: grafana
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-oracledb_monitoring}
+      - POSTGRES_USER=${POSTGRES_USER:-oracledb_monitoring}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-oracledb_monitoring}
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+
+  free26ai:
+    image: gvenzl/oracle-free:23.26.1-slim-faststart
+    container_name: free26ai
+    ports:
+      - 0.0.0.0:1521:1521
+    environment:
+      - ORACLE_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - ./oracle:/container-entrypoint-initdb.d
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "printf \"whenever sqlerror exit failure\\nset heading off feedback off pagesize 0 verify off\\nselect 'READY' from dual;\\nexit;\\n\" | sqlplus -s \"pdbadmin/$${ORACLE_PASSWORD}@//localhost:1521/FREEPDB1\" | grep -q READY",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  second26ai:
+    image: gvenzl/oracle-free:23.26.1-slim-faststart
+    container_name: second26ai
+    ports:
+      - 0.0.0.0:1522:1521
+    environment:
+      - ORACLE_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - ./oracle:/container-entrypoint-initdb.d
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "printf \"whenever sqlerror exit failure\\nset heading off feedback off pagesize 0 verify off\\nselect 'READY' from dual;\\nexit;\\n\" | sqlplus -s \"pdbadmin/$${ORACLE_PASSWORD}@//localhost:1521/FREEPDB1\" | grep -q READY",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  dbscraper:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: scraper-godror
+      cache_from:
+        - ${BUILD_DEPS_IMAGE:-oracledb-performance-scraper-build-deps:local}
+      args:
+        GOOS: ${GOOS:-linux}
+        GOARCH: ${GOARCH:-amd64}
+        TAGS: ${TAGS:-godror}
+        CGO_ENABLED: ${CGO_ENABLED:-1}
+        GO_VERSION: ${GO_VERSION:-1.26.3}
+        VERSION: ${VERSION:-1.0.0}
+    image: oracledb-performance-scraper:local
+    container_name: dbscraper
+    command:
+      - --config.file=/scraper/${COMPOSE_CONFIG_FILE:-config.yaml}
+    ports:
+      - 9161:9161
+    environment:
+      # If using wallet, these can bet set. Otherwise, not necessary to supply.
+      - TNS_ADMIN=${TNS_ADMIN}
+      - ADB_USERNAME=${ADB_USERNAME}
+      - ADB_PASSWORD=${ADB_PASSWORD}
+      - ADB_TNS_ALIAS=${ADB_TNS_ALIAS}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-oracledb_monitoring}
+      - POSTGRES_USER=${POSTGRES_USER:-oracledb_monitoring}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-oracledb_monitoring}
+      #   - DB_USERNAME=pdbadmin
+      #   - DB_PASSWORD=${DB_PASSWORD}
+      #   - DB_CONNECT_STRING=free26ai:1521/freepdb1
+    volumes:
+      - ./scraper:/scraper
+      - ./wallet:/scraper/wallet
+    depends_on:
+      postgres:
+        condition: service_healthy
+      free26ai:
+        condition: service_healthy
+      second26ai:
+        condition: service_healthy
+volumes:
+  postgres_data:

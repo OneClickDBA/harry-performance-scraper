@@ -1,0 +1,159 @@
+// Copyright (c) 2025, Oracle and/or its affiliates.
+// Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
+
+package hashivault
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	vault "github.com/hashicorp/vault/api"
+	"log/slog"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+)
+
+const (
+	MountTypeKVv1     = "kvv1"
+	MountTypeKVv2     = "kvv2"
+	MountTypeDatabase = "database"
+	MountTypeLogical  = "logical"
+)
+
+var UnsupportedMountType = errors.New("Unsupported HashiCorp Vault mount type")
+var RequiredKeyMissing = errors.New("Required key missing from HashiCorp Vault secret")
+var SecretNotFound = errors.New("HashiCorp Vault secret not found")
+
+type HashicorpVaultClient struct {
+	client *vault.Client
+	logger *slog.Logger
+}
+
+// newUnixSocketVaultClient creates a custom HTTP client using a Unix socket
+func newUnixSocketVaultClient(socketPath string) (*vault.Client, error) {
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", socketPath)
+			},
+		},
+		Timeout: 10 * time.Second,
+	}
+
+	// Configure the Vault client
+	config := &vault.Config{
+		Address:      "http://unix",
+		HttpClient:   httpClient,
+		Timeout:      10 * time.Second,
+		MinRetryWait: time.Millisecond * 1000,
+		MaxRetryWait: time.Millisecond * 1500,
+		MaxRetries:   2,
+	}
+
+	return vault.NewClient(config)
+}
+
+// newDefaultVaultClient creates a Vault client using the standard environment-driven configuration.
+func newDefaultVaultClient() (*vault.Client, error) {
+	return vault.NewClient(vault.DefaultConfig())
+}
+
+// createVaultClient connects to a vault client, using connection method specified with the parameters. Returns error if fails.
+func createVaultClient(logger *slog.Logger, socketPath string) (HashicorpVaultClient, error) {
+	var vaultClient HashicorpVaultClient
+	var err error
+
+	if socketPath == "" {
+		vaultClient.client, err = newDefaultVaultClient()
+	} else {
+		// Create Vault client that uses Unix Socket
+		vaultClient.client, err = newUnixSocketVaultClient(socketPath)
+	}
+	if err != nil {
+		logger.Error("Failed to connect to HashiCorp Vault", "err", err)
+	}
+	vaultClient.logger = logger
+	return vaultClient, err
+}
+
+// CreateVaultClient connects to a vault client, using connection method specified with the parameters.
+func CreateVaultClient(logger *slog.Logger, socketPath string) (HashicorpVaultClient, error) {
+	return createVaultClient(logger, socketPath)
+}
+
+// getVaultSecret fetches secret from vault using specified mount type. Returns error on failure.
+func (c HashicorpVaultClient) getVaultSecret(mountType string, mount string, path string, requiredKeys []string) (map[string]string, error) {
+	result := map[string]string{}
+	var err error
+	var secretData map[string]interface{}
+	if mountType == MountTypeKVv1 || mountType == MountTypeKVv2 {
+		// Handle simple key-value secrets
+		var secret *vault.KVSecret
+		c.logger.Info("Making call to HashiCorp Vault", "mountType", mountType, "mountName", mount, "secretPath", path, "expectedKeys", requiredKeys)
+		if mountType == MountTypeKVv2 {
+			secret, err = c.client.KVv2(mount).Get(context.TODO(), path)
+		} else {
+			secret, err = c.client.KVv1(mount).Get(context.TODO(), path)
+		}
+		if err != nil {
+			c.logger.Error("Failed to fetch secret from HashiCorp Vault", "err", err)
+			return result, err
+		}
+		if secret == nil {
+			c.logger.Error(SecretNotFound.Error(), "mountType", mountType, "mountName", mount, "secretPath", path)
+			return result, fmt.Errorf("%w: %s/%s", SecretNotFound, mount, path)
+		}
+		secretData = secret.Data
+	} else if mountType == MountTypeDatabase || mountType == MountTypeLogical {
+		// Handle other types of secrets, for example database roles, just using the Logical() backend
+		var secret *vault.Secret
+		var secretPath string
+		if mountType == MountTypeDatabase {
+			secretPath = fmt.Sprintf("%s/creds/%s", mount, path)
+		} else {
+			secretPath = fmt.Sprintf("%s/%s", mount, path)
+		}
+		c.logger.Info("Making logical call to HashiCorp Vault", "mountType", mountType, "mountName", mount, "secretPath", path, "expectedKeys", requiredKeys)
+		secret, err = c.client.Logical().Read(secretPath)
+		if err != nil {
+			c.logger.Error("Failed to fetch secret from HashiCorp Vault", "err", err)
+			return result, err
+		}
+		if secret == nil {
+			c.logger.Error(SecretNotFound.Error(), "secretPath", secretPath)
+			return result, fmt.Errorf("%w: %s", SecretNotFound, secretPath)
+		}
+		secretData = secret.Data
+	} else {
+		c.logger.Error(UnsupportedMountType.Error())
+		return result, UnsupportedMountType
+	}
+	c.copyStringSecretData(result, secretData)
+	// Check that we have all required keys present
+	for _, key := range requiredKeys {
+		val, keyExists := result[key]
+		if !keyExists || val == "" {
+			c.logger.Error(RequiredKeyMissing.Error(), "key", key)
+			return result, RequiredKeyMissing
+		}
+	}
+	return result, nil
+}
+
+// GetVaultSecret fetches secret from vault using specified mount type.
+func (c HashicorpVaultClient) GetVaultSecret(mountType string, mount string, path string, requiredKeys []string) (map[string]string, error) {
+	return c.getVaultSecret(mountType, mount, path, requiredKeys)
+}
+
+func (c HashicorpVaultClient) copyStringSecretData(result map[string]string, secretData map[string]interface{}) {
+	for key, val := range secretData {
+		strVal, ok := val.(string)
+		if !ok {
+			c.logger.Warn("Skipping non-string HashiCorp Vault secret value", "key", key, "type", fmt.Sprintf("%T", val))
+			continue
+		}
+		result[key] = strings.TrimRight(strVal, "\r\n") // make sure a \r and/or \n didn't make it into the secret
+	}
+}

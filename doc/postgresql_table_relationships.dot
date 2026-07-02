@@ -1,0 +1,69 @@
+digraph postgresql_table_relationships {
+  graph [
+    label="Oracle DB Performance Scraper - PostgreSQL Partitioned Table Relationships",
+    labelloc=t,
+    fontsize=20,
+    rankdir=LR,
+    splines=spline,
+    nodesep=0.8,
+    ranksep=1.1
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#e8f1ff",
+    fontsize=11,
+    fontname="Helvetica"
+  ];
+
+  edge [
+    fontsize=10,
+    fontname="Helvetica"
+  ];
+
+  oracle_metric_samples [
+    label="oracle_metric_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\lcontext\lmetric_name\lmetric_help\lmetric_type\lvalue\llabels jsonb\l\lIndexes\lcollected_at\lsource_database, context\llabels gin\l"
+  ];
+
+  oracle_sql_samples [
+    label="oracle_sql_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lsql_id\lchild_number\lplan_hash_value\lparsing_schema_name\lmodule\lexecutions\lelapsed_time_micro\lcpu_time_micro\luser_io_wait_micro\lapplication_wait_micro\lconcurrency_wait_micro\lcluster_wait_micro\lbuffer_gets\ldisk_reads\ldirect_writes\lrows_processed\lfetches\lloads\linvalidations\lparse_calls\llast_active_time\lsql_text\l\lIndexes\lcollected_at\lsource_database, sql_id, child_number\lelapsed_time_micro desc\l"
+  ];
+
+  oracle_session_samples [
+    label="oracle_session_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lsid\lserial_number\lusername\lstatus\lsql_id\lsql_child_number\lprev_sql_id\levent\lwait_class\lstate\lseconds_in_wait\lblocking_instance\lblocking_session\lmachine\lprogram\lmodule\laction\lservice_name\llogon_time\l\lIndexes\lcollected_at\lsource_database, sql_id\lsource_database, wait_class\l"
+  ];
+
+  oracle_blocking_session_samples [
+    label="oracle_blocking_session_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lsid\lserial_number\lusername\lsql_id\levent\lwait_class\lblocking_instance\lblocking_session\lblocking_username\lblocking_sql_id\lblocking_event\l\lIndexes\lcollected_at\lsource_database, sql_id\l"
+  ];
+
+  oracle_database_activity_samples [
+    label="oracle_database_activity_samples\l\lPartitioned by RANGE (sample_time)\lcollected_at\lsource_database\lsample_id\lsample_time\linst_id\lsession_id\lsession_serial_number\lsession_serial_number_key generated\lsession_type\luser_id\lsql_id\lsql_child_number\lsql_exec_id\lsql_exec_start\ltop_level_sql_id\lsession_state\levent\lwait_class\lwait_time_micro\ltime_waited_micro\lblocking_session\lblocking_session_serial_number\lblocking_inst_id\lcurrent_object_id\lcurrent_file_number\lcurrent_block_number\lprogram\lmodule\laction\lmachine\lpga_allocated\ltemp_space_allocated\lcon_id\l\lUnique\lsample_time, source_database, inst_id, sample_id, session_id, session_serial_number_key\l\lIndexes\lsample_time\lsource_database, sql_id, sample_time\lsource_database, wait_class, sample_time\l"
+  ];
+
+  // Logical relationships used by dashboards and analysis queries.
+  oracle_session_samples -> oracle_sql_samples [
+    label="logical: source_database, sql_id, sql_child_number",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_blocking_session_samples -> oracle_session_samples [
+    label="logical: source_database, inst_id/sid/serial_number",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_database_activity_samples -> oracle_sql_samples [
+    label="logical: source_database, sql_id, sql_child_number",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_database_activity_samples -> oracle_session_samples [
+    label="logical: source_database, inst_id, session_id, session_serial_number",
+    style=dashed,
+    color="#666666"
+  ];
+}
