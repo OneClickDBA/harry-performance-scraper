@@ -440,8 +440,8 @@
             "axisLabel": "Active samples",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 15,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -449,8 +449,8 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 0,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -459,7 +459,7 @@
             "spanNulls": false,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -489,7 +489,7 @@
       "options": {
         "legend": {
           "calcs": [
-            "lastNotNull",
+            "sum",
             "max"
           ],
           "displayMode": "table",
@@ -510,11 +510,11 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "select date_trunc('second', sample_time) as \"time\",\n       sql_id as metric,\n       count(*)::double precision as value\nfrom oracle_database_activity_samples\nwhere $__timeFilter(sample_time)\n  and source_database = ${source_database:sqlstring}\n  and sql_id is not null\ngroup by date_trunc('second', sample_time), sql_id\norder by 1;",
+          "rawSql": "with top_sql as (\n  select sql_id,\n         count(*) as active_samples\n  from oracle_database_activity_samples\n  where $__timeFilter(sample_time)\n    and source_database = ${source_database:sqlstring}\n    and sql_id is not null\n  group by sql_id\n  order by active_samples desc\n  limit 15\n)\nselect date_bin('$__interval'::interval, a.sample_time, timestamptz '1970-01-01 00:00:00+00') as \"time\",\n       a.sql_id as metric,\n       count(*)::double precision as value\nfrom oracle_database_activity_samples a\njoin top_sql t on t.sql_id = a.sql_id\nwhere $__timeFilter(a.sample_time)\n  and a.source_database = ${source_database:sqlstring}\ngroup by date_bin('$__interval'::interval, a.sample_time, timestamptz '1970-01-01 00:00:00+00'), a.sql_id\norder by 1, 2;",
           "refId": "A"
         }
       ],
-      "title": "Activity by SQL_ID",
+      "title": "Top SQL_ID Activity Over Time",
       "type": "timeseries"
     },
     {

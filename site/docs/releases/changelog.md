@@ -30,6 +30,7 @@ List of upcoming and historic changes to the scraper.
 - Remove the duplicated raw JSON payload from `oracle_metric_samples` to reduce PostgreSQL storage usage.
 - Remove DAH-overlapping activity history panels from the Oracle DB Performance Grafana dashboard.
 - Add DAH Grafana drilldowns for top wait events and module/program activity.
+- Change the DAH SQL_ID activity panel to a stacked top-SQL timeline using interval buckets and total/max legend values.
 - Add a PostgreSQL-backed Oracle SQL Performance Grafana dashboard for high-cardinality SQL diagnostics.
 - Refactor the Oracle DB Performance Grafana dashboard into a current sessions and blocking dashboard.
 
