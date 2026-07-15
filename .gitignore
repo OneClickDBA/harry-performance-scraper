@@ -13,3 +13,4 @@ oci8.pc
 .gocache
 test-coverage.out
 docker_images
+bin/
