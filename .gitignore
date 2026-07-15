@@ -11,7 +11,5 @@ oci8.pc
 .DS_Store
 **/.cache/
 .gocache
-
 test-coverage.out
-
 docker_images
