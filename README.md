@@ -125,11 +125,13 @@ For production-like manual deployment without containers, see:
 
 ## Documentation
 
-The detailed documentation will live in the project documentation site under
-`site/docs/`. The generated `docs/` directory is build output and should not be
-edited manually.
+The detailed documentation is published at the
+[Oracle DB Performance Scraper documentation site](https://dodger-one.github.io/oracledb-performance-scraper-web/).
+Its Docusaurus sources are maintained in the separate
+[oracledb-performance-scraper-web repository](https://github.com/dodger-one/oracledb-performance-scraper-web).
 
-Additional implementation diagrams live in `doc/`.
+PostgreSQL schema and Oracle-to-PostgreSQL data-flow diagrams remain in `doc/`
+because they are maintained alongside the implementation.
 
 ## Developer
 

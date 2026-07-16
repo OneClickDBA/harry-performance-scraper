@@ -14,3 +14,7 @@ oci8.pc
 test-coverage.out
 docker_images
 bin/
+
+# Documentation is maintained in oracledb-performance-scraper-web.
+/docs/
+/site/

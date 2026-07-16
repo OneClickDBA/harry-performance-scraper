@@ -33,8 +33,8 @@ can be accepted.
 2. Fork this repository.
 3. Create a branch in your fork to implement the changes. Oracle recommends using
    the issue number as part of your branch name. For example: `1234-fixes`
-4. Ensure that any documentation is updated with the changes that are required
-   by your change.
+4. Submit any required public documentation changes to the separate
+   [documentation repository](https://github.com/dodger-one/oracledb-performance-scraper-web).
 5. Ensure that any samples are updated, if the base image has been changed.
 6. Submit the pull request. *Do not leave the pull request blank*. Explain exactly
    what your changes are meant to do, and provide simple steps to indicate how to validate
