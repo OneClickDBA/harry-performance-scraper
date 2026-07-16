@@ -113,6 +113,7 @@ PostgreSQL datasource and imports dashboards from:
 
 - `docker-compose/grafana/dashboards/oracle-postgresql-performance.json`
 - `docker-compose/grafana/dashboards/database-activity-history.json`
+- `docker-compose/grafana/dashboards/database-activity-history.json`
 
 ## Local Testing
 
