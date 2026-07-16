@@ -14,6 +14,8 @@ oci8.pc
 test-coverage.out
 docker_images
 bin/
+minikube_tests.sh
+.env
 
 # Documentation is maintained in oracledb-performance-scraper-web.
 /docs/
