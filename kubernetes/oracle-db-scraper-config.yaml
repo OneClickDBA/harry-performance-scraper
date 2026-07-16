@@ -45,10 +45,10 @@ metrics:
   scrapeInterval: 15s
   ## How long to wait before attempting to reconnect to an invalid database (login or locked user)
   # connectionBackoff: 5m
-  ## Path to default metrics file.
-  default: default-metrics.toml
-  ## Paths to any custom metrics files
-  # custom:
+  ## Optional SQL-derived metric definition files. The operational pack is
+  ## included in the container image; add mounted files as needed.
+  definitions:
+    - /oracle-operational-metrics.toml
   #   - /oracle/scraper/txeventq-metrics.toml
 
 output:

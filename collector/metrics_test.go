@@ -63,28 +63,40 @@ func TestMetricsToMapUsesStableMetricID(t *testing.T) {
 	}
 }
 
-func TestDefaultMetricsAssignsIDs(t *testing.T) {
+func TestLoadMetricsToScrapeWithoutDefinitions(t *testing.T) {
 	scraper := &Scraper{
 		MetricsConfiguration: &MetricsConfiguration{},
 		logger:               slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
-	metrics := scraper.DefaultMetrics()
-
-	if len(metrics) == 0 {
-		t.Fatal("expected embedded default metrics to load")
+	metrics, err := scraper.loadMetricsToScrape()
+	if err != nil {
+		t.Fatalf("expected empty definitions to load, got %v", err)
 	}
+	if len(metrics) != 0 {
+		t.Fatalf("expected no additional metrics, got %d", len(metrics))
+	}
+}
 
-	for id, metric := range metrics {
-		if id == "" {
-			t.Fatal("expected default metric map key to be non-empty")
-		}
-		if metric == nil {
-			t.Fatalf("expected metric for ID %q", id)
-		}
-		if metric.ID != id {
-			t.Fatalf("expected metric ID %q to match map key, got %q", id, metric.ID)
-		}
+func TestOperationalMetricDefinitionFilesLoad(t *testing.T) {
+	for _, definitionFile := range []string{
+		"../oracle-operational-metrics.toml",
+		"../oracle-operational-metrics.yaml",
+	} {
+		t.Run(definitionFile, func(t *testing.T) {
+			metrics := &Metrics{}
+			if err := loadMetricsConfig(definitionFile, metrics); err != nil {
+				t.Fatalf("expected operational definitions to load: %v", err)
+			}
+			if len(metrics.Metric) == 0 {
+				t.Fatal("expected operational definitions to contain metrics")
+			}
+			for _, metric := range metrics.Metric {
+				if metric.Context == "top_sql" {
+					t.Fatal("operational definitions must not include generic top SQL collection")
+				}
+			}
+		})
 	}
 }
 

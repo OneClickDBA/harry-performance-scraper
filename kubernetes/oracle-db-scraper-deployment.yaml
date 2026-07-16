@@ -65,7 +65,7 @@ spec:
             readOnly: true
           - name: tmp
             mountPath: /tmp
-          # uncomment and customize the next item if you want to provide custom metrics definitions
+          # Uncomment to mount an additional metric definition file.
           #- name: config-volume
           #  mountPath: /oracle/scraper/txeventq-metrics.toml
           #  subPath: txeventq-metrics.toml
@@ -88,7 +88,7 @@ spec:
             name: oracle-db-scraper-config
         - name: tmp
           emptyDir: {}
-        # uncomment and customize the next item if you want to provide custom metrics definitions
+        # Uncomment to provide an additional metric definition file.
         #- name: config-volume
         #  configMap:
         #    name: db-metrics-txeventq-scraper-config

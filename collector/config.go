@@ -31,7 +31,7 @@ var (
 type MetricsConfiguration struct {
 	ListenAddress string                    `yaml:"listenAddress"`
 	Databases     map[string]DatabaseConfig `yaml:"databases"`
-	Metrics       MetricsFilesConfig        `yaml:"metrics"`
+	Metrics       MetricsConfig             `yaml:"metrics"`
 	Output        OutputConfig              `yaml:"output"`
 	Logging       LoggingConfig             `yaml:"log"`
 	Web           WebConfig                 `yaml:"web"`
@@ -102,10 +102,9 @@ type HashiCorpVault struct {
 	fetchedSecert map[string]string
 }
 
-type MetricsFilesConfig struct {
-	DatabaseLabel     string `yaml:"databaseLabel"`
-	Default           string
-	Custom            []string
+type MetricsConfig struct {
+	DatabaseLabel     string         `yaml:"databaseLabel"`
+	Definitions       []string       `yaml:"definitions"`
 	ScrapeInterval    *time.Duration `yaml:"scrapeInterval"`
 	ConnectionBackoff *time.Duration `yaml:"connectionBackoff"`
 }
@@ -223,8 +222,8 @@ func (wc WebConfig) GetIdleTimeout() time.Duration {
 	return *wc.IdleTimeout
 }
 
-func (m *MetricsConfiguration) CustomMetricsFiles() []string {
-	return m.Metrics.Custom
+func (m *MetricsConfiguration) MetricDefinitionFiles() []string {
+	return m.Metrics.Definitions
 }
 
 func (c ConnectConfig) GetMaxOpenConns() int {
@@ -399,7 +398,6 @@ func LoadMetricsConfiguration(logger *slog.Logger, cfg *Config) (*MetricsConfigu
 func (m *MetricsConfiguration) merge() {
 	m.mergeWebConfig()
 	m.mergeLoggingConfig()
-	m.mergeMetricsConfig()
 	m.mergeOutputConfig()
 	if m.Metrics.ScrapeInterval == nil {
 		scrapeInterval := time.Duration(0)
@@ -435,12 +433,6 @@ func (m *MetricsConfiguration) mergeLoggingConfig() {
 	}
 	if len(m.Logging.Format) == 0 {
 		m.Logging.Format = "logfmt"
-	}
-}
-
-func (m *MetricsConfiguration) mergeMetricsConfig() {
-	if len(m.Metrics.Default) == 0 {
-		m.Metrics.Default = "default-metrics.toml"
 	}
 }
 

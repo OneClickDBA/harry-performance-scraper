@@ -128,25 +128,6 @@ GROUP BY inst_id, platform_name
 '''
 
 [[metric]]
-context = "top_sql"
-labels = [ "inst_id", "sql_id", "sql_text" ]
-metricsdesc = { elapsed = "SQL statement elapsed time running" }
-request = '''
-select * from (
-select inst_id, sql_id, elapsed_time / 1000000 as elapsed, substrb(replace(sql_text,'',' '),1,55) as sql_text
-from   gv$sqlstats
-order by elapsed_time desc
-) where rownum <= 15
-'''
-ignorezeroresult = true
-querytimeout = "10s"
-# scrapeinterval = "5m"
-# The previous line is an example of changing the interval at which this one metric
-# will be scraped. You may wish to do this to scrape a metric less often, if the SQL
-# statement to collect that metric places more load on your database instance than
-# desired when it is run at every scrape.
-
-[[metric]]
 context = "cache_hit_ratio"
 labels = [ "inst_id", "cache_hit_type" ]
 metricsdesc = { value = "Cache Hit Ratio" }

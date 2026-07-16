@@ -23,7 +23,7 @@ digraph oracle_to_postgresql_tables {
     shape=plain,
     label=<
       <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
-        <TR><TD BGCOLOR="#f3d99b"><B>Oracle sources for metric samples</B></TD></TR>
+        <TR><TD BGCOLOR="#f3d99b"><B>Oracle sources for additional metric samples</B></TD></TR>
         <TR><TD ALIGN="LEFT">DUAL</TD></TR>
         <TR><TD ALIGN="LEFT">GV$ASM_DISKGROUP_STAT</TD></TR>
         <TR><TD ALIGN="LEFT">GV$CON_SYSMETRIC</TD></TR>
@@ -34,13 +34,12 @@ digraph oracle_to_postgresql_tables {
         <TR><TD ALIGN="LEFT">GV$PROCESS</TD></TR>
         <TR><TD ALIGN="LEFT">GV$RESOURCE_LIMIT</TD></TR>
         <TR><TD ALIGN="LEFT">GV$SESSION</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$SQLSTATS</TD></TR>
         <TR><TD ALIGN="LEFT">GV$SYSSTAT</TD></TR>
         <TR><TD ALIGN="LEFT">GV$SYSTEM_WAIT_CLASS</TD></TR>
         <TR><TD ALIGN="LEFT">DBA_TABLESPACE_USAGE_METRICS</TD></TR>
         <TR><TD ALIGN="LEFT">DBA_TABLESPACES</TD></TR>
         <TR><TD ALIGN="LEFT">DBA_TEMP_FREE_SPACE</TD></TR>
-        <TR><TD ALIGN="LEFT">Custom examples: GV$SQL, USER_SEGMENTS, DBA_SEGMENTS,<BR/>GV$AQ_SHARDED_SUBSCRIBER_STAT, GV$PERSISTENT_QUEUES</TD></TR>
+        <TR><TD ALIGN="LEFT">Additional examples: GV$SQL, USER_SEGMENTS, DBA_SEGMENTS,<BR/>GV$AQ_SHARDED_SUBSCRIBER_STAT, GV$PERSISTENT_QUEUES</TD></TR>
       </TABLE>
     >
   ];

@@ -382,7 +382,7 @@ func newTestScheduledScraper(t *testing.T, scrapeInterval time.Duration) (*Scrap
 		databases:       []*Database{database},
 		logger:          logger,
 		MetricsConfiguration: &MetricsConfiguration{
-			Metrics: MetricsFilesConfig{
+			Metrics: MetricsConfig{
 				DatabaseLabel:  "database",
 				ScrapeInterval: &scrapeInterval,
 			},

@@ -47,10 +47,10 @@ databases:
 metrics:
   ## How often to collect samples.
   # scrapeInterval: 15s
-  ## Path to default metrics file.
-  default: default-metrics.toml
-  ## Paths to any custom metrics files
-  custom:
+  ## Optional SQL-derived metric definition files. Order matters: later files
+  ## override metrics with the same generated identifier from earlier files.
+  definitions:
+    - oracle-operational-metrics.toml
     - custom-metrics-example/custom-metrics.toml
 
 output:

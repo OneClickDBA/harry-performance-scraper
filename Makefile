@@ -36,8 +36,7 @@ go-build:
 	@echo "Build $(OS_TYPE)"
 	mkdir -p $(OUTDIR)/oracledb_performance_scraper-$(VERSION).$(GOOS)-$(GOARCH)/
 	go build $(GOFLAGS) -o $(OUTDIR)/oracledb_performance_scraper-$(VERSION).$(GOOS)-$(GOARCH)/oracledb_performance_scraper$(EXT)
-	cp default-metrics.toml $(OUTDIR)/oracledb_performance_scraper-$(VERSION).$(GOOS)-$(GOARCH)/
-	#cp teq-default-metrics.toml $(OUTDIR)/$(DIST_DIR)/default-metrics.toml
+	cp oracle-operational-metrics.toml $(OUTDIR)/oracledb_performance_scraper-$(VERSION).$(GOOS)-$(GOARCH)/
 	(cd dist ; tar cfz oracledb_performance_scraper-$(VERSION).$(GOOS)-$(GOARCH).tar.gz oracledb_performance_scraper-$(VERSION).$(GOOS)-$(GOARCH))
 
 .PHONY: go-build-linux-amd64

@@ -56,10 +56,9 @@ metrics:
   # connectionBackoff: 5m
   ## How often to collect samples.
   scrapeInterval: 15s
-  ## Path to default metrics file.
-  default: default-metrics.toml
-  ## Paths to any custom metrics files
-  custom:
+  ## Optional SQL-derived metric definition files.
+  definitions:
+    - /oracle-operational-metrics.toml
     - /scraper/txeventq-metrics.toml
     - /scraper/more-txeventq-metrics.toml
 

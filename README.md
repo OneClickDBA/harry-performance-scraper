@@ -31,8 +31,10 @@ writes samples to PostgreSQL, and exposes only a small health endpoint.
 
 ## Current Focus
 
-- Collect Oracle database metrics from `default-metrics.toml` and optional
-  custom TOML metric files.
+- Collect native SQL, session, blocking, and database activity samples by
+  default.
+- Optionally collect additional SQL-derived metrics from TOML or YAML
+  definition files such as `oracle-operational-metrics.toml`.
 - Collect direct performance samples from Oracle dynamic performance views such
   as `GV$SQL`, `GV$SESSION`, and `GV$ACTIVE_SESSION_HISTORY`.
 - Store samples in PostgreSQL range-partitioned tables.
@@ -85,8 +87,8 @@ databases:
 
 metrics:
   scrapeInterval: 15s
-  default: /etc/oracledb-monitor/default-metrics.toml
-  custom: []
+  definitions:
+    - /etc/oracledb-monitor/oracle-operational-metrics.toml
 
 output:
   postgresql:
@@ -111,7 +113,7 @@ the PostgreSQL-backed scraper will not continuously collect samples.
 Grafana reads PostgreSQL directly. The Docker Compose test stack provisions the
 PostgreSQL datasource and imports dashboards from:
 
-- `docker-compose/grafana/dashboards/oracle-postgresql-performance.json`
+- `docker-compose/grafana/dashboards/oracle-sessions-and-blocking.json`
 - `docker-compose/grafana/dashboards/database-activity-history.json`
 - `docker-compose/grafana/dashboards/database-activity-history.json`
 

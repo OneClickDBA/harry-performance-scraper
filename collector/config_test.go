@@ -148,8 +148,8 @@ databases:
 		t.Fatalf("expected config to load, got %v", err)
 	}
 
-	if cfg.Metrics.Default != "default-metrics.toml" {
-		t.Fatalf("expected default metrics file, got %q", cfg.Metrics.Default)
+	if len(cfg.Metrics.Definitions) != 0 {
+		t.Fatalf("expected no additional metric definitions by default, got %#v", cfg.Metrics.Definitions)
 	}
 	if cfg.Logging.Level != "info" {
 		t.Fatalf("expected default log level, got %q", cfg.Logging.Level)
@@ -183,6 +183,61 @@ databases:
 	}
 	if cfg.Output.PostgreSQL.GetRetention() != 0 {
 		t.Fatalf("expected default retention to be disabled, got %s", cfg.Output.PostgreSQL.GetRetention())
+	}
+}
+
+func TestLoadMetricsConfigurationAcceptsMetricDefinitions(t *testing.T) {
+	configPath := writeScraperConfig(t, `
+databases:
+  default:
+    username: scott
+    password: tiger
+    url: localhost:1521/freepdb1
+metrics:
+  definitions:
+    - /etc/oracledb-monitor/oracle-operational-metrics.toml
+    - /etc/oracledb-monitor/application-metrics.toml
+`)
+
+	cfg, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
+	if err != nil {
+		t.Fatalf("expected config to load, got %v", err)
+	}
+	want := []string{
+		"/etc/oracledb-monitor/oracle-operational-metrics.toml",
+		"/etc/oracledb-monitor/application-metrics.toml",
+	}
+	if strings.Join(cfg.Metrics.Definitions, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected metric definitions: got %#v want %#v", cfg.Metrics.Definitions, want)
+	}
+}
+
+func TestLoadMetricsConfigurationRejectsLegacyMetricFileKeys(t *testing.T) {
+	tests := []struct {
+		name        string
+		metricsYAML string
+		wantErr     string
+	}{
+		{name: "default", metricsYAML: "  default: default-metrics.toml\n", wantErr: "field default not found"},
+		{name: "custom", metricsYAML: "  custom: []\n", wantErr: "field custom not found"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configPath := writeScraperConfig(t, `
+databases:
+  default:
+    username: scott
+    password: tiger
+    url: localhost:1521/freepdb1
+metrics:
+`+tt.metricsYAML)
+
+			_, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+			}
+		})
 	}
 }
 

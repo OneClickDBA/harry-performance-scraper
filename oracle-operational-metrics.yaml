@@ -1,3 +1,4 @@
+---
 metrics:
   - context: "sessions"
     labels: [ "inst_id", "status", "type" ]
@@ -117,20 +118,6 @@ metrics:
       SELECT inst_id, platform_name, 1 as value
       FROM gv$database
       GROUP BY inst_id, platform_name
-
-  - context: "top_sql"
-    labels: [ "inst_id", "sql_id", "sql_text" ]
-    metricsdesc:
-      elapsed: "SQL statement elapsed time running"
-    request: |
-      select * from (
-      select inst_id, sql_id, elapsed_time / 1000000 as elapsed, substrb(replace(sql_text,'',' '),1,55) as sql_text
-      from   gv$sqlstats
-      order by elapsed_time desc
-      ) where rownum <= 15
-    ignorezeroresult: true
-    querytimeout: "10s"
-    # scrapeinterval: "5m"
 
   - context: "cache_hit_ratio"
     labels: [ "inst_id", "cache_hit_type" ]

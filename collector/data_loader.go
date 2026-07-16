@@ -20,27 +20,30 @@ func (e *Scraper) reloadMetrics() bool {
 	}
 
 	e.metricsToScrape = metricsToScrape
-	e.refreshCustomMetricsHashes()
+	e.refreshMetricDefinitionHashes()
 	e.initCache()
 	return true
 }
 
 func (e *Scraper) loadMetricsToScrape() (map[string]*Metric, error) {
-	metricsToScrape := e.DefaultMetrics()
+	metricsToScrape := map[string]*Metric{}
 
-	if len(e.CustomMetricsFiles()) == 0 {
-		e.logger.Debug("No custom metrics defined.")
+	if len(e.MetricDefinitionFiles()) == 0 {
+		e.logger.Debug("No additional metric definitions configured")
 		return metricsToScrape, nil
 	}
 
-	for _, _customMetrics := range e.CustomMetricsFiles() {
+	for _, definitionFile := range e.MetricDefinitionFiles() {
+		if strings.TrimSpace(definitionFile) == "" {
+			continue
+		}
 		metrics := &Metrics{}
 
-		if err := loadMetricsConfig(_customMetrics, metrics); err != nil {
-			return nil, fmt.Errorf("failed to load custom metrics %s: %w", _customMetrics, err)
+		if err := loadMetricsConfig(definitionFile, metrics); err != nil {
+			return nil, fmt.Errorf("failed to load metric definitions %s: %w", definitionFile, err)
 		}
 
-		e.logger.Info("Successfully loaded custom metrics from " + _customMetrics)
+		e.logger.Info("Successfully loaded additional metric definitions", "file", definitionFile)
 		mergeMetrics(metricsToScrape, metrics)
 	}
 
@@ -59,31 +62,31 @@ func mergeMetrics(dst map[string]*Metric, metrics *Metrics) {
 	}
 }
 
-func loadYamlMetricsConfig(_metricsFileName string, metrics *Metrics) error {
-	yamlBytes, err := os.ReadFile(_metricsFileName)
+func loadYamlMetricsConfig(definitionFile string, metrics *Metrics) error {
+	yamlBytes, err := os.ReadFile(definitionFile)
 	if err != nil {
-		return fmt.Errorf("cannot read the metrics config %s: %w", _metricsFileName, err)
+		return fmt.Errorf("cannot read the metrics config %s: %w", definitionFile, err)
 	}
 	if err := yaml.Unmarshal(yamlBytes, metrics); err != nil {
-		return fmt.Errorf("cannot unmarshal the metrics config %s: %w", _metricsFileName, err)
+		return fmt.Errorf("cannot unmarshal the metrics config %s: %w", definitionFile, err)
 	}
 	return nil
 }
 
-func loadTomlMetricsConfig(_customMetrics string, metrics *Metrics) error {
-	if _, err := toml.DecodeFile(_customMetrics, metrics); err != nil {
-		return fmt.Errorf("cannot read the metrics config %s: %w", _customMetrics, err)
+func loadTomlMetricsConfig(definitionFile string, metrics *Metrics) error {
+	if _, err := toml.DecodeFile(definitionFile, metrics); err != nil {
+		return fmt.Errorf("cannot read the metrics config %s: %w", definitionFile, err)
 	}
 	return nil
 }
 
-func loadMetricsConfig(_customMetrics string, metrics *Metrics) error {
-	if strings.HasSuffix(_customMetrics, "toml") {
-		if err := loadTomlMetricsConfig(_customMetrics, metrics); err != nil {
+func loadMetricsConfig(definitionFile string, metrics *Metrics) error {
+	if strings.HasSuffix(definitionFile, "toml") {
+		if err := loadTomlMetricsConfig(definitionFile, metrics); err != nil {
 			return fmt.Errorf("cannot load toml based metrics: %w", err)
 		}
 	} else {
-		if err := loadYamlMetricsConfig(_customMetrics, metrics); err != nil {
+		if err := loadYamlMetricsConfig(definitionFile, metrics); err != nil {
 			return fmt.Errorf("cannot load yaml based metrics: %w", err)
 		}
 	}

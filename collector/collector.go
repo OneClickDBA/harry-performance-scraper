@@ -53,18 +53,18 @@ func NewScraper(logger *slog.Logger, m *MetricsConfiguration) *Scraper {
 		databases = append(databases, database)
 	}
 	e := &Scraper{
-		mu:                   &sync.Mutex{},
-		customMetricsHashes:  map[string][]byte{},
-		scrapeRequests:       make(chan struct{}, 1),
-		logger:               logger,
-		MetricsConfiguration: m,
-		databases:            databases,
-		allConstLabels:       allConstLabels,
+		mu:                     &sync.Mutex{},
+		metricDefinitionHashes: map[string][]byte{},
+		scrapeRequests:         make(chan struct{}, 1),
+		logger:                 logger,
+		MetricsConfiguration:   m,
+		databases:              databases,
+		allConstLabels:         allConstLabels,
 	}
 	metricsToScrape, err := e.loadMetricsToScrape()
 	if err != nil {
-		logger.Error("failed to load custom metrics during startup; continuing with default metrics only", "error", err)
-		metricsToScrape = e.DefaultMetrics()
+		logger.Error("failed to load additional metric definitions during startup; continuing with native performance collection only", "error", err)
+		metricsToScrape = map[string]*Metric{}
 	}
 	e.metricsToScrape = metricsToScrape
 	e.initCache()
@@ -289,12 +289,12 @@ func (e *Scraper) GetDBs() []*Database {
 }
 
 func (e *Scraper) checkIfMetricsChanged() bool {
-	for _, _customMetrics := range e.CustomMetricsFiles() {
-		if len(_customMetrics) == 0 {
+	for _, definitionFile := range e.MetricDefinitionFiles() {
+		if len(definitionFile) == 0 {
 			continue
 		}
-		cleanPath := filepath.Clean(_customMetrics)
-		e.logger.Debug("Checking modifications in following metrics definition file:" + _customMetrics)
+		cleanPath := filepath.Clean(definitionFile)
+		e.logger.Debug("Checking metric definition file for changes", "file", definitionFile)
 		h := sha256.New()
 		if err := hashFile(h, cleanPath); err != nil {
 			e.logger.Error("Unable to get file hash; treating metrics file as changed until a reload succeeds", "error", err, "file", cleanPath)
@@ -302,29 +302,29 @@ func (e *Scraper) checkIfMetricsChanged() bool {
 		}
 		sum := h.Sum(nil)
 		// If any of files has been changed reload metrics
-		if !bytes.Equal(e.customMetricsHashes[cleanPath], sum) {
-			e.logger.Info(_customMetrics + " has been changed. Reloading metrics...")
+		if !bytes.Equal(e.metricDefinitionHashes[cleanPath], sum) {
+			e.logger.Info("Metric definition file changed; reloading definitions", "file", definitionFile)
 			return true
 		}
 	}
 	return false
 }
 
-func (e *Scraper) refreshCustomMetricsHashes() {
+func (e *Scraper) refreshMetricDefinitionHashes() {
 	hashes := map[string][]byte{}
-	for _, _customMetrics := range e.CustomMetricsFiles() {
-		if len(_customMetrics) == 0 {
+	for _, definitionFile := range e.MetricDefinitionFiles() {
+		if len(definitionFile) == 0 {
 			continue
 		}
-		cleanPath := filepath.Clean(_customMetrics)
+		cleanPath := filepath.Clean(definitionFile)
 		h := sha256.New()
 		if err := hashFile(h, cleanPath); err != nil {
-			e.logger.Error("Unable to refresh custom metrics hash", "error", err, "file", cleanPath)
+			e.logger.Error("Unable to refresh metric definition hash", "error", err, "file", cleanPath)
 			continue
 		}
 		hashes[cleanPath] = h.Sum(nil)
 	}
-	e.customMetricsHashes = hashes
+	e.metricDefinitionHashes = hashes
 }
 
 func hashFile(h hash.Hash, fn string) error {
