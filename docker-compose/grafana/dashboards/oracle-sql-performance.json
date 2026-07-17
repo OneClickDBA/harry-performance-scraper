@@ -91,7 +91,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module,\n    max(left(sql_text, 240)) as sql_text\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  sql_text\nfrom deltas\nwhere elapsed_micro_delta > 0\norder by elapsed_micro_delta desc\nlimit 50;",
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  left((select t.sql_fulltext from oracle_sql_texts t where t.source_database = deltas.source_database and t.sql_id = deltas.sql_id), 240) as sql_text\nfrom deltas\nwhere elapsed_micro_delta > 0\norder by elapsed_micro_delta desc\nlimit 50;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -184,7 +184,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module,\n    max(left(sql_text, 240)) as sql_text\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  sql_text\nfrom deltas\nwhere cpu_micro_delta > 0\norder by cpu_micro_delta desc\nlimit 50;",
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  left((select t.sql_fulltext from oracle_sql_texts t where t.source_database = deltas.source_database and t.sql_id = deltas.sql_id), 240) as sql_text\nfrom deltas\nwhere cpu_micro_delta > 0\norder by cpu_micro_delta desc\nlimit 50;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -277,7 +277,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module,\n    max(left(sql_text, 240)) as sql_text\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  sql_text\nfrom deltas\nwhere user_io_micro_delta > 0\norder by user_io_micro_delta desc\nlimit 50;",
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  left((select t.sql_fulltext from oracle_sql_texts t where t.source_database = deltas.source_database and t.sql_id = deltas.sql_id), 240) as sql_text\nfrom deltas\nwhere user_io_micro_delta > 0\norder by user_io_micro_delta desc\nlimit 50;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -370,7 +370,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(coalesce(rows_processed, 0)) - min(coalesce(rows_processed, 0)) as rows_processed_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module,\n    max(left(sql_text, 240)) as sql_text\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  executions_delta,\n  rows_processed_delta,\n  round((elapsed_micro_delta / 1000000.0) / nullif(executions_delta, 0), 6) as elapsed_seconds_per_exec,\n  round(buffer_gets_delta::numeric / nullif(rows_processed_delta, 0), 3) as buffer_gets_per_row,\n  round(disk_reads_delta::numeric / nullif(executions_delta, 0), 3) as disk_reads_per_exec,\n  parsing_schema_name,\n  module,\n  sql_text\nfrom deltas\nwhere elapsed_micro_delta > 0\norder by coalesce((elapsed_micro_delta / 1000000.0) / nullif(executions_delta, 0), 0) desc\nlimit 50;",
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(coalesce(rows_processed, 0)) - min(coalesce(rows_processed, 0)) as rows_processed_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  source_database,\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  executions_delta,\n  rows_processed_delta,\n  round((elapsed_micro_delta / 1000000.0) / nullif(executions_delta, 0), 6) as elapsed_seconds_per_exec,\n  round(buffer_gets_delta::numeric / nullif(rows_processed_delta, 0), 3) as buffer_gets_per_row,\n  round(disk_reads_delta::numeric / nullif(executions_delta, 0), 3) as disk_reads_per_exec,\n  parsing_schema_name,\n  module,\n  left((select t.sql_fulltext from oracle_sql_texts t where t.source_database = deltas.source_database and t.sql_id = deltas.sql_id), 240) as sql_text\nfrom deltas\nwhere elapsed_micro_delta > 0\norder by coalesce((elapsed_micro_delta / 1000000.0) / nullif(executions_delta, 0), 0) desc\nlimit 50;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -517,7 +517,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 35
       },
@@ -574,58 +574,25 @@
         "uid": "PostgreSQL"
       },
       "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "sql_text"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 560
-              }
-            ]
-          }
-        ]
+        "defaults": {},
+        "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 35
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 43
       },
       "id": 7,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
+        "dedupStrategy": "none",
+        "enableLogDetails": false,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": false,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
       },
       "pluginVersion": "11.4.0",
       "targets": [
@@ -637,29 +604,13 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and (${sql_id:sqlstring} = '' or sql_id = ${sql_id:sqlstring})\n  group by source_database\n)\nselect\n  s.source_database,\n  s.inst_id,\n  s.sql_id,\n  s.child_number,\n  s.plan_hash_value,\n  s.parsing_schema_name,\n  s.module,\n  s.last_active_time,\n  s.sql_text\nfrom oracle_sql_samples s\njoin latest l on l.source_database = s.source_database and l.collected_at = s.collected_at\nwhere ${sql_id:sqlstring} = '' or s.sql_id = ${sql_id:sqlstring}\norder by s.last_active_time desc nulls last, s.sql_id\nlimit 50;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "select\n  last_text_seen_at as \"time\",\n  sql_fulltext as \"line\"\nfrom oracle_sql_texts\nwhere source_database = ${source_database:sqlstring}\n  and sql_id = nullif(${sql_id:sqlstring}, '');",
+          "refId": "A"
         }
       ],
-      "title": "SQL Text Lookup",
-      "type": "table"
+      "title": "Selected SQL Full Text",
+      "type": "logs",
+      "description": "Complete Oracle SQL text for the SQL_ID selected in the dashboard variable."
     }
   ],
   "refresh": "30s",
@@ -720,6 +671,6 @@
   "timezone": "",
   "title": "Oracle SQL Performance",
   "uid": "oracle-sql-performance",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

@@ -27,7 +27,11 @@ digraph postgresql_table_relationships {
   ];
 
   oracle_sql_samples [
-    label="oracle_sql_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lsql_id\lchild_number\lplan_hash_value\lparsing_schema_name\lmodule\lexecutions\lelapsed_time_micro\lcpu_time_micro\luser_io_wait_micro\lapplication_wait_micro\lconcurrency_wait_micro\lcluster_wait_micro\lbuffer_gets\ldisk_reads\ldirect_writes\lrows_processed\lfetches\lloads\linvalidations\lparse_calls\llast_active_time\lsql_text\l\lIndexes\lcollected_at\lsource_database, sql_id, child_number\lelapsed_time_micro desc\l"
+    label="oracle_sql_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lsql_id\lchild_number\lplan_hash_value\lparsing_schema_name\lmodule\lexecutions\lelapsed_time_micro\lcpu_time_micro\luser_io_wait_micro\lapplication_wait_micro\lconcurrency_wait_micro\lcluster_wait_micro\lbuffer_gets\ldisk_reads\ldirect_writes\lrows_processed\lfetches\lloads\linvalidations\lparse_calls\llast_active_time\l\lIndexes\lcollected_at\lsource_database, sql_id, child_number\lelapsed_time_micro desc\l"
+  ];
+
+  oracle_sql_texts [
+    label="oracle_sql_texts\l\lsource_database PK\lsql_id PK\lsql_fulltext\lfirst_seen_at\llast_text_seen_at\llast_referenced_at\l\lIndexes\llast_referenced_at\l"
   ];
 
   oracle_session_samples [
@@ -57,6 +61,30 @@ digraph postgresql_table_relationships {
 
   oracle_database_activity_samples -> oracle_sql_samples [
     label="logical: source_database, sql_id, sql_child_number",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_sql_samples -> oracle_sql_texts [
+    label="logical: source_database, sql_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_session_samples -> oracle_sql_texts [
+    label="logical: source_database, sql_id / prev_sql_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_blocking_session_samples -> oracle_sql_texts [
+    label="logical: source_database, sql_id / blocking_sql_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_database_activity_samples -> oracle_sql_texts [
+    label="logical: source_database, sql_id / top_level_sql_id",
     style=dashed,
     color="#666666"
   ];

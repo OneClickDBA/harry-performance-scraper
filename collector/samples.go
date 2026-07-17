@@ -53,7 +53,7 @@ type SQLSample struct {
 	Invalidations        *int64
 	ParseCalls           *int64
 	LastActiveTime       *time.Time
-	SQLText              *string
+	SQLFullText          *string
 }
 
 type SessionSample struct {

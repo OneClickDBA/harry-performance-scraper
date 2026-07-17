@@ -37,7 +37,7 @@ select
 	q.invalidations,
 	q.parse_calls,
 	q.last_active_time,
-	q.sql_text
+	q.sql_fulltext
 from gv$sql q
 where q.sql_id is not null
 order by q.elapsed_time desc
@@ -190,7 +190,7 @@ func (e *Scraper) scrapeSQLSamples(d *Database, collectedAt time.Time, timeout t
 		var userIOWait, applicationWait, concurrencyWait, clusterWait sql.NullInt64
 		var bufferGets, diskReads, directWrites, rowsProcessed, fetches sql.NullInt64
 		var loads, invalidations, parseCalls sql.NullInt64
-		var parsingSchema, module, sqlText sql.NullString
+		var parsingSchema, module, sqlFullText sql.NullString
 		var lastActiveTime sql.NullTime
 
 		if err := rows.Scan(
@@ -216,7 +216,7 @@ func (e *Scraper) scrapeSQLSamples(d *Database, collectedAt time.Time, timeout t
 			&invalidations,
 			&parseCalls,
 			&lastActiveTime,
-			&sqlText,
+			&sqlFullText,
 		); err != nil {
 			return nil, err
 		}
@@ -243,7 +243,7 @@ func (e *Scraper) scrapeSQLSamples(d *Database, collectedAt time.Time, timeout t
 		sample.Invalidations = int64Ptr(invalidations)
 		sample.ParseCalls = int64Ptr(parseCalls)
 		sample.LastActiveTime = timePtr(lastActiveTime)
-		sample.SQLText = stringPtr(sqlText)
+		sample.SQLFullText = stringPtr(sqlFullText)
 		samples = append(samples, sample)
 	}
 	return samples, rows.Err()

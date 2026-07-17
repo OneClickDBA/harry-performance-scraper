@@ -49,12 +49,15 @@ The scraper writes to PostgreSQL tables such as:
 
 - `oracle_metric_samples`
 - `oracle_sql_samples`
+- `oracle_sql_texts`
 - `oracle_session_samples`
 - `oracle_blocking_session_samples`
 - `oracle_database_activity_samples`
 
 Tables are created automatically when `output.postgresql.autoMigrate: true` is
-set. Daily partitions are created on demand before samples are written.
+set. Daily partitions are created on demand before samples are written. Complete
+SQL text is normalized into the non-partitioned `oracle_sql_texts` lookup table
+instead of being duplicated in every SQL sample.
 
 ## Build
 

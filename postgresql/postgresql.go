@@ -23,6 +23,7 @@ type Sink struct {
 	retention             time.Duration
 	samplesTable          pgx.Identifier
 	sqlSamplesTable       pgx.Identifier
+	sqlTextsTable         pgx.Identifier
 	sessionSamplesTable   pgx.Identifier
 	blockingSessionsTable pgx.Identifier
 	databaseActivityTable pgx.Identifier
@@ -46,12 +47,14 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 		return nil, fmt.Errorf("create postgresql pool: %w", err)
 	}
 
+	sqlSamplesTable := identifier(cfg.SQLSamplesTable, "oracle_sql_samples")
 	s := &Sink{
 		pool:                  pool,
 		logger:                logger,
 		retention:             cfg.GetRetention(),
 		samplesTable:          identifier(cfg.SamplesTable, "oracle_metric_samples"),
-		sqlSamplesTable:       identifier(cfg.SQLSamplesTable, "oracle_sql_samples"),
+		sqlSamplesTable:       sqlSamplesTable,
+		sqlTextsTable:         siblingIdentifier(sqlSamplesTable, "oracle_sql_texts"),
 		sessionSamplesTable:   identifier(cfg.SessionSamplesTable, "oracle_session_samples"),
 		blockingSessionsTable: identifier(cfg.BlockingSessionsTable, "oracle_blocking_session_samples"),
 		databaseActivityTable: identifier(cfg.DatabaseActivityTable, "oracle_database_activity_samples"),
@@ -74,6 +77,7 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 func (s *Sink) Migrate(ctx context.Context) error {
 	samples := s.samplesTable.Sanitize()
 	sqlSamples := s.sqlSamplesTable.Sanitize()
+	sqlTexts := s.sqlTextsTable.Sanitize()
 	sessionSamples := s.sessionSamplesTable.Sanitize()
 	blockingSessions := s.blockingSessionsTable.Sanitize()
 	databaseActivity := s.databaseActivityTable.Sanitize()
@@ -92,6 +96,18 @@ create table if not exists %s (
 create index if not exists oracle_metric_samples_collected_at_idx on %s (collected_at);
 create index if not exists oracle_metric_samples_database_context_idx on %s (source_database, context);
 create index if not exists oracle_metric_samples_labels_gin_idx on %s using gin (labels);
+
+create table if not exists %s (
+	source_database text not null,
+	sql_id text not null,
+	sql_fulltext text not null,
+	first_seen_at timestamptz not null,
+	last_text_seen_at timestamptz not null,
+	last_referenced_at timestamptz not null,
+	primary key (source_database, sql_id)
+);
+
+create index if not exists oracle_sql_texts_last_referenced_at_idx on %s (last_referenced_at);
 
 create table if not exists %s (
 	collected_at timestamptz not null,
@@ -117,8 +133,7 @@ create table if not exists %s (
 	loads bigint,
 	invalidations bigint,
 	parse_calls bigint,
-	last_active_time timestamptz,
-	sql_text text
+	last_active_time timestamptz
 ) partition by range (collected_at);
 
 create index if not exists oracle_sql_samples_collected_at_idx on %s (collected_at);
@@ -215,6 +230,7 @@ create index if not exists oracle_database_activity_samples_sample_time_idx on %
 create index if not exists oracle_database_activity_samples_sql_id_idx on %s (source_database, sql_id, sample_time);
 create index if not exists oracle_database_activity_samples_wait_class_idx on %s (source_database, wait_class, sample_time);
 `, samples, samples, samples, samples,
+		sqlTexts, sqlTexts,
 		sqlSamples, sqlSamples, sqlSamples, sqlSamples,
 		sessionSamples, sessionSamples, sessionSamples, sessionSamples,
 		blockingSessions, blockingSessions, blockingSessions,
@@ -267,6 +283,9 @@ func (s *Sink) WriteSamples(ctx context.Context, samples []collector.MetricSampl
 		}
 	}
 
+	if err := s.writeSQLTexts(ctx, tx, performance); err != nil {
+		return err
+	}
 	if err := s.writeSQLSamples(ctx, tx, performance.SQL); err != nil {
 		return err
 	}
@@ -293,6 +312,125 @@ func (s *Sink) WriteSamples(ctx context.Context, samples []collector.MetricSampl
 		"duration", summary.DurationSeconds)
 	s.cleanupRetention(ctx)
 	return nil
+}
+
+type sqlTextKey struct {
+	database string
+	sqlID    string
+}
+
+type sqlTextRecord struct {
+	fullText  string
+	firstSeen time.Time
+	lastSeen  time.Time
+}
+
+func (s *Sink) writeSQLTexts(ctx context.Context, tx pgx.Tx, performance collector.PerformanceSamples) error {
+	texts, references := collectSQLTextUpdates(performance)
+
+	if len(texts) > 0 {
+		insertSQL := fmt.Sprintf(`insert into %s as existing (
+			source_database, sql_id, sql_fulltext, first_seen_at, last_text_seen_at, last_referenced_at
+		) values ($1, $2, $3, $4, $5, $5)
+		on conflict (source_database, sql_id) do update set
+			sql_fulltext = case
+				when excluded.last_text_seen_at >= existing.last_text_seen_at then excluded.sql_fulltext
+				else existing.sql_fulltext
+			end,
+			first_seen_at = least(existing.first_seen_at, excluded.first_seen_at),
+			last_text_seen_at = greatest(existing.last_text_seen_at, excluded.last_text_seen_at),
+			last_referenced_at = greatest(existing.last_referenced_at, excluded.last_referenced_at)`,
+			s.sqlTextsTable.Sanitize())
+		batch := &pgx.Batch{}
+		for key, record := range texts {
+			batch.Queue(insertSQL, key.database, key.sqlID, record.fullText, record.firstSeen, record.lastSeen)
+		}
+		results := tx.SendBatch(ctx, batch)
+		for range texts {
+			if _, err := results.Exec(); err != nil {
+				_ = results.Close()
+				return fmt.Errorf("upsert SQL full text: %w", err)
+			}
+		}
+		if err := results.Close(); err != nil {
+			return fmt.Errorf("close SQL full text upsert batch: %w", err)
+		}
+	}
+
+	if len(references) == 0 {
+		return nil
+	}
+	databases := make([]string, 0, len(references))
+	sqlIDs := make([]string, 0, len(references))
+	seenAt := make([]time.Time, 0, len(references))
+	for key, referencedAt := range references {
+		databases = append(databases, key.database)
+		sqlIDs = append(sqlIDs, key.sqlID)
+		seenAt = append(seenAt, referencedAt)
+	}
+	updateSQL := fmt.Sprintf(`update %s as texts
+	set last_referenced_at = greatest(texts.last_referenced_at, refs.referenced_at)
+	from unnest($1::text[], $2::text[], $3::timestamptz[])
+		as refs(source_database, sql_id, referenced_at)
+	where texts.source_database = refs.source_database
+		and texts.sql_id = refs.sql_id`, s.sqlTextsTable.Sanitize())
+	if _, err := tx.Exec(ctx, updateSQL, databases, sqlIDs, seenAt); err != nil {
+		return fmt.Errorf("update SQL text references: %w", err)
+	}
+	return nil
+}
+
+func collectSQLTextUpdates(performance collector.PerformanceSamples) (map[sqlTextKey]sqlTextRecord, map[sqlTextKey]time.Time) {
+	texts := make(map[sqlTextKey]sqlTextRecord)
+	references := make(map[sqlTextKey]time.Time)
+	addReference := func(database, sqlID string, seenAt time.Time) {
+		if strings.TrimSpace(database) == "" || strings.TrimSpace(sqlID) == "" || seenAt.IsZero() {
+			return
+		}
+		key := sqlTextKey{database: database, sqlID: sqlID}
+		if previous, ok := references[key]; !ok || seenAt.After(previous) {
+			references[key] = seenAt
+		}
+	}
+	addOptionalReference := func(database string, sqlID *string, seenAt time.Time) {
+		if sqlID != nil {
+			addReference(database, *sqlID, seenAt)
+		}
+	}
+
+	for _, sample := range performance.SQL {
+		addReference(sample.Database, sample.SQLID, sample.CollectedAt)
+		if sample.SQLFullText == nil {
+			continue
+		}
+		key := sqlTextKey{database: sample.Database, sqlID: sample.SQLID}
+		record, ok := texts[key]
+		if !ok {
+			texts[key] = sqlTextRecord{fullText: *sample.SQLFullText, firstSeen: sample.CollectedAt, lastSeen: sample.CollectedAt}
+			continue
+		}
+		if sample.CollectedAt.Before(record.firstSeen) {
+			record.firstSeen = sample.CollectedAt
+		}
+		if !sample.CollectedAt.Before(record.lastSeen) {
+			record.fullText = *sample.SQLFullText
+			record.lastSeen = sample.CollectedAt
+		}
+		texts[key] = record
+	}
+	for _, sample := range performance.Sessions {
+		addOptionalReference(sample.Database, sample.SQLID, sample.CollectedAt)
+		addOptionalReference(sample.Database, sample.PrevSQLID, sample.CollectedAt)
+	}
+	for _, sample := range performance.BlockingSessions {
+		addOptionalReference(sample.Database, sample.SQLID, sample.CollectedAt)
+		addOptionalReference(sample.Database, sample.BlockingSQLID, sample.CollectedAt)
+	}
+	for _, sample := range performance.DatabaseActivity {
+		addOptionalReference(sample.Database, sample.SQLID, sample.CollectedAt)
+		addOptionalReference(sample.Database, sample.TopLevelSQLID, sample.CollectedAt)
+	}
+	return texts, references
 }
 
 func (s *Sink) writeSQLSamples(ctx context.Context, tx pgx.Tx, samples []collector.SQLSample) error {
@@ -326,7 +464,6 @@ func (s *Sink) writeSQLSamples(ctx context.Context, tx pgx.Tx, samples []collect
 			sample.Invalidations,
 			sample.ParseCalls,
 			sample.LastActiveTime,
-			sample.SQLText,
 		})
 	}
 
@@ -335,7 +472,6 @@ func (s *Sink) writeSQLSamples(ctx context.Context, tx pgx.Tx, samples []collect
 		"parsing_schema_name", "module", "executions", "elapsed_time_micro", "cpu_time_micro", "user_io_wait_micro",
 		"application_wait_micro", "concurrency_wait_micro", "cluster_wait_micro", "buffer_gets", "disk_reads",
 		"direct_writes", "rows_processed", "fetches", "loads", "invalidations", "parse_calls", "last_active_time",
-		"sql_text",
 	}, pgx.CopyFromRows(rows)); err != nil {
 		return fmt.Errorf("copy sql samples: %w", err)
 	}
@@ -607,14 +743,36 @@ func (s *Sink) cleanupRetention(ctx context.Context) {
 	if s.retention <= 0 {
 		return
 	}
-	dropped, err := s.dropExpiredPartitions(ctx, time.Now().UTC().Add(-s.retention))
+	cutoff := time.Now().UTC().Add(-s.retention)
+	dropped, err := s.dropExpiredPartitions(ctx, cutoff)
 	if err != nil {
 		s.logger.Warn("Unable to clean PostgreSQL sample partitions", "error", err, "retention", s.retention.String())
+		return
+	}
+	deletedSQLTexts, err := s.deleteExpiredSQLTexts(ctx, sqlTextRetentionCutoff(cutoff))
+	if err != nil {
+		s.logger.Warn("Unable to clean PostgreSQL SQL texts", "error", err, "retention", s.retention.String())
 		return
 	}
 	if dropped > 0 {
 		s.logger.Info("Cleaned PostgreSQL sample partitions", "partitions_dropped", dropped, "retention", s.retention.String())
 	}
+	if deletedSQLTexts > 0 {
+		s.logger.Info("Cleaned PostgreSQL SQL texts", "sql_texts_deleted", deletedSQLTexts, "retention", s.retention.String())
+	}
+}
+
+func sqlTextRetentionCutoff(partitionCutoff time.Time) time.Time {
+	return dayStartUTC(partitionCutoff)
+}
+
+func (s *Sink) deleteExpiredSQLTexts(ctx context.Context, cutoff time.Time) (int64, error) {
+	query := fmt.Sprintf("delete from %s where last_referenced_at < $1", s.sqlTextsTable.Sanitize())
+	result, err := s.pool.Exec(ctx, query, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("delete SQL texts last referenced before %s: %w", cutoff.Format(time.RFC3339), err)
+	}
+	return result.RowsAffected(), nil
 }
 
 func (s *Sink) dropExpiredPartitions(ctx context.Context, cutoff time.Time) (int, error) {
@@ -713,4 +871,13 @@ func identifier(name, fallback string) pgx.Identifier {
 		return pgx.Identifier{fallback}
 	}
 	return out
+}
+
+func siblingIdentifier(identifier pgx.Identifier, table string) pgx.Identifier {
+	if len(identifier) <= 1 {
+		return pgx.Identifier{table}
+	}
+	sibling := append(pgx.Identifier(nil), identifier...)
+	sibling[len(sibling)-1] = table
+	return sibling
 }
