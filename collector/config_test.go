@@ -184,6 +184,77 @@ databases:
 	if cfg.Output.PostgreSQL.GetRetention() != 0 {
 		t.Fatalf("expected default retention to be disabled, got %s", cfg.Output.PostgreSQL.GetRetention())
 	}
+	if !cfg.Performance.SQLPlans.GetEnabled() {
+		t.Fatal("expected SQL plan collection to be enabled by default")
+	}
+	if got := cfg.Performance.SQLPlans.GetInterval(); got != 2*time.Minute {
+		t.Fatalf("expected default SQL plan interval of 2m, got %s", got)
+	}
+	if got := cfg.Performance.SQLPlans.GetTopN(); got != 20 {
+		t.Fatalf("expected default SQL plan topN of 20, got %d", got)
+	}
+	if got := cfg.Performance.SQLPlans.GetQueryTimeout(); got != 10*time.Second {
+		t.Fatalf("expected default SQL plan query timeout of 10s, got %s", got)
+	}
+}
+
+func TestLoadMetricsConfigurationAcceptsSQLPlanSettings(t *testing.T) {
+	configPath := writeScraperConfig(t, `
+databases:
+  default:
+    username: scott
+    password: tiger
+    url: localhost:1521/freepdb1
+performance:
+  sqlPlans:
+    enabled: true
+    interval: 5m
+    topN: 12
+    queryTimeout: 20s
+`)
+
+	cfg, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
+	if err != nil {
+		t.Fatalf("expected config to load, got %v", err)
+	}
+	if got := cfg.Performance.SQLPlans.GetInterval(); got != 5*time.Minute {
+		t.Fatalf("SQL plan interval = %s, want 5m", got)
+	}
+	if got := cfg.Performance.SQLPlans.GetTopN(); got != 12 {
+		t.Fatalf("SQL plan topN = %d, want 12", got)
+	}
+	if got := cfg.Performance.SQLPlans.GetQueryTimeout(); got != 20*time.Second {
+		t.Fatalf("SQL plan query timeout = %s, want 20s", got)
+	}
+}
+
+func TestLoadMetricsConfigurationRejectsInvalidSQLPlanSettings(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		settings string
+		wantErr  string
+	}{
+		{name: "interval", settings: "    interval: 0s\n", wantErr: "interval must be greater than zero"},
+		{name: "topN zero", settings: "    topN: 0\n", wantErr: "topN must be between"},
+		{name: "topN too large", settings: "    topN: 101\n", wantErr: "topN must be between"},
+		{name: "timeout", settings: "    queryTimeout: 0s\n", wantErr: "queryTimeout must be greater than zero"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			configPath := writeScraperConfig(t, `
+databases:
+  default:
+    username: scott
+    password: tiger
+    url: localhost:1521/freepdb1
+performance:
+  sqlPlans:
+`+tt.settings)
+			_, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
 }
 
 func TestLoadMetricsConfigurationAcceptsMetricDefinitions(t *testing.T) {

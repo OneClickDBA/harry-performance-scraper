@@ -20,6 +20,9 @@ type Scraper struct {
 	databases              []*Database
 	logger                 *slog.Logger
 	allConstLabels         []string
+	planCacheMu            sync.Mutex
+	lastPlanCollection     map[string]time.Time
+	knownPlans             map[string]map[SQLPlanKey]struct{}
 }
 
 type Database struct {

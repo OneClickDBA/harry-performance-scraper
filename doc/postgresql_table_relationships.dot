@@ -34,6 +34,10 @@ digraph postgresql_table_relationships {
     label="oracle_sql_texts\l\lsource_database PK\lsql_id PK\lsql_fulltext\lfirst_seen_at\llast_text_seen_at\llast_referenced_at\l\lIndexes\llast_referenced_at\l"
   ];
 
+  oracle_sql_plans [
+    label="oracle_sql_plans\l\lsource_database PK\linst_id PK\lsql_id PK\lchild_number PK\lplan_hash_value PK\lplan_line_id PK\lparent_id\ldepth\lposition\loperation\loptions\lobject_owner\lobject_name\lobject_type\loptimizer\lcost\lcardinality\lbytes\lcpu_cost\lio_cost\ltemp_space\lpartition_start\lpartition_stop\laccess_predicates\lfilter_predicates\lfirst_seen_at\llast_seen_at\llast_referenced_at\l\lIndexes\lsource_database, sql_id, plan_hash_value\llast_referenced_at\l"
+  ];
+
   oracle_session_samples [
     label="oracle_session_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lsid\lserial_number\lusername\lstatus\lsql_id\lsql_child_number\lprev_sql_id\levent\lwait_class\lstate\lseconds_in_wait\lblocking_instance\lblocking_session\lmachine\lprogram\lmodule\laction\lservice_name\llogon_time\l\lIndexes\lcollected_at\lsource_database, sql_id\lsource_database, wait_class\l"
   ];
@@ -66,6 +70,18 @@ digraph postgresql_table_relationships {
   ];
 
   oracle_sql_samples -> oracle_sql_texts [
+    label="logical: source_database, sql_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_sql_samples -> oracle_sql_plans [
+    label="logical: source_database, inst_id, sql_id, child_number, plan_hash_value",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_sql_plans -> oracle_sql_texts [
     label="logical: source_database, sql_id",
     style=dashed,
     color="#666666"

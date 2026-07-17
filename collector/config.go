@@ -32,6 +32,7 @@ type MetricsConfiguration struct {
 	ListenAddress string                    `yaml:"listenAddress"`
 	Databases     map[string]DatabaseConfig `yaml:"databases"`
 	Metrics       MetricsConfig             `yaml:"metrics"`
+	Performance   PerformanceConfig         `yaml:"performance"`
 	Output        OutputConfig              `yaml:"output"`
 	Logging       LoggingConfig             `yaml:"log"`
 	Web           WebConfig                 `yaml:"web"`
@@ -107,6 +108,45 @@ type MetricsConfig struct {
 	Definitions       []string       `yaml:"definitions"`
 	ScrapeInterval    *time.Duration `yaml:"scrapeInterval"`
 	ConnectionBackoff *time.Duration `yaml:"connectionBackoff"`
+}
+
+type PerformanceConfig struct {
+	SQLPlans SQLPlanConfig `yaml:"sqlPlans"`
+}
+
+type SQLPlanConfig struct {
+	Enabled      *bool          `yaml:"enabled"`
+	Interval     *time.Duration `yaml:"interval"`
+	TopN         *int           `yaml:"topN"`
+	QueryTimeout *time.Duration `yaml:"queryTimeout"`
+}
+
+func (c SQLPlanConfig) GetEnabled() bool {
+	if c.Enabled == nil {
+		return true
+	}
+	return *c.Enabled
+}
+
+func (c SQLPlanConfig) GetInterval() time.Duration {
+	if c.Interval == nil {
+		return 2 * time.Minute
+	}
+	return *c.Interval
+}
+
+func (c SQLPlanConfig) GetTopN() int {
+	if c.TopN == nil {
+		return 20
+	}
+	return *c.TopN
+}
+
+func (c SQLPlanConfig) GetQueryTimeout() time.Duration {
+	if c.QueryTimeout == nil {
+		return 10 * time.Second
+	}
+	return *c.QueryTimeout
 }
 
 type LoggingConfig struct {
@@ -461,6 +501,25 @@ func (m *MetricsConfiguration) validate(logger *slog.Logger) error {
 	}
 	if err := m.validateLoggingConfig(); err != nil {
 		return err
+	}
+	if err := m.validatePerformanceConfig(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *MetricsConfiguration) validatePerformanceConfig() error {
+	if !m.Performance.SQLPlans.GetEnabled() {
+		return nil
+	}
+	if m.Performance.SQLPlans.GetInterval() <= 0 {
+		return fmt.Errorf("performance.sqlPlans.interval must be greater than zero")
+	}
+	if m.Performance.SQLPlans.GetTopN() <= 0 || m.Performance.SQLPlans.GetTopN() > topSQLLimit {
+		return fmt.Errorf("performance.sqlPlans.topN must be between 1 and %d", topSQLLimit)
+	}
+	if m.Performance.SQLPlans.GetQueryTimeout() <= 0 {
+		return fmt.Errorf("performance.sqlPlans.queryTimeout must be greater than zero")
 	}
 	return nil
 }

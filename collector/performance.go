@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -42,6 +43,35 @@ from gv$sql q
 where q.sql_id is not null
 order by q.elapsed_time desc
 fetch first 100 rows only`
+
+const sqlPlanQueryPrefix = `
+select
+	p.inst_id,
+	p.sql_id,
+	p.child_number,
+	p.plan_hash_value,
+	p.id,
+	p.parent_id,
+	p.depth,
+	p.position,
+	p.operation,
+	p.options,
+	p.object_owner,
+	p.object_name,
+	p.object_type,
+	p.optimizer,
+	p.cost,
+	p.cardinality,
+	p.bytes,
+	p.cpu_cost,
+	p.io_cost,
+	p.temp_space,
+	p.partition_start,
+	p.partition_stop,
+	p.access_predicates,
+	p.filter_predicates
+from gv$sql_plan p
+where `
 
 const sessionPerformanceQuery = `
 select
@@ -148,6 +178,24 @@ func (e *Scraper) ScrapePerformanceSamples(d *Database, tick *time.Time) (Perfor
 	if databaseActivityErr != nil {
 		databaseActivityErr = fmt.Errorf("scrape database activity history: %w", databaseActivityErr)
 	}
+	var sqlPlans []SQLPlanOperation
+	var sqlPlanErr error
+	if len(sqlSamples) > 0 && e.shouldCollectSQLPlans(d.Name, collectedAt) {
+		candidates := e.uncachedSQLPlanCandidates(d.Name, sqlSamples, e.Performance.SQLPlans.GetTopN())
+		if len(candidates) > 0 {
+			sqlPlans, sqlPlanErr = e.scrapeSQLPlans(d, collectedAt, candidates, e.Performance.SQLPlans.GetQueryTimeout())
+			if sqlPlanErr != nil {
+				sqlPlanErr = fmt.Errorf("scrape SQL execution plans: %w", sqlPlanErr)
+			} else {
+				e.markSQLPlansCollected(d.Name, sqlPlans)
+				e.logger.Debug("Scraped SQL execution plans",
+					"database", d.Name,
+					"cursor_plans_requested", len(candidates),
+					"plan_operations", len(sqlPlans),
+				)
+			}
+		}
+	}
 	ashSamples := len(databaseActivitySamples)
 	sessionDerivedActivitySamples := 0
 	if len(databaseActivitySamples) == 0 && len(sessionSamples) > 0 {
@@ -163,10 +211,178 @@ func (e *Scraper) ScrapePerformanceSamples(d *Database, tick *time.Time) (Perfor
 	)
 	return PerformanceSamples{
 		SQL:              sqlSamples,
+		SQLPlans:         sqlPlans,
 		Sessions:         sessionSamples,
 		BlockingSessions: blockingSamples,
 		DatabaseActivity: databaseActivitySamples,
-	}, errors.Join(err, sessionErr, blockingErr, databaseActivityErr)
+	}, errors.Join(err, sqlPlanErr, sessionErr, blockingErr, databaseActivityErr)
+}
+
+func (e *Scraper) shouldCollectSQLPlans(database string, collectedAt time.Time) bool {
+	if e.MetricsConfiguration == nil || !e.Performance.SQLPlans.GetEnabled() {
+		return false
+	}
+
+	e.planCacheMu.Lock()
+	defer e.planCacheMu.Unlock()
+	if e.lastPlanCollection == nil {
+		e.lastPlanCollection = map[string]time.Time{}
+	}
+	last, ok := e.lastPlanCollection[database]
+	if ok && collectedAt.Before(last.Add(e.Performance.SQLPlans.GetInterval())) {
+		return false
+	}
+	e.lastPlanCollection[database] = collectedAt
+	return true
+}
+
+func (e *Scraper) uncachedSQLPlanCandidates(database string, samples []SQLSample, limit int) []SQLPlanKey {
+	allCandidates := make([]SQLPlanKey, 0, limit)
+	seen := make(map[SQLPlanKey]struct{}, limit)
+	for _, sample := range samples {
+		if len(allCandidates) >= limit {
+			break
+		}
+		if sample.ChildNumber == nil || sample.PlanHashValue == nil || *sample.PlanHashValue <= 0 {
+			continue
+		}
+		key := SQLPlanKey{
+			InstID:        sample.InstID,
+			SQLID:         sample.SQLID,
+			ChildNumber:   *sample.ChildNumber,
+			PlanHashValue: *sample.PlanHashValue,
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		allCandidates = append(allCandidates, key)
+	}
+
+	e.planCacheMu.Lock()
+	defer e.planCacheMu.Unlock()
+	if e.knownPlans == nil {
+		e.knownPlans = map[string]map[SQLPlanKey]struct{}{}
+	}
+	known := e.knownPlans[database]
+	activeKnown := make(map[SQLPlanKey]struct{}, len(allCandidates))
+	uncached := make([]SQLPlanKey, 0, len(allCandidates))
+	for _, candidate := range allCandidates {
+		if _, ok := known[candidate]; ok {
+			activeKnown[candidate] = struct{}{}
+			continue
+		}
+		uncached = append(uncached, candidate)
+	}
+	e.knownPlans[database] = activeKnown
+	return uncached
+}
+
+func (e *Scraper) markSQLPlansCollected(database string, plans []SQLPlanOperation) {
+	e.planCacheMu.Lock()
+	defer e.planCacheMu.Unlock()
+	if e.knownPlans == nil {
+		e.knownPlans = map[string]map[SQLPlanKey]struct{}{}
+	}
+	if e.knownPlans[database] == nil {
+		e.knownPlans[database] = map[SQLPlanKey]struct{}{}
+	}
+	for _, plan := range plans {
+		e.knownPlans[database][plan.SQLPlanKey] = struct{}{}
+	}
+}
+
+func buildSQLPlanQuery(candidates []SQLPlanKey) (string, []any) {
+	conditions := make([]string, 0, len(candidates))
+	args := make([]any, 0, len(candidates)*4)
+	for i, candidate := range candidates {
+		bind := i*4 + 1
+		conditions = append(conditions, fmt.Sprintf(
+			"(p.inst_id = :%d and p.sql_id = :%d and p.child_number = :%d and p.plan_hash_value = :%d)",
+			bind, bind+1, bind+2, bind+3,
+		))
+		args = append(args, candidate.InstID, candidate.SQLID, candidate.ChildNumber, candidate.PlanHashValue)
+	}
+	return sqlPlanQueryPrefix + strings.Join(conditions, " or ") +
+		" order by p.inst_id, p.sql_id, p.child_number, p.plan_hash_value, p.id", args
+}
+
+func (e *Scraper) scrapeSQLPlans(d *Database, collectedAt time.Time, candidates []SQLPlanKey, timeout time.Duration) ([]SQLPlanOperation, error) {
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	query, args := buildSQLPlanQuery(candidates)
+	rows, unlock, err := d.QueryContext(ctx, query, args...)
+	if ctx.Err() == context.DeadlineExceeded {
+		return nil, fmt.Errorf("Oracle query timed out")
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	defer rows.Close()
+
+	var plans []SQLPlanOperation
+	for rows.Next() {
+		var plan SQLPlanOperation
+		var parentID, depth, position, cost, cardinality, bytesValue sql.NullInt64
+		var cpuCost, ioCost, tempSpace sql.NullInt64
+		var operation, options, objectOwner, objectName, objectType, optimizer sql.NullString
+		var partitionStart, partitionStop, accessPredicates, filterPredicates sql.NullString
+		if err := rows.Scan(
+			&plan.InstID,
+			&plan.SQLID,
+			&plan.ChildNumber,
+			&plan.PlanHashValue,
+			&plan.PlanLineID,
+			&parentID,
+			&depth,
+			&position,
+			&operation,
+			&options,
+			&objectOwner,
+			&objectName,
+			&objectType,
+			&optimizer,
+			&cost,
+			&cardinality,
+			&bytesValue,
+			&cpuCost,
+			&ioCost,
+			&tempSpace,
+			&partitionStart,
+			&partitionStop,
+			&accessPredicates,
+			&filterPredicates,
+		); err != nil {
+			return nil, err
+		}
+		plan.CollectedAt = collectedAt
+		plan.Database = d.Name
+		plan.Operation = operation.String
+		plan.ParentID = int64Ptr(parentID)
+		plan.Depth = int64Ptr(depth)
+		plan.Position = int64Ptr(position)
+		plan.Options = stringPtr(options)
+		plan.ObjectOwner = stringPtr(objectOwner)
+		plan.ObjectName = stringPtr(objectName)
+		plan.ObjectType = stringPtr(objectType)
+		plan.Optimizer = stringPtr(optimizer)
+		plan.Cost = int64Ptr(cost)
+		plan.Cardinality = int64Ptr(cardinality)
+		plan.Bytes = int64Ptr(bytesValue)
+		plan.CPUCost = int64Ptr(cpuCost)
+		plan.IOCost = int64Ptr(ioCost)
+		plan.TempSpace = int64Ptr(tempSpace)
+		plan.PartitionStart = stringPtr(partitionStart)
+		plan.PartitionStop = stringPtr(partitionStop)
+		plan.AccessPredicates = stringPtr(accessPredicates)
+		plan.FilterPredicates = stringPtr(filterPredicates)
+		plans = append(plans, plan)
+	}
+	return plans, rows.Err()
 }
 
 func (e *Scraper) scrapeSQLSamples(d *Database, collectedAt time.Time, timeout time.Duration) ([]SQLSample, error) {

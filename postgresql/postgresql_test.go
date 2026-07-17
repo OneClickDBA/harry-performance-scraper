@@ -80,6 +80,24 @@ func TestSiblingIdentifier(t *testing.T) {
 	}
 }
 
+func TestSQLPlanSiblingIdentifier(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		base pgx.Identifier
+		want pgx.Identifier
+	}{
+		{name: "default schema", base: pgx.Identifier{"oracle_sql_samples"}, want: pgx.Identifier{"oracle_sql_plans"}},
+		{name: "configured schema", base: pgx.Identifier{"monitoring", "sql_samples"}, want: pgx.Identifier{"monitoring", "oracle_sql_plans"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := siblingIdentifier(tt.base, "oracle_sql_plans")
+			if got.Sanitize() != tt.want.Sanitize() {
+				t.Fatalf("siblingIdentifier() = %s, want %s", got.Sanitize(), tt.want.Sanitize())
+			}
+		})
+	}
+}
+
 func TestCollectSQLTextUpdates(t *testing.T) {
 	first := time.Date(2026, 7, 17, 8, 0, 0, 0, time.UTC)
 	second := first.Add(time.Minute)
@@ -122,5 +140,26 @@ func TestCollectSQLTextUpdates(t *testing.T) {
 		if _, ok := references[sqlTextKey{database: "DB1", sqlID: referencedSQLID}]; !ok {
 			t.Fatalf("expected reference for SQL ID %s", referencedSQLID)
 		}
+	}
+}
+
+func TestCollectSQLPlanReferences(t *testing.T) {
+	first := time.Date(2026, 7, 17, 8, 0, 0, 0, time.UTC)
+	last := first.Add(time.Minute)
+	child := int64(2)
+	planHash := int64(12345)
+	zeroPlanHash := int64(0)
+	references := collectSQLPlanReferences([]collector.SQLSample{
+		{CollectedAt: first, Database: "DB1", InstID: 1, SQLID: "sql1", ChildNumber: &child, PlanHashValue: &planHash},
+		{CollectedAt: last, Database: "DB1", InstID: 1, SQLID: "sql1", ChildNumber: &child, PlanHashValue: &planHash},
+		{CollectedAt: last, Database: "DB1", InstID: 1, SQLID: "missing-child", PlanHashValue: &planHash},
+		{CollectedAt: last, Database: "DB1", InstID: 1, SQLID: "zero-plan", ChildNumber: &child, PlanHashValue: &zeroPlanHash},
+	})
+	if len(references) != 1 {
+		t.Fatalf("references = %d, want 1", len(references))
+	}
+	key := sqlPlanReferenceKey{database: "DB1", instID: 1, sqlID: "sql1", childNumber: child, planHashValue: planHash}
+	if got := references[key]; !got.Equal(last) {
+		t.Fatalf("latest plan reference = %s, want %s", got, last)
 	}
 }

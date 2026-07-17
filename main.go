@@ -159,6 +159,11 @@ func main() {
 		"session_samples_table", m.Output.PostgreSQL.SessionSamplesTable,
 		"blocking_sessions_table", m.Output.PostgreSQL.BlockingSessionsTable,
 		"database_activity_table", m.Output.PostgreSQL.DatabaseActivityTable)
+	logger.Info("SQL execution plan collection configuration",
+		"enabled", m.Performance.SQLPlans.GetEnabled(),
+		"interval", m.Performance.SQLPlans.GetInterval(),
+		"top_n", m.Performance.SQLPlans.GetTopN(),
+		"query_timeout", m.Performance.SQLPlans.GetQueryTimeout())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {

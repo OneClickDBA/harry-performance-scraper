@@ -24,6 +24,7 @@ type Sink struct {
 	samplesTable          pgx.Identifier
 	sqlSamplesTable       pgx.Identifier
 	sqlTextsTable         pgx.Identifier
+	sqlPlansTable         pgx.Identifier
 	sessionSamplesTable   pgx.Identifier
 	blockingSessionsTable pgx.Identifier
 	databaseActivityTable pgx.Identifier
@@ -55,6 +56,7 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 		samplesTable:          identifier(cfg.SamplesTable, "oracle_metric_samples"),
 		sqlSamplesTable:       sqlSamplesTable,
 		sqlTextsTable:         siblingIdentifier(sqlSamplesTable, "oracle_sql_texts"),
+		sqlPlansTable:         siblingIdentifier(sqlSamplesTable, "oracle_sql_plans"),
 		sessionSamplesTable:   identifier(cfg.SessionSamplesTable, "oracle_session_samples"),
 		blockingSessionsTable: identifier(cfg.BlockingSessionsTable, "oracle_blocking_session_samples"),
 		databaseActivityTable: identifier(cfg.DatabaseActivityTable, "oracle_database_activity_samples"),
@@ -78,6 +80,7 @@ func (s *Sink) Migrate(ctx context.Context) error {
 	samples := s.samplesTable.Sanitize()
 	sqlSamples := s.sqlSamplesTable.Sanitize()
 	sqlTexts := s.sqlTextsTable.Sanitize()
+	sqlPlans := s.sqlPlansTable.Sanitize()
 	sessionSamples := s.sessionSamplesTable.Sanitize()
 	blockingSessions := s.blockingSessionsTable.Sanitize()
 	databaseActivity := s.databaseActivityTable.Sanitize()
@@ -108,6 +111,41 @@ create table if not exists %s (
 );
 
 create index if not exists oracle_sql_texts_last_referenced_at_idx on %s (last_referenced_at);
+
+create table if not exists %s (
+	source_database text not null,
+	inst_id bigint not null,
+	sql_id text not null,
+	child_number bigint not null,
+	plan_hash_value bigint not null,
+	plan_line_id bigint not null,
+	parent_id bigint,
+	depth bigint,
+	position bigint,
+	operation text not null,
+	options text,
+	object_owner text,
+	object_name text,
+	object_type text,
+	optimizer text,
+	cost bigint,
+	cardinality bigint,
+	bytes bigint,
+	cpu_cost bigint,
+	io_cost bigint,
+	temp_space bigint,
+	partition_start text,
+	partition_stop text,
+	access_predicates text,
+	filter_predicates text,
+	first_seen_at timestamptz not null,
+	last_seen_at timestamptz not null,
+	last_referenced_at timestamptz not null,
+	primary key (source_database, inst_id, sql_id, child_number, plan_hash_value, plan_line_id)
+);
+
+create index if not exists oracle_sql_plans_sql_id_idx on %s (source_database, sql_id, plan_hash_value);
+create index if not exists oracle_sql_plans_last_referenced_at_idx on %s (last_referenced_at);
 
 create table if not exists %s (
 	collected_at timestamptz not null,
@@ -231,6 +269,7 @@ create index if not exists oracle_database_activity_samples_sql_id_idx on %s (so
 create index if not exists oracle_database_activity_samples_wait_class_idx on %s (source_database, wait_class, sample_time);
 `, samples, samples, samples, samples,
 		sqlTexts, sqlTexts,
+		sqlPlans, sqlPlans, sqlPlans,
 		sqlSamples, sqlSamples, sqlSamples, sqlSamples,
 		sessionSamples, sessionSamples, sessionSamples, sessionSamples,
 		blockingSessions, blockingSessions, blockingSessions,
@@ -286,6 +325,9 @@ func (s *Sink) WriteSamples(ctx context.Context, samples []collector.MetricSampl
 	if err := s.writeSQLTexts(ctx, tx, performance); err != nil {
 		return err
 	}
+	if err := s.writeSQLPlans(ctx, tx, performance); err != nil {
+		return err
+	}
 	if err := s.writeSQLSamples(ctx, tx, performance.SQL); err != nil {
 		return err
 	}
@@ -305,6 +347,7 @@ func (s *Sink) WriteSamples(ctx context.Context, samples []collector.MetricSampl
 	s.logger.Info("Wrote scrape samples to PostgreSQL",
 		"samples", len(samples),
 		"sql_samples", len(performance.SQL),
+		"sql_plan_operations", len(performance.SQLPlans),
 		"session_samples", len(performance.Sessions),
 		"blocking_session_samples", len(performance.BlockingSessions),
 		"database_activity_samples", len(performance.DatabaseActivity),
@@ -431,6 +474,125 @@ func collectSQLTextUpdates(performance collector.PerformanceSamples) (map[sqlTex
 		addOptionalReference(sample.Database, sample.TopLevelSQLID, sample.CollectedAt)
 	}
 	return texts, references
+}
+
+type sqlPlanReferenceKey struct {
+	database      string
+	instID        int64
+	sqlID         string
+	childNumber   int64
+	planHashValue int64
+}
+
+func (s *Sink) writeSQLPlans(ctx context.Context, tx pgx.Tx, performance collector.PerformanceSamples) error {
+	if len(performance.SQLPlans) > 0 {
+		insertSQL := fmt.Sprintf(`insert into %s as existing (
+			source_database, inst_id, sql_id, child_number, plan_hash_value, plan_line_id,
+			parent_id, depth, position, operation, options, object_owner, object_name, object_type,
+			optimizer, cost, cardinality, bytes, cpu_cost, io_cost, temp_space, partition_start,
+			partition_stop, access_predicates, filter_predicates, first_seen_at, last_seen_at, last_referenced_at
+		) values (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $26, $26
+		)
+		on conflict (source_database, inst_id, sql_id, child_number, plan_hash_value, plan_line_id)
+		do update set
+			parent_id = excluded.parent_id,
+			depth = excluded.depth,
+			position = excluded.position,
+			operation = excluded.operation,
+			options = excluded.options,
+			object_owner = excluded.object_owner,
+			object_name = excluded.object_name,
+			object_type = excluded.object_type,
+			optimizer = excluded.optimizer,
+			cost = excluded.cost,
+			cardinality = excluded.cardinality,
+			bytes = excluded.bytes,
+			cpu_cost = excluded.cpu_cost,
+			io_cost = excluded.io_cost,
+			temp_space = excluded.temp_space,
+			partition_start = excluded.partition_start,
+			partition_stop = excluded.partition_stop,
+			access_predicates = excluded.access_predicates,
+			filter_predicates = excluded.filter_predicates,
+			first_seen_at = least(existing.first_seen_at, excluded.first_seen_at),
+			last_seen_at = greatest(existing.last_seen_at, excluded.last_seen_at),
+			last_referenced_at = greatest(existing.last_referenced_at, excluded.last_referenced_at)`,
+			s.sqlPlansTable.Sanitize())
+		batch := &pgx.Batch{}
+		for _, plan := range performance.SQLPlans {
+			batch.Queue(insertSQL,
+				plan.Database, plan.InstID, plan.SQLID, plan.ChildNumber, plan.PlanHashValue, plan.PlanLineID,
+				plan.ParentID, plan.Depth, plan.Position, plan.Operation, plan.Options, plan.ObjectOwner,
+				plan.ObjectName, plan.ObjectType, plan.Optimizer, plan.Cost, plan.Cardinality, plan.Bytes,
+				plan.CPUCost, plan.IOCost, plan.TempSpace, plan.PartitionStart, plan.PartitionStop,
+				plan.AccessPredicates, plan.FilterPredicates, plan.CollectedAt,
+			)
+		}
+		results := tx.SendBatch(ctx, batch)
+		for range performance.SQLPlans {
+			if _, err := results.Exec(); err != nil {
+				_ = results.Close()
+				return fmt.Errorf("upsert SQL plan operation: %w", err)
+			}
+		}
+		if err := results.Close(); err != nil {
+			return fmt.Errorf("close SQL plan upsert batch: %w", err)
+		}
+	}
+
+	references := collectSQLPlanReferences(performance.SQL)
+	if len(references) == 0 {
+		return nil
+	}
+	databases := make([]string, 0, len(references))
+	instIDs := make([]int64, 0, len(references))
+	sqlIDs := make([]string, 0, len(references))
+	childNumbers := make([]int64, 0, len(references))
+	planHashValues := make([]int64, 0, len(references))
+	referencedAt := make([]time.Time, 0, len(references))
+	for key, seenAt := range references {
+		databases = append(databases, key.database)
+		instIDs = append(instIDs, key.instID)
+		sqlIDs = append(sqlIDs, key.sqlID)
+		childNumbers = append(childNumbers, key.childNumber)
+		planHashValues = append(planHashValues, key.planHashValue)
+		referencedAt = append(referencedAt, seenAt)
+	}
+	updateSQL := fmt.Sprintf(`update %s as plans
+	set last_referenced_at = greatest(plans.last_referenced_at, refs.referenced_at)
+	from unnest($1::text[], $2::bigint[], $3::text[], $4::bigint[], $5::bigint[], $6::timestamptz[])
+		as refs(source_database, inst_id, sql_id, child_number, plan_hash_value, referenced_at)
+	where plans.source_database = refs.source_database
+		and plans.inst_id = refs.inst_id
+		and plans.sql_id = refs.sql_id
+		and plans.child_number = refs.child_number
+		and plans.plan_hash_value = refs.plan_hash_value`, s.sqlPlansTable.Sanitize())
+	if _, err := tx.Exec(ctx, updateSQL, databases, instIDs, sqlIDs, childNumbers, planHashValues, referencedAt); err != nil {
+		return fmt.Errorf("update SQL plan references: %w", err)
+	}
+	return nil
+}
+
+func collectSQLPlanReferences(samples []collector.SQLSample) map[sqlPlanReferenceKey]time.Time {
+	references := make(map[sqlPlanReferenceKey]time.Time)
+	for _, sample := range samples {
+		if sample.ChildNumber == nil || sample.PlanHashValue == nil || *sample.PlanHashValue <= 0 {
+			continue
+		}
+		key := sqlPlanReferenceKey{
+			database:      sample.Database,
+			instID:        sample.InstID,
+			sqlID:         sample.SQLID,
+			childNumber:   *sample.ChildNumber,
+			planHashValue: *sample.PlanHashValue,
+		}
+		if previous, ok := references[key]; !ok || sample.CollectedAt.After(previous) {
+			references[key] = sample.CollectedAt
+		}
+	}
+	return references
 }
 
 func (s *Sink) writeSQLSamples(ctx context.Context, tx pgx.Tx, samples []collector.SQLSample) error {
@@ -754,11 +916,19 @@ func (s *Sink) cleanupRetention(ctx context.Context) {
 		s.logger.Warn("Unable to clean PostgreSQL SQL texts", "error", err, "retention", s.retention.String())
 		return
 	}
+	deletedSQLPlans, err := s.deleteExpiredSQLPlans(ctx, sqlTextRetentionCutoff(cutoff))
+	if err != nil {
+		s.logger.Warn("Unable to clean PostgreSQL SQL plans", "error", err, "retention", s.retention.String())
+		return
+	}
 	if dropped > 0 {
 		s.logger.Info("Cleaned PostgreSQL sample partitions", "partitions_dropped", dropped, "retention", s.retention.String())
 	}
 	if deletedSQLTexts > 0 {
 		s.logger.Info("Cleaned PostgreSQL SQL texts", "sql_texts_deleted", deletedSQLTexts, "retention", s.retention.String())
+	}
+	if deletedSQLPlans > 0 {
+		s.logger.Info("Cleaned PostgreSQL SQL plans", "sql_plan_operations_deleted", deletedSQLPlans, "retention", s.retention.String())
 	}
 }
 
@@ -771,6 +941,15 @@ func (s *Sink) deleteExpiredSQLTexts(ctx context.Context, cutoff time.Time) (int
 	result, err := s.pool.Exec(ctx, query, cutoff)
 	if err != nil {
 		return 0, fmt.Errorf("delete SQL texts last referenced before %s: %w", cutoff.Format(time.RFC3339), err)
+	}
+	return result.RowsAffected(), nil
+}
+
+func (s *Sink) deleteExpiredSQLPlans(ctx context.Context, cutoff time.Time) (int64, error) {
+	query := fmt.Sprintf("delete from %s where last_referenced_at < $1", s.sqlPlansTable.Sanitize())
+	result, err := s.pool.Exec(ctx, query, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("delete SQL plans last referenced before %s: %w", cutoff.Format(time.RFC3339), err)
 	}
 	return result.RowsAffected(), nil
 }

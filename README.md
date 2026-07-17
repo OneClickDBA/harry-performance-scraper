@@ -50,6 +50,7 @@ The scraper writes to PostgreSQL tables such as:
 - `oracle_metric_samples`
 - `oracle_sql_samples`
 - `oracle_sql_texts`
+- `oracle_sql_plans`
 - `oracle_session_samples`
 - `oracle_blocking_session_samples`
 - `oracle_database_activity_samples`
@@ -58,6 +59,9 @@ Tables are created automatically when `output.postgresql.autoMigrate: true` is
 set. Daily partitions are created on demand before samples are written. Complete
 SQL text is normalized into the non-partitioned `oracle_sql_texts` lookup table
 instead of being duplicated in every SQL sample.
+Execution-plan operations from `GV$SQL_PLAN` are deduplicated in the
+non-partitioned `oracle_sql_plans` lookup table and retained while their cursor
+plan remains referenced by SQL samples.
 
 ## Build
 
@@ -93,6 +97,13 @@ metrics:
   definitions:
     - /etc/oracledb-monitor/oracle-operational-metrics.toml
 
+performance:
+  sqlPlans:
+    enabled: true
+    interval: 2m
+    topN: 20
+    queryTimeout: 10s
+
 output:
   postgresql:
     url: ${POSTGRES_URL}
@@ -108,8 +119,7 @@ web:
   listenAddresses: [":9161"]
 ```
 
-Keep `metrics.scrapeInterval` configured for continuous collection. Without it,
-the PostgreSQL-backed scraper will not continuously collect samples.
+`metrics.scrapeInterval` defaults to `15s` when omitted.
 
 ## Grafana
 
@@ -118,7 +128,7 @@ PostgreSQL datasource and imports dashboards from:
 
 - `docker-compose/grafana/dashboards/oracle-sessions-and-blocking.json`
 - `docker-compose/grafana/dashboards/database-activity-history.json`
-- `docker-compose/grafana/dashboards/database-activity-history.json`
+- `docker-compose/grafana/dashboards/oracle-sql-performance.json`
 
 ## Local Testing
 

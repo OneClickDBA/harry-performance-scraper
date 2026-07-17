@@ -53,6 +53,14 @@ metrics:
     - oracle-operational-metrics.toml
     - custom-metrics-example/custom-metrics.toml
 
+performance:
+  sqlPlans:
+    ## Collect cached execution plans for bounded top SQL candidates from GV$SQL_PLAN.
+    enabled: true
+    interval: 2m
+    topN: 20
+    queryTimeout: 10s
+
 output:
   postgresql:
     ## PostgreSQL connection URL. Environment variables will be expanded.
