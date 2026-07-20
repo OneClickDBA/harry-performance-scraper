@@ -31,6 +31,19 @@ type testQueryConnector struct {
 	rows driver.Rows
 }
 
+type trackedQueryConnector struct {
+	tracker *queryConcurrencyTracker
+}
+
+type trackedQueryConn struct {
+	tracker *queryConcurrencyTracker
+}
+
+type queryConcurrencyTracker struct {
+	current atomic.Int64
+	maximum atomic.Int64
+}
+
 var testQueryDriverID atomic.Uint64
 
 func (testQueryDriver) Open(name string) (driver.Conn, error) {
@@ -49,6 +62,14 @@ func (testQueryConnector) Driver() driver.Driver {
 	return testQueryDriver{}
 }
 
+func (c trackedQueryConnector) Connect(context.Context) (driver.Conn, error) {
+	return trackedQueryConn{tracker: c.tracker}, nil
+}
+
+func (trackedQueryConnector) Driver() driver.Driver {
+	return testQueryDriver{}
+}
+
 func (testQueryConn) Prepare(string) (driver.Stmt, error) {
 	return nil, errors.New("not implemented")
 }
@@ -63,6 +84,30 @@ func (testQueryConn) Begin() (driver.Tx, error) {
 
 func (c testQueryConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
 	return c.rows, nil
+}
+
+func (trackedQueryConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (trackedQueryConn) Close() error {
+	return nil
+}
+
+func (trackedQueryConn) Begin() (driver.Tx, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c trackedQueryConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	current := c.tracker.current.Add(1)
+	for maximum := c.tracker.maximum.Load(); current > maximum; maximum = c.tracker.maximum.Load() {
+		if c.tracker.maximum.CompareAndSwap(maximum, current) {
+			break
+		}
+	}
+	time.Sleep(20 * time.Millisecond)
+	c.tracker.current.Add(-1)
+	return &testQueryRows{}, nil
 }
 
 func (r *testQueryRows) Columns() []string {
@@ -310,6 +355,45 @@ func TestScrapeDatabaseSkipsWhileStartupInProgress(t *testing.T) {
 	case <-performanceCh:
 		t.Fatal("did not expect performance samples while startup is in progress")
 	default:
+	}
+}
+
+func TestScrapeDatabaseRunsAdditionalMetricsSerially(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	tracker := &queryConcurrencyTracker{}
+	db := sql.OpenDB(trackedQueryConnector{tracker: tracker})
+	t.Cleanup(func() { _ = db.Close() })
+
+	metrics := map[string]*Metric{}
+	for _, id := range []string{"first", "second", "third"} {
+		metrics[id] = &Metric{
+			ID:          id,
+			Context:     id,
+			MetricsDesc: map[string]string{"value": "Test metric."},
+			Request:     "select 1 as value from dual",
+		}
+	}
+	database := &Database{
+		Name:          "db1",
+		Session:       db,
+		DatabaseLabel: "database",
+	}
+	database.startupReady.Store(true)
+	database.initCache(metrics)
+	scraper := &Scraper{
+		logger:               logger,
+		metricsToScrape:      metrics,
+		MetricsConfiguration: &MetricsConfiguration{},
+	}
+
+	errChan := make(chan error, len(metrics)+1)
+	sampleCh := make(chan []MetricSample, len(metrics))
+	performanceCh := make(chan PerformanceSamples, 1)
+	now := time.Now()
+	scraper.scrapeDatabaseSamples(sampleCh, performanceCh, errChan, database, &now)
+
+	if maximum := tracker.maximum.Load(); maximum != 1 {
+		t.Fatalf("expected at most one concurrent query per database, got %d", maximum)
 	}
 }
 

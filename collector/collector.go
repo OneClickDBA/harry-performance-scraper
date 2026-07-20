@@ -207,7 +207,6 @@ func (e *Scraper) scrapeSamples(tick *time.Time) ([]MetricSample, PerformanceSam
 
 func (e *Scraper) scrapeDatabaseSamples(sampleCh chan<- []MetricSample, performanceCh chan<- PerformanceSamples, errChan chan<- error, d *Database, tick *time.Time) {
 	dbScrapeStart := time.Now()
-	wg := &sync.WaitGroup{}
 	defer func() {
 		e.logger.Debug("Finished database scrape", "database", d.Name, "duration", time.Since(dbScrapeStart))
 	}()
@@ -228,40 +227,36 @@ func (e *Scraper) scrapeDatabaseSamples(sampleCh chan<- []MetricSample, performa
 		return
 	}
 
+	// Keep additional queries serial per database. When pooled connections expire
+	// together, concurrent queries can otherwise cause an OCI connection stampede.
 	for _, metric := range e.metricsToScrape {
-		metric := metric
 		if !isScrapeMetric(e.logger, tick, metric, d) {
 			errChan <- nil
 			continue
 		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			scrapeStart := time.Now()
-			samples, scrapeError := e.ScrapeMetricSamples(d, metric, tick)
-			errChan <- scrapeError
-			if scrapeError != nil {
-				if shouldLogScrapeError(scrapeError, metric.IgnoreZeroResult) {
-					e.logger.Error("Error scraping metric",
-						"Context", metric.Context,
-						"MetricsDesc", fmt.Sprint(metric.MetricsDesc),
-						"duration", time.Since(scrapeStart),
-						"error", scrapeError,
-						"database", d.Name)
-				}
-				return
+		scrapeStart := time.Now()
+		samples, scrapeError := e.ScrapeMetricSamples(d, metric, tick)
+		errChan <- scrapeError
+		if scrapeError != nil {
+			if shouldLogScrapeError(scrapeError, metric.IgnoreZeroResult) {
+				e.logger.Error("Error scraping metric",
+					"Context", metric.Context,
+					"MetricsDesc", fmt.Sprint(metric.MetricsDesc),
+					"duration", time.Since(scrapeStart),
+					"error", scrapeError,
+					"database", d.Name)
 			}
-			d.MetricsCache.SetLastScraped(metric, tick)
-			sampleCh <- samples
-			e.logger.Debug("Successfully scraped metric",
-				"Context", metric.Context,
-				"MetricDesc", fmt.Sprint(metric.MetricsDesc),
-				"duration", time.Since(scrapeStart),
-				"samples", len(samples),
-				"database", d.Name)
-		}()
+			continue
+		}
+		d.MetricsCache.SetLastScraped(metric, tick)
+		sampleCh <- samples
+		e.logger.Debug("Successfully scraped metric",
+			"Context", metric.Context,
+			"MetricDesc", fmt.Sprint(metric.MetricsDesc),
+			"duration", time.Since(scrapeStart),
+			"samples", len(samples),
+			"database", d.Name)
 	}
-	wg.Wait()
 
 	performanceSamples, err := e.ScrapePerformanceSamples(d, tick)
 	errChan <- err
