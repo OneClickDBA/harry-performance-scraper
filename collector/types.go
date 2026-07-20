@@ -13,18 +13,21 @@ import (
 // Scraper collects Oracle DB metrics.
 type Scraper struct {
 	*MetricsConfiguration
-	mu                     *sync.Mutex
-	metricsToScrape        map[string]*Metric
-	metricDefinitionHashes map[string][]byte
-	scrapeRequests         chan struct{}
-	databases              []*Database
-	logger                 *slog.Logger
-	allConstLabels         []string
-	planCacheMu            sync.Mutex
-	lastPlanCollection     map[string]time.Time
-	knownPlans             map[string]map[SQLPlanKey]struct{}
-	activityWatermarkMu    sync.Mutex
-	activityWatermarks     map[string]time.Time
+	mu                      *sync.Mutex
+	metricsToScrape         map[string]*Metric
+	metricDefinitionHashes  map[string][]byte
+	scrapeRequests          chan struct{}
+	databases               []*Database
+	logger                  *slog.Logger
+	allConstLabels          []string
+	planCacheMu             sync.Mutex
+	lastSQLDetailCollection map[string]time.Time
+	knownPlans              map[string]map[SQLPlanKey]struct{}
+	sqlConsumerMu           sync.Mutex
+	sqlCounterSnapshots     map[string]map[sqlCounterKey]sqlCounterValues
+	sqlConsumerDeltas       map[string]map[string]sqlCounterValues
+	activityWatermarkMu     sync.Mutex
+	activityWatermarks      map[string]time.Time
 }
 
 type Database struct {

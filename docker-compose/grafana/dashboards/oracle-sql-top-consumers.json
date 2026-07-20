@@ -1,0 +1,943 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "SQL Performance Overview",
+      "tooltip": "Open category rankings",
+      "type": "link",
+      "url": "/d/oracle-sql-performance/oracle-sql-performance"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_id"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Select SQL_ID",
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_id=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_preview"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 420
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_text_status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with ordered as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(elapsed_time_micro, 0) as elapsed_time_micro,\n    coalesce(cpu_time_micro, 0) as cpu_time_micro,\n    coalesce(user_io_wait_micro, 0) as user_io_wait_micro,\n    coalesce(application_wait_micro, 0) as application_wait_micro,\n    coalesce(concurrency_wait_micro, 0) as concurrency_wait_micro,\n    coalesce(cluster_wait_micro, 0) as cluster_wait_micro,\n    coalesce(executions, 0) as executions,\n    coalesce(buffer_gets, 0) as buffer_gets,\n    coalesce(disk_reads, 0) as disk_reads,\n    lag(coalesce(elapsed_time_micro, 0)) over w as prev_elapsed,\n    lag(coalesce(cpu_time_micro, 0)) over w as prev_cpu,\n    lag(coalesce(user_io_wait_micro, 0)) over w as prev_user_io,\n    lag(coalesce(application_wait_micro, 0)) over w as prev_application,\n    lag(coalesce(concurrency_wait_micro, 0)) over w as prev_concurrency,\n    lag(coalesce(cluster_wait_micro, 0)) over w as prev_cluster,\n    lag(coalesce(executions, 0)) over w as prev_executions,\n    lag(coalesce(buffer_gets, 0)) over w as prev_buffer_gets,\n    lag(coalesce(disk_reads, 0)) over w as prev_disk_reads\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), deltas as (\n  select sql_id,\n    case when prev_elapsed is null then 0 when elapsed_time_micro >= prev_elapsed then elapsed_time_micro - prev_elapsed else elapsed_time_micro end as elapsed_delta,\n    case when prev_cpu is null then 0 when cpu_time_micro >= prev_cpu then cpu_time_micro - prev_cpu else cpu_time_micro end as cpu_delta,\n    case when prev_user_io is null then 0 when user_io_wait_micro >= prev_user_io then user_io_wait_micro - prev_user_io else user_io_wait_micro end as user_io_delta,\n    case when prev_application is null then 0 when application_wait_micro >= prev_application then application_wait_micro - prev_application else application_wait_micro end as application_delta,\n    case when prev_concurrency is null then 0 when concurrency_wait_micro >= prev_concurrency then concurrency_wait_micro - prev_concurrency else concurrency_wait_micro end as concurrency_delta,\n    case when prev_cluster is null then 0 when cluster_wait_micro >= prev_cluster then cluster_wait_micro - prev_cluster else cluster_wait_micro end as cluster_delta,\n    case when prev_executions is null then 0 when executions >= prev_executions then executions - prev_executions else executions end as executions_delta,\n    case when prev_buffer_gets is null then 0 when buffer_gets >= prev_buffer_gets then buffer_gets - prev_buffer_gets else buffer_gets end as buffer_gets_delta,\n    case when prev_disk_reads is null then 0 when disk_reads >= prev_disk_reads then disk_reads - prev_disk_reads else disk_reads end as disk_reads_delta\n  from ordered\n), consumers as (\n  select sql_id,\n    sum(elapsed_delta) as elapsed_micro,\n    sum(cpu_delta) as cpu_micro,\n    sum(user_io_delta) as user_io_micro,\n    sum(application_delta) as application_micro,\n    sum(concurrency_delta) as concurrency_micro,\n    sum(cluster_delta) as cluster_micro,\n    sum(executions_delta) as executions_delta,\n    sum(buffer_gets_delta) as buffer_gets_delta,\n    sum(disk_reads_delta) as disk_reads_delta\n  from deltas\n  group by sql_id\n), ranked as (\n  select *,\n    rank() over (order by elapsed_micro desc) as elapsed_rank,\n    rank() over (order by cpu_micro desc) as cpu_rank,\n    rank() over (order by user_io_micro desc) as user_io_rank,\n    rank() over (order by executions_delta desc) as executions_rank\n  from consumers\n  where elapsed_micro > 0\n)\nselect r.sql_id, elapsed_rank, cpu_rank, user_io_rank, executions_rank,\n  case\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) <= 0 then 'Other'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = cpu_micro then 'CPU'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = user_io_micro then 'User I/O'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = application_micro then 'Application'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = concurrency_micro then 'Concurrency'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = cluster_micro then 'Cluster'\n    else 'Other'\n  end as primary_pressure,\n  round(elapsed_micro / 1000000.0, 3) as elapsed_seconds,\n  round(cpu_micro / 1000000.0, 3) as cpu_seconds,\n  round(user_io_micro / 1000000.0, 3) as user_io_seconds,\n  round(application_micro / 1000000.0, 3) as application_seconds,\n  round(concurrency_micro / 1000000.0, 3) as concurrency_seconds,\n  round(cluster_micro / 1000000.0, 3) as cluster_seconds,\n  executions_delta,\n  round((elapsed_micro / 1000000.0) / nullif(executions_delta, 0), 6) as elapsed_seconds_per_exec,\n  buffer_gets_delta, disk_reads_delta,\n  case when t.sql_id is null then 'Not collected or aged out' else 'Available' end as sql_text_status,\n  coalesce(p.plan_count, 0) as collected_plans,\n  left(t.sql_fulltext, 240) as sql_preview\nfrom ranked r\nleft join oracle_sql_texts t\n  on t.source_database = ${source_database:sqlstring} and t.sql_id = r.sql_id\nleft join lateral (\n  select count(distinct (inst_id, child_number, plan_hash_value)) as plan_count\n  from oracle_sql_plans p\n  where p.source_database = ${source_database:sqlstring} and p.sql_id = r.sql_id\n) p on true\norder by elapsed_rank\nlimit 20;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top 20 SQL Consumers by Elapsed Time",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Delta seconds",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#58A55C"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "User I/O"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Application"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E65A8A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Concurrency"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7B5BC7"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cluster"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#A8A8A8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Elapsed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2C94C"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "with ordered as (\n  select collected_at, inst_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(elapsed_time_micro, 0) as elapsed_time_micro,\n    coalesce(cpu_time_micro, 0) as cpu_time_micro,\n    coalesce(user_io_wait_micro, 0) as user_io_wait_micro,\n    coalesce(application_wait_micro, 0) as application_wait_micro,\n    coalesce(concurrency_wait_micro, 0) as concurrency_wait_micro,\n    coalesce(cluster_wait_micro, 0) as cluster_wait_micro,\n    lag(coalesce(elapsed_time_micro, 0)) over w as prev_elapsed,\n    lag(coalesce(cpu_time_micro, 0)) over w as prev_cpu,\n    lag(coalesce(user_io_wait_micro, 0)) over w as prev_user_io,\n    lag(coalesce(application_wait_micro, 0)) over w as prev_application,\n    lag(coalesce(concurrency_wait_micro, 0)) over w as prev_concurrency,\n    lag(coalesce(cluster_wait_micro, 0)) over w as prev_cluster\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and sql_id = nullif(${sql_id:sqlstring}, '')\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), per_time as (\n  select collected_at,\n    sum(case when prev_elapsed is null then 0 when elapsed_time_micro >= prev_elapsed then elapsed_time_micro - prev_elapsed else elapsed_time_micro end) / 1000000.0 as elapsed_seconds,\n    sum(case when prev_cpu is null then 0 when cpu_time_micro >= prev_cpu then cpu_time_micro - prev_cpu else cpu_time_micro end) / 1000000.0 as cpu_seconds,\n    sum(case when prev_user_io is null then 0 when user_io_wait_micro >= prev_user_io then user_io_wait_micro - prev_user_io else user_io_wait_micro end) / 1000000.0 as user_io_seconds,\n    sum(case when prev_application is null then 0 when application_wait_micro >= prev_application then application_wait_micro - prev_application else application_wait_micro end) / 1000000.0 as application_seconds,\n    sum(case when prev_concurrency is null then 0 when concurrency_wait_micro >= prev_concurrency then concurrency_wait_micro - prev_concurrency else concurrency_wait_micro end) / 1000000.0 as concurrency_seconds,\n    sum(case when prev_cluster is null then 0 when cluster_wait_micro >= prev_cluster then cluster_wait_micro - prev_cluster else cluster_wait_micro end) / 1000000.0 as cluster_seconds\n  from ordered group by collected_at\n)\nselect collected_at as \"time\", metric, value::double precision\nfrom per_time\ncross join lateral (values\n  ('Elapsed', elapsed_seconds), ('CPU', cpu_seconds), ('User I/O', user_io_seconds),\n  ('Application', application_seconds), ('Concurrency', concurrency_seconds), ('Cluster', cluster_seconds)\n) series(metric, value)\norder by 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Selected SQL Time Breakdown",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Delta count",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Executions"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#58A55C"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rows Processed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Parse Calls"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "with ordered as (\n  select collected_at, inst_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(executions, 0) as executions, coalesce(rows_processed, 0) as rows_processed,\n    coalesce(parse_calls, 0) as parse_calls,\n    lag(coalesce(executions, 0)) over w as prev_executions,\n    lag(coalesce(rows_processed, 0)) over w as prev_rows,\n    lag(coalesce(parse_calls, 0)) over w as prev_parses\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and sql_id = nullif(${sql_id:sqlstring}, '')\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), per_time as (\n  select collected_at,\n    sum(case when prev_executions is null then 0 when executions >= prev_executions then executions - prev_executions else executions end) as executions_delta,\n    sum(case when prev_rows is null then 0 when rows_processed >= prev_rows then rows_processed - prev_rows else rows_processed end) as rows_delta,\n    sum(case when prev_parses is null then 0 when parse_calls >= prev_parses then parse_calls - prev_parses else parse_calls end) as parses_delta\n  from ordered group by collected_at\n)\nselect collected_at as \"time\", metric, value::double precision\nfrom per_time\ncross join lateral (values\n  ('Executions', executions_delta), ('Rows Processed', rows_delta), ('Parse Calls', parses_delta)\n) series(metric, value)\norder by 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Selected SQL Workload Delta",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Delta operations",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Buffer Gets"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#58A55C"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Disk Reads"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Direct Writes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E65A8A"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "with ordered as (\n  select collected_at, inst_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(buffer_gets, 0) as buffer_gets, coalesce(disk_reads, 0) as disk_reads,\n    coalesce(direct_writes, 0) as direct_writes,\n    lag(coalesce(buffer_gets, 0)) over w as prev_buffer_gets,\n    lag(coalesce(disk_reads, 0)) over w as prev_disk_reads,\n    lag(coalesce(direct_writes, 0)) over w as prev_direct_writes\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and sql_id = nullif(${sql_id:sqlstring}, '')\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), per_time as (\n  select collected_at,\n    sum(case when prev_buffer_gets is null then 0 when buffer_gets >= prev_buffer_gets then buffer_gets - prev_buffer_gets else buffer_gets end) as buffer_gets_delta,\n    sum(case when prev_disk_reads is null then 0 when disk_reads >= prev_disk_reads then disk_reads - prev_disk_reads else disk_reads end) as disk_reads_delta,\n    sum(case when prev_direct_writes is null then 0 when direct_writes >= prev_direct_writes then direct_writes - prev_direct_writes else direct_writes end) as direct_writes_delta\n  from ordered group by collected_at\n)\nselect collected_at as \"time\", metric, value::double precision\nfrom per_time\ncross join lateral (values\n  ('Buffer Gets', buffer_gets_delta), ('Disk Reads', disk_reads_delta), ('Direct Writes', direct_writes_delta)\n) series(metric, value)\norder by 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Selected SQL I/O Delta",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 5,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select s.inst_id, s.sql_id, s.child_number, s.plan_hash_value,\n  min(s.collected_at) as first_seen, max(s.collected_at) as last_seen,\n  count(*) as samples,\n  max(s.executions) - min(s.executions) as executions_delta,\n  round((max(coalesce(s.elapsed_time_micro, 0)) - min(coalesce(s.elapsed_time_micro, 0))) / 1000000.0, 3) as elapsed_seconds_delta,\n  case when exists (\n    select 1 from oracle_sql_plans p\n    where p.source_database = s.source_database\n      and p.sql_id = s.sql_id\n      and p.plan_hash_value = s.plan_hash_value\n  ) then 'Available' else 'Not collected or aged out' end as plan_status\nfrom oracle_sql_samples s\nwhere $__timeFilter(s.collected_at)\n  and s.source_database = ${source_database:sqlstring}\n  and s.sql_id = nullif(${sql_id:sqlstring}, '')\ngroup by s.source_database, s.inst_id, s.sql_id, s.child_number, s.plan_hash_value\norder by last_seen desc, elapsed_seconds_delta desc;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Selected SQL Plan Hashes",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "id": 6,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": false,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": false,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  last_text_seen_at as \"time\",\n  sql_fulltext as \"line\"\nfrom oracle_sql_texts\nwhere source_database = ${source_database:sqlstring}\n  and sql_id = nullif(${sql_id:sqlstring}, '');",
+          "refId": "A"
+        }
+      ],
+      "title": "Selected SQL Full Text",
+      "type": "logs",
+      "description": "Complete Oracle SQL text for the SQL_ID selected in the dashboard variable."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "description": "Cached cursor-plan operations from GV$SQL_PLAN for the selected SQL_ID and plan hash. Estimates are optimizer estimates, not ALLSTATS runtime values. A full table scan is not necessarily inefficient and must be evaluated with the SQL workload and object size.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_operation"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 420
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "access_predicates"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "filter_predicates"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 46
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  inst_id,\n  child_number,\n  plan_hash_value,\n  plan_line_id as id,\n  parent_id,\n  repeat('  ', greatest(coalesce(depth, 0), 0)::integer) || operation ||\n    case when options is not null then ' ' || options else '' end as plan_operation,\n  concat_ws('.', object_owner, object_name) as object,\n  object_type,\n  cost,\n  cardinality as estimated_rows,\n  bytes as estimated_bytes,\n  temp_space,\n  partition_start,\n  partition_stop,\n  case when operation = 'TABLE ACCESS' and options = 'FULL' then true else false end as full_table_scan,\n  access_predicates,\n  filter_predicates,\n  last_referenced_at\nfrom oracle_sql_plans\nwhere source_database = ${source_database:sqlstring}\n  and sql_id = nullif(${sql_id:sqlstring}, '')\n  and (nullif(${plan_hash_value:sqlstring}, '') is null\n       or plan_hash_value::text = ${plan_hash_value:sqlstring})\norder by inst_id, child_number, plan_hash_value, plan_line_id;",
+          "refId": "A"
+        }
+      ],
+      "title": "Selected SQL Execution Plan",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "oracle",
+    "postgresql",
+    "sql",
+    "performance",
+    "top-consumers"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "PostgreSQL"
+        },
+        "definition": "select distinct source_database from oracle_sql_samples order by 1;",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Source Database",
+        "multi": false,
+        "name": "source_database",
+        "options": [],
+        "query": "select distinct source_database from oracle_sql_samples order by 1;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "PostgreSQL"
+        },
+        "definition": "with ordered as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(elapsed_time_micro, 0) as elapsed_time_micro,\n    lag(coalesce(elapsed_time_micro, 0)) over (\n      partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n      order by collected_at\n    ) as prev_elapsed\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n), consumers as (\n  select sql_id,\n    sum(case when prev_elapsed is null then 0 when elapsed_time_micro >= prev_elapsed then elapsed_time_micro - prev_elapsed else elapsed_time_micro end) as elapsed_micro\n  from ordered\n  group by sql_id\n)\nselect sql_id as __text, sql_id as __value\nfrom consumers\nwhere elapsed_micro > 0\norder by elapsed_micro desc, sql_id\nlimit 20;",
+        "hide": 0,
+        "includeAll": false,
+        "label": "SQL_ID",
+        "multi": false,
+        "name": "sql_id",
+        "options": [],
+        "query": "with ordered as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(elapsed_time_micro, 0) as elapsed_time_micro,\n    lag(coalesce(elapsed_time_micro, 0)) over (\n      partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n      order by collected_at\n    ) as prev_elapsed\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n), consumers as (\n  select sql_id,\n    sum(case when prev_elapsed is null then 0 when elapsed_time_micro >= prev_elapsed then elapsed_time_micro - prev_elapsed else elapsed_time_micro end) as elapsed_micro\n  from ordered\n  group by sql_id\n)\nselect sql_id as __text, sql_id as __value\nfrom consumers\nwhere elapsed_micro > 0\norder by elapsed_micro desc, sql_id\nlimit 20;",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "PostgreSQL"
+        },
+        "definition": "select plan_hash_value::text as __text, plan_hash_value::text as __value from oracle_sql_plans where source_database = ${source_database:sqlstring} and sql_id = nullif(${sql_id:sqlstring}, '') group by plan_hash_value order by max(last_referenced_at) desc;",
+        "hide": 0,
+        "includeAll": false,
+        "label": "PLAN_HASH_VALUE",
+        "multi": false,
+        "name": "plan_hash_value",
+        "options": [],
+        "query": "select plan_hash_value::text as __text, plan_hash_value::text as __value from oracle_sql_plans where source_database = ${source_database:sqlstring} and sql_id = nullif(${sql_id:sqlstring}, '') group by plan_hash_value order by max(last_referenced_at) desc;",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Oracle SQL Top Consumers",
+  "uid": "oracle-sql-top-consumers",
+  "version": 1,
+  "weekStart": ""
+}

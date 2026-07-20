@@ -20,9 +20,14 @@ func TestNativeActivityAndSQLQueriesAvoidASHAndSQLTextByDefault(t *testing.T) {
 	if strings.Contains(strings.ToLower(sqlPerformanceQuery), "sql_fulltext") {
 		t.Fatal("frequent SQL counter query must not retrieve SQL_FULLTEXT")
 	}
-	if !strings.Contains(strings.ToLower(sqlDetailQuery), "gv$sql") ||
-		!strings.Contains(strings.ToLower(sqlDetailQuery), "candidate_rank <= :1") {
-		t.Fatal("SQL detail query must be bounded and use GV$SQL")
+	detailQuery, detailArgs := buildSQLDetailQuery([]string{"sql1", "sql2"})
+	if !strings.Contains(strings.ToLower(detailQuery), "gv$sql") ||
+		!strings.Contains(strings.ToLower(detailQuery), "where q.sql_id in (:1, :2)") ||
+		!strings.Contains(strings.ToLower(detailQuery), "where child_rank = 1") {
+		t.Fatalf("SQL detail query must bind selected SQL IDs and bound child cursors: %s", detailQuery)
+	}
+	if len(detailArgs) != 2 || detailArgs[0] != "sql1" || detailArgs[1] != "sql2" {
+		t.Fatalf("unexpected SQL detail arguments: %#v", detailArgs)
 	}
 }
 
@@ -78,17 +83,77 @@ func TestSQLPlanCollectionCadence(t *testing.T) {
 		},
 	}
 	first := time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC)
-	if !scraper.shouldCollectSQLPlans("DB1", first) {
+	if !scraper.shouldCollectSQLDetails("DB1", first) {
 		t.Fatal("expected initial plan collection")
 	}
-	if scraper.shouldCollectSQLPlans("DB1", first.Add(time.Minute)) {
+	if scraper.shouldCollectSQLDetails("DB1", first.Add(time.Minute)) {
 		t.Fatal("did not expect collection before interval")
 	}
-	if !scraper.shouldCollectSQLPlans("DB1", first.Add(interval)) {
+	if !scraper.shouldCollectSQLDetails("DB1", first.Add(interval)) {
 		t.Fatal("expected collection at interval")
 	}
-	if !scraper.shouldCollectSQLPlans("DB2", first.Add(time.Minute)) {
+	if !scraper.shouldCollectSQLDetails("DB2", first.Add(time.Minute)) {
 		t.Fatal("expected independent cadence for another database")
+	}
+}
+
+func TestTopSQLConsumersUseAccumulatedIntervalDeltas(t *testing.T) {
+	scraper := &Scraper{}
+	scraper.recordSQLConsumerDeltas("DB1", []SQLSample{
+		testSQLCounterSample(1, "historical", 10, 10_000, 8_000, 1_000),
+		testSQLCounterSample(1, "current", 20, 100, 50, 10),
+		testSQLCounterSample(2, "current", 20, 200, 80, 20),
+	})
+	if got := scraper.takeTopSQLConsumers("DB1", 20); len(got) != 0 {
+		t.Fatalf("initial counter snapshot must not create consumers, got %#v", got)
+	}
+
+	scraper.recordSQLConsumerDeltas("DB1", []SQLSample{
+		testSQLCounterSample(1, "historical", 10, 10_010, 8_005, 1_001),
+		testSQLCounterSample(1, "current", 20, 150, 80, 20),
+		testSQLCounterSample(2, "current", 20, 240, 100, 30),
+	})
+	scraper.recordSQLConsumerDeltas("DB1", []SQLSample{
+		testSQLCounterSample(1, "historical", 10, 10_020, 8_010, 1_002),
+		testSQLCounterSample(1, "current", 20, 180, 100, 30),
+		testSQLCounterSample(2, "current", 20, 280, 120, 40),
+	})
+
+	got := scraper.takeTopSQLConsumers("DB1", 2)
+	want := []string{"current", "historical"}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("top consumers = %#v, want %#v", got, want)
+	}
+	if got := scraper.takeTopSQLConsumers("DB1", 2); len(got) != 0 {
+		t.Fatalf("taking consumers must clear the completed interval, got %#v", got)
+	}
+}
+
+func TestSQLConsumerDeltaHandlesCounterResetAndNewCursor(t *testing.T) {
+	scraper := &Scraper{}
+	scraper.recordSQLConsumerDeltas("DB1", []SQLSample{
+		testSQLCounterSample(1, "reset", 10, 500, 300, 100),
+	})
+	scraper.recordSQLConsumerDeltas("DB1", []SQLSample{
+		testSQLCounterSample(1, "reset", 10, 25, 15, 5),
+		testSQLCounterSample(1, "new", 20, 40, 20, 10),
+	})
+
+	got := scraper.takeTopSQLConsumers("DB1", 2)
+	want := []string{"new", "reset"}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("top consumers after reset = %#v, want %#v", got, want)
+	}
+}
+
+func testSQLCounterSample(instID int64, sqlID string, planHash, elapsed, cpu, userIO int64) SQLSample {
+	return SQLSample{
+		InstID:           instID,
+		SQLID:            sqlID,
+		PlanHashValue:    &planHash,
+		ElapsedTimeMicro: &elapsed,
+		CPUTimeMicro:     &cpu,
+		UserIOWaitMicro:  &userIO,
 	}
 }
 

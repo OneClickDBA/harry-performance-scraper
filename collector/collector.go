@@ -53,16 +53,18 @@ func NewScraper(logger *slog.Logger, m *MetricsConfiguration) *Scraper {
 		databases = append(databases, database)
 	}
 	e := &Scraper{
-		mu:                     &sync.Mutex{},
-		metricDefinitionHashes: map[string][]byte{},
-		scrapeRequests:         make(chan struct{}, 1),
-		logger:                 logger,
-		MetricsConfiguration:   m,
-		databases:              databases,
-		allConstLabels:         allConstLabels,
-		lastPlanCollection:     map[string]time.Time{},
-		knownPlans:             map[string]map[SQLPlanKey]struct{}{},
-		activityWatermarks:     map[string]time.Time{},
+		mu:                      &sync.Mutex{},
+		metricDefinitionHashes:  map[string][]byte{},
+		scrapeRequests:          make(chan struct{}, 1),
+		logger:                  logger,
+		MetricsConfiguration:    m,
+		databases:               databases,
+		allConstLabels:          allConstLabels,
+		lastSQLDetailCollection: map[string]time.Time{},
+		knownPlans:              map[string]map[SQLPlanKey]struct{}{},
+		sqlCounterSnapshots:     map[string]map[sqlCounterKey]sqlCounterValues{},
+		sqlConsumerDeltas:       map[string]map[string]sqlCounterValues{},
+		activityWatermarks:      map[string]time.Time{},
 	}
 	metricsToScrape, err := e.loadMetricsToScrape()
 	if err != nil {

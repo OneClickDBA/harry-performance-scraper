@@ -61,7 +61,7 @@ performance:
     interval: 2s
     queryTimeout: 2s
   sqlPlans:
-    ## Collect cached execution plans for bounded top SQL candidates from GV$SQL_PLAN.
+    ## Collect SQL text and cached plans for top elapsed-time interval consumers.
     enabled: true
     interval: 2m
     topN: 20

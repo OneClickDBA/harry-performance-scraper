@@ -58,6 +58,7 @@ performance:
     interval: 2s
     queryTimeout: 2s
   sqlPlans:
+    # Collect SQL text and cached plans for top elapsed-time interval consumers.
     enabled: true
     interval: 2m
     topN: 20

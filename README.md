@@ -67,9 +67,10 @@ set. Daily partitions are created on demand before samples are written. Complete
 SQL text is normalized into the non-partitioned `oracle_sql_texts` lookup table
 instead of being duplicated in every SQL sample.
 Frequent SQL counter collection uses `GV$SQLSTATS`, including statements too
-short to appear reliably in session samples. Complete text and child cursor
-details are fetched from `GV$SQL` only for a bounded candidate set on the slower
-plan collection interval. Execution-plan operations from `GV$SQL_PLAN` are deduplicated in the
+short to appear reliably in session samples. The scraper accumulates interval
+deltas and selects the top elapsed-time SQL IDs for the slower, bounded detail
+pass. Complete text and child cursor details are then fetched from `GV$SQL`.
+Execution-plan operations from `GV$SQL_PLAN` are deduplicated in the
 non-partitioned `oracle_sql_plans` lookup table and retained while their cursor
 plan remains referenced by SQL samples.
 

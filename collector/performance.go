@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -43,15 +44,16 @@ where q.sql_id is not null
 	and q.last_active_time >= :1
 order by q.last_active_time desc`
 
-const sqlDetailQuery = `
+const sqlDetailQueryPrefix = `
 select inst_id, sql_id, child_number, plan_hash_value, sql_fulltext
 from (
 	select q.inst_id, q.sql_id, q.child_number, q.plan_hash_value, q.sql_fulltext,
-		row_number() over (order by q.elapsed_time desc) as candidate_rank
+		row_number() over (
+			partition by q.inst_id, q.sql_id, q.plan_hash_value
+			order by q.elapsed_time desc, q.child_number
+		) as child_rank
 	from gv$sql q
-	where q.sql_id is not null
-)
-where candidate_rank <= :1`
+	where q.sql_id in (`
 
 const sqlPlanQueryPrefix = `
 select
@@ -137,6 +139,8 @@ func (e *Scraper) ScrapePerformanceSamples(d *Database, tick *time.Time) (Perfor
 	sqlSamples, err := e.scrapeSQLSamples(d, collectedAt, timeout)
 	if err != nil {
 		err = fmt.Errorf("scrape sql performance: %w", err)
+	} else {
+		e.recordSQLConsumerDeltas(d.Name, sqlSamples)
 	}
 	sessionSamples, sessionErr := e.scrapeSessionSamples(d, collectedAt, timeout)
 	if sessionErr != nil {
@@ -150,8 +154,9 @@ func (e *Scraper) ScrapePerformanceSamples(d *Database, tick *time.Time) (Perfor
 	var sqlTexts []SQLTextSample
 	var sqlDetails []SQLSample
 	var sqlPlanErr error
-	if e.shouldCollectSQLPlans(d.Name, collectedAt) {
-		detailSamples, detailErr := e.scrapeSQLDetails(d, collectedAt, e.Performance.SQLPlans.GetTopN(), e.Performance.SQLPlans.GetQueryTimeout())
+	if e.shouldCollectSQLDetails(d.Name, collectedAt) {
+		consumerSQLIDs := e.takeTopSQLConsumers(d.Name, e.Performance.SQLPlans.GetTopN())
+		detailSamples, detailErr := e.scrapeSQLDetails(d, collectedAt, consumerSQLIDs, e.Performance.SQLPlans.GetQueryTimeout())
 		sqlDetails = detailSamples
 		if detailErr != nil {
 			sqlPlanErr = fmt.Errorf("scrape SQL text and plan candidates: %w", detailErr)
@@ -166,7 +171,7 @@ func (e *Scraper) ScrapePerformanceSamples(d *Database, tick *time.Time) (Perfor
 				})
 			}
 		}
-		candidates := e.uncachedSQLPlanCandidates(d.Name, detailSamples, e.Performance.SQLPlans.GetTopN())
+		candidates := e.uncachedSQLPlanCandidates(d.Name, detailSamples, topSQLLimit)
 		if len(candidates) > 0 {
 			var planErr error
 			sqlPlans, planErr = e.scrapeSQLPlans(d, collectedAt, candidates, e.Performance.SQLPlans.GetQueryTimeout())
@@ -192,22 +197,185 @@ func (e *Scraper) ScrapePerformanceSamples(d *Database, tick *time.Time) (Perfor
 	}, errors.Join(err, sqlPlanErr, sessionErr, blockingErr)
 }
 
-func (e *Scraper) shouldCollectSQLPlans(database string, collectedAt time.Time) bool {
+func (e *Scraper) shouldCollectSQLDetails(database string, collectedAt time.Time) bool {
 	if e.MetricsConfiguration == nil || !e.Performance.SQLPlans.GetEnabled() {
 		return false
 	}
 
 	e.planCacheMu.Lock()
 	defer e.planCacheMu.Unlock()
-	if e.lastPlanCollection == nil {
-		e.lastPlanCollection = map[string]time.Time{}
+	if e.lastSQLDetailCollection == nil {
+		e.lastSQLDetailCollection = map[string]time.Time{}
 	}
-	last, ok := e.lastPlanCollection[database]
+	last, ok := e.lastSQLDetailCollection[database]
 	if ok && collectedAt.Before(last.Add(e.Performance.SQLPlans.GetInterval())) {
 		return false
 	}
-	e.lastPlanCollection[database] = collectedAt
+	e.lastSQLDetailCollection[database] = collectedAt
 	return true
+}
+
+type sqlCounterKey struct {
+	InstID        int64
+	SQLID         string
+	PlanHashValue int64
+}
+
+type sqlCounterValues struct {
+	ElapsedTimeMicro     int64
+	CPUTimeMicro         int64
+	UserIOWaitMicro      int64
+	ApplicationWaitMicro int64
+	ConcurrencyWaitMicro int64
+	ClusterWaitMicro     int64
+	Executions           int64
+	BufferGets           int64
+	DiskReads            int64
+}
+
+func (e *Scraper) recordSQLConsumerDeltas(database string, samples []SQLSample) {
+	e.sqlConsumerMu.Lock()
+	defer e.sqlConsumerMu.Unlock()
+
+	if e.sqlCounterSnapshots == nil {
+		e.sqlCounterSnapshots = map[string]map[sqlCounterKey]sqlCounterValues{}
+	}
+	if e.sqlConsumerDeltas == nil {
+		e.sqlConsumerDeltas = map[string]map[string]sqlCounterValues{}
+	}
+	previous, initialized := e.sqlCounterSnapshots[database]
+	current := make(map[sqlCounterKey]sqlCounterValues, len(samples))
+	if e.sqlConsumerDeltas[database] == nil {
+		e.sqlConsumerDeltas[database] = map[string]sqlCounterValues{}
+	}
+
+	for _, sample := range samples {
+		if sample.SQLID == "" {
+			continue
+		}
+		key := sqlCounterKey{InstID: sample.InstID, SQLID: sample.SQLID}
+		if sample.PlanHashValue != nil {
+			key.PlanHashValue = *sample.PlanHashValue
+		}
+		values := sqlCounterValuesFromSample(sample)
+		current[key] = values
+		if !initialized {
+			continue
+		}
+		previousValues, hadPrevious := previous[key]
+		delta := sqlCounterDelta(values, previousValues, hadPrevious)
+		accumulated := e.sqlConsumerDeltas[database][sample.SQLID]
+		accumulated.add(delta)
+		e.sqlConsumerDeltas[database][sample.SQLID] = accumulated
+	}
+	e.sqlCounterSnapshots[database] = current
+}
+
+func sqlCounterValuesFromSample(sample SQLSample) sqlCounterValues {
+	return sqlCounterValues{
+		ElapsedTimeMicro:     int64Value(sample.ElapsedTimeMicro),
+		CPUTimeMicro:         int64Value(sample.CPUTimeMicro),
+		UserIOWaitMicro:      int64Value(sample.UserIOWaitMicro),
+		ApplicationWaitMicro: int64Value(sample.ApplicationWaitMicro),
+		ConcurrencyWaitMicro: int64Value(sample.ConcurrencyWaitMicro),
+		ClusterWaitMicro:     int64Value(sample.ClusterWaitMicro),
+		Executions:           int64Value(sample.Executions),
+		BufferGets:           int64Value(sample.BufferGets),
+		DiskReads:            int64Value(sample.DiskReads),
+	}
+}
+
+func int64Value(value *int64) int64 {
+	if value == nil {
+		return 0
+	}
+	return *value
+}
+
+func sqlCounterDelta(current, previous sqlCounterValues, hadPrevious bool) sqlCounterValues {
+	if !hadPrevious {
+		return current
+	}
+	return sqlCounterValues{
+		ElapsedTimeMicro:     monotonicDelta(current.ElapsedTimeMicro, previous.ElapsedTimeMicro),
+		CPUTimeMicro:         monotonicDelta(current.CPUTimeMicro, previous.CPUTimeMicro),
+		UserIOWaitMicro:      monotonicDelta(current.UserIOWaitMicro, previous.UserIOWaitMicro),
+		ApplicationWaitMicro: monotonicDelta(current.ApplicationWaitMicro, previous.ApplicationWaitMicro),
+		ConcurrencyWaitMicro: monotonicDelta(current.ConcurrencyWaitMicro, previous.ConcurrencyWaitMicro),
+		ClusterWaitMicro:     monotonicDelta(current.ClusterWaitMicro, previous.ClusterWaitMicro),
+		Executions:           monotonicDelta(current.Executions, previous.Executions),
+		BufferGets:           monotonicDelta(current.BufferGets, previous.BufferGets),
+		DiskReads:            monotonicDelta(current.DiskReads, previous.DiskReads),
+	}
+}
+
+func monotonicDelta(current, previous int64) int64 {
+	if current >= previous {
+		return current - previous
+	}
+	return current
+}
+
+func (v *sqlCounterValues) add(other sqlCounterValues) {
+	v.ElapsedTimeMicro += other.ElapsedTimeMicro
+	v.CPUTimeMicro += other.CPUTimeMicro
+	v.UserIOWaitMicro += other.UserIOWaitMicro
+	v.ApplicationWaitMicro += other.ApplicationWaitMicro
+	v.ConcurrencyWaitMicro += other.ConcurrencyWaitMicro
+	v.ClusterWaitMicro += other.ClusterWaitMicro
+	v.Executions += other.Executions
+	v.BufferGets += other.BufferGets
+	v.DiskReads += other.DiskReads
+}
+
+func (e *Scraper) takeTopSQLConsumers(database string, limit int) []string {
+	e.sqlConsumerMu.Lock()
+	defer e.sqlConsumerMu.Unlock()
+
+	deltas := e.sqlConsumerDeltas[database]
+	type rankedSQL struct {
+		SQLID string
+		sqlCounterValues
+	}
+	ranked := make([]rankedSQL, 0, len(deltas))
+	for sqlID, values := range deltas {
+		if values.ElapsedTimeMicro <= 0 {
+			continue
+		}
+		ranked = append(ranked, rankedSQL{SQLID: sqlID, sqlCounterValues: values})
+	}
+	slices.SortFunc(ranked, func(a, b rankedSQL) int {
+		if a.ElapsedTimeMicro != b.ElapsedTimeMicro {
+			return -compareInt64(a.ElapsedTimeMicro, b.ElapsedTimeMicro)
+		}
+		if a.CPUTimeMicro != b.CPUTimeMicro {
+			return -compareInt64(a.CPUTimeMicro, b.CPUTimeMicro)
+		}
+		if a.UserIOWaitMicro != b.UserIOWaitMicro {
+			return -compareInt64(a.UserIOWaitMicro, b.UserIOWaitMicro)
+		}
+		return strings.Compare(a.SQLID, b.SQLID)
+	})
+	if limit > len(ranked) {
+		limit = len(ranked)
+	}
+	result := make([]string, limit)
+	for i := 0; i < limit; i++ {
+		result[i] = ranked[i].SQLID
+	}
+	delete(e.sqlConsumerDeltas, database)
+	return result
+}
+
+func compareInt64(a, b int64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func (e *Scraper) uncachedSQLPlanCandidates(database string, samples []SQLSample, limit int) []SQLPlanKey {
@@ -279,6 +447,20 @@ func buildSQLPlanQuery(candidates []SQLPlanKey) (string, []any) {
 	}
 	return sqlPlanQueryPrefix + strings.Join(conditions, " or ") +
 		" order by p.inst_id, p.sql_id, p.child_number, p.plan_hash_value, p.id", args
+}
+
+func buildSQLDetailQuery(sqlIDs []string) (string, []any) {
+	binds := make([]string, len(sqlIDs))
+	args := make([]any, len(sqlIDs))
+	for i, sqlID := range sqlIDs {
+		binds[i] = fmt.Sprintf(":%d", i+1)
+		args[i] = sqlID
+	}
+	query := sqlDetailQueryPrefix + strings.Join(binds, ", ") + `)
+)
+where child_rank = 1
+order by sql_id, inst_id, plan_hash_value, child_number`
+	return query, args
 }
 
 func (e *Scraper) scrapeSQLPlans(d *Database, collectedAt time.Time, candidates []SQLPlanKey, timeout time.Duration) ([]SQLPlanOperation, error) {
@@ -441,10 +623,14 @@ func (e *Scraper) scrapeSQLSamples(d *Database, collectedAt time.Time, timeout t
 	return samples, rows.Err()
 }
 
-func (e *Scraper) scrapeSQLDetails(d *Database, collectedAt time.Time, limit int, timeout time.Duration) ([]SQLSample, error) {
+func (e *Scraper) scrapeSQLDetails(d *Database, collectedAt time.Time, sqlIDs []string, timeout time.Duration) ([]SQLSample, error) {
+	if len(sqlIDs) == 0 {
+		return nil, nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	rows, unlock, err := d.QueryContext(ctx, sqlDetailQuery, limit)
+	query, args := buildSQLDetailQuery(sqlIDs)
+	rows, unlock, err := d.QueryContext(ctx, query, args...)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return nil, fmt.Errorf("Oracle query timed out")
