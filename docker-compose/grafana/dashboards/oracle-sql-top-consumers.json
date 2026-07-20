@@ -176,7 +176,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "Delta seconds",
+            "axisLabel": "Average active sessions",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
@@ -214,7 +214,7 @@
               }
             ]
           },
-          "unit": "s"
+          "unit": "short"
         },
         "overrides": [
           {
@@ -355,11 +355,11 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "with ordered as (\n  select collected_at, inst_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(elapsed_time_micro, 0) as elapsed_time_micro,\n    coalesce(cpu_time_micro, 0) as cpu_time_micro,\n    coalesce(user_io_wait_micro, 0) as user_io_wait_micro,\n    coalesce(application_wait_micro, 0) as application_wait_micro,\n    coalesce(concurrency_wait_micro, 0) as concurrency_wait_micro,\n    coalesce(cluster_wait_micro, 0) as cluster_wait_micro,\n    lag(coalesce(elapsed_time_micro, 0)) over w as prev_elapsed,\n    lag(coalesce(cpu_time_micro, 0)) over w as prev_cpu,\n    lag(coalesce(user_io_wait_micro, 0)) over w as prev_user_io,\n    lag(coalesce(application_wait_micro, 0)) over w as prev_application,\n    lag(coalesce(concurrency_wait_micro, 0)) over w as prev_concurrency,\n    lag(coalesce(cluster_wait_micro, 0)) over w as prev_cluster\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and sql_id = nullif(${sql_id:sqlstring}, '')\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), per_time as (\n  select collected_at,\n    sum(case when prev_elapsed is null then 0 when elapsed_time_micro >= prev_elapsed then elapsed_time_micro - prev_elapsed else elapsed_time_micro end) / 1000000.0 as elapsed_seconds,\n    sum(case when prev_cpu is null then 0 when cpu_time_micro >= prev_cpu then cpu_time_micro - prev_cpu else cpu_time_micro end) / 1000000.0 as cpu_seconds,\n    sum(case when prev_user_io is null then 0 when user_io_wait_micro >= prev_user_io then user_io_wait_micro - prev_user_io else user_io_wait_micro end) / 1000000.0 as user_io_seconds,\n    sum(case when prev_application is null then 0 when application_wait_micro >= prev_application then application_wait_micro - prev_application else application_wait_micro end) / 1000000.0 as application_seconds,\n    sum(case when prev_concurrency is null then 0 when concurrency_wait_micro >= prev_concurrency then concurrency_wait_micro - prev_concurrency else concurrency_wait_micro end) / 1000000.0 as concurrency_seconds,\n    sum(case when prev_cluster is null then 0 when cluster_wait_micro >= prev_cluster then cluster_wait_micro - prev_cluster else cluster_wait_micro end) / 1000000.0 as cluster_seconds\n  from ordered group by collected_at\n)\nselect collected_at as \"time\", metric, value::double precision\nfrom per_time\ncross join lateral (values\n  ('Elapsed', elapsed_seconds), ('CPU', cpu_seconds), ('User I/O', user_io_seconds),\n  ('Application', application_seconds), ('Concurrency', concurrency_seconds), ('Cluster', cluster_seconds)\n) series(metric, value)\norder by 1, 2;",
+          "rawSql": "with ordered as (\n  select collected_at, inst_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(elapsed_time_micro, 0) as elapsed_time_micro,\n    coalesce(cpu_time_micro, 0) as cpu_time_micro,\n    coalesce(user_io_wait_micro, 0) as user_io_wait_micro,\n    coalesce(application_wait_micro, 0) as application_wait_micro,\n    coalesce(concurrency_wait_micro, 0) as concurrency_wait_micro,\n    coalesce(cluster_wait_micro, 0) as cluster_wait_micro,\n    lag(collected_at) over w as prev_collected_at,\n    lag(coalesce(elapsed_time_micro, 0)) over w as prev_elapsed,\n    lag(coalesce(cpu_time_micro, 0)) over w as prev_cpu,\n    lag(coalesce(user_io_wait_micro, 0)) over w as prev_user_io,\n    lag(coalesce(application_wait_micro, 0)) over w as prev_application,\n    lag(coalesce(concurrency_wait_micro, 0)) over w as prev_concurrency,\n    lag(coalesce(cluster_wait_micro, 0)) over w as prev_cluster\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and sql_id = nullif(${sql_id:sqlstring}, '')\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), per_scrape as (\n  select collected_at,\n    max(extract(epoch from collected_at - prev_collected_at)) as interval_seconds,\n    sum(case when prev_elapsed is null then null else\n      (case when elapsed_time_micro >= prev_elapsed then elapsed_time_micro - prev_elapsed else elapsed_time_micro end) /\n      nullif(extract(epoch from collected_at - prev_collected_at) * 1000000.0, 0) end) as elapsed_aas,\n    sum(case when prev_cpu is null then null else\n      (case when cpu_time_micro >= prev_cpu then cpu_time_micro - prev_cpu else cpu_time_micro end) /\n      nullif(extract(epoch from collected_at - prev_collected_at) * 1000000.0, 0) end) as cpu_aas,\n    sum(case when prev_user_io is null then null else\n      (case when user_io_wait_micro >= prev_user_io then user_io_wait_micro - prev_user_io else user_io_wait_micro end) /\n      nullif(extract(epoch from collected_at - prev_collected_at) * 1000000.0, 0) end) as user_io_aas,\n    sum(case when prev_application is null then null else\n      (case when application_wait_micro >= prev_application then application_wait_micro - prev_application else application_wait_micro end) /\n      nullif(extract(epoch from collected_at - prev_collected_at) * 1000000.0, 0) end) as application_aas,\n    sum(case when prev_concurrency is null then null else\n      (case when concurrency_wait_micro >= prev_concurrency then concurrency_wait_micro - prev_concurrency else concurrency_wait_micro end) /\n      nullif(extract(epoch from collected_at - prev_collected_at) * 1000000.0, 0) end) as concurrency_aas,\n    sum(case when prev_cluster is null then null else\n      (case when cluster_wait_micro >= prev_cluster then cluster_wait_micro - prev_cluster else cluster_wait_micro end) /\n      nullif(extract(epoch from collected_at - prev_collected_at) * 1000000.0, 0) end) as cluster_aas\n  from ordered\n  group by collected_at\n), per_minute as (\n  select date_bin(interval '1 minute', collected_at, timestamptz '1970-01-01 00:00:00+00') as bucket,\n    sum(elapsed_aas * interval_seconds) / nullif(sum(interval_seconds), 0) as elapsed_aas,\n    sum(cpu_aas * interval_seconds) / nullif(sum(interval_seconds), 0) as cpu_aas,\n    sum(user_io_aas * interval_seconds) / nullif(sum(interval_seconds), 0) as user_io_aas,\n    sum(application_aas * interval_seconds) / nullif(sum(interval_seconds), 0) as application_aas,\n    sum(concurrency_aas * interval_seconds) / nullif(sum(interval_seconds), 0) as concurrency_aas,\n    sum(cluster_aas * interval_seconds) / nullif(sum(interval_seconds), 0) as cluster_aas\n  from per_scrape\n  group by 1\n)\nselect bucket as \"time\", metric, value::double precision\nfrom per_minute\ncross join lateral (values\n  ('Elapsed', elapsed_aas), ('CPU', cpu_aas), ('User I/O', user_io_aas),\n  ('Application', application_aas), ('Concurrency', concurrency_aas), ('Cluster', cluster_aas)\n) series(metric, value)\norder by 1, 2;\n",
           "refId": "A"
         }
       ],
-      "title": "Selected SQL Time Breakdown",
+      "title": "Selected SQL Database Time (1m Average)",
       "type": "timeseries"
     },
     {
@@ -376,7 +376,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "Delta count",
+            "axisLabel": "Operations / second",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
@@ -414,13 +414,13 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "ops"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "Executions"
+              "options": "Executions / s"
             },
             "properties": [
               {
@@ -435,7 +435,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Rows Processed"
+              "options": "Rows Processed / s"
             },
             "properties": [
               {
@@ -450,7 +450,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Parse Calls"
+              "options": "Parse Calls / s"
             },
             "properties": [
               {
@@ -495,11 +495,11 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "with ordered as (\n  select collected_at, inst_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(executions, 0) as executions, coalesce(rows_processed, 0) as rows_processed,\n    coalesce(parse_calls, 0) as parse_calls,\n    lag(coalesce(executions, 0)) over w as prev_executions,\n    lag(coalesce(rows_processed, 0)) over w as prev_rows,\n    lag(coalesce(parse_calls, 0)) over w as prev_parses\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and sql_id = nullif(${sql_id:sqlstring}, '')\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), per_time as (\n  select collected_at,\n    sum(case when prev_executions is null then 0 when executions >= prev_executions then executions - prev_executions else executions end) as executions_delta,\n    sum(case when prev_rows is null then 0 when rows_processed >= prev_rows then rows_processed - prev_rows else rows_processed end) as rows_delta,\n    sum(case when prev_parses is null then 0 when parse_calls >= prev_parses then parse_calls - prev_parses else parse_calls end) as parses_delta\n  from ordered group by collected_at\n)\nselect collected_at as \"time\", metric, value::double precision\nfrom per_time\ncross join lateral (values\n  ('Executions', executions_delta), ('Rows Processed', rows_delta), ('Parse Calls', parses_delta)\n) series(metric, value)\norder by 1, 2;",
+          "rawSql": "with ordered as (\n  select collected_at, inst_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(executions, 0) as executions,\n    coalesce(rows_processed, 0) as rows_processed,\n    coalesce(parse_calls, 0) as parse_calls,\n    lag(collected_at) over w as prev_collected_at,\n    lag(coalesce(executions, 0)) over w as prev_executions,\n    lag(coalesce(rows_processed, 0)) over w as prev_rows,\n    lag(coalesce(parse_calls, 0)) over w as prev_parses\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and sql_id = nullif(${sql_id:sqlstring}, '')\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), per_scrape as (\n  select collected_at,\n    max(extract(epoch from collected_at - prev_collected_at)) as interval_seconds,\n    sum(case when prev_executions is null then null else\n      (case when executions >= prev_executions then executions - prev_executions else executions end) /\n      nullif(extract(epoch from collected_at - prev_collected_at), 0) end) as executions_per_second,\n    sum(case when prev_rows is null then null else\n      (case when rows_processed >= prev_rows then rows_processed - prev_rows else rows_processed end) /\n      nullif(extract(epoch from collected_at - prev_collected_at), 0) end) as rows_per_second,\n    sum(case when prev_parses is null then null else\n      (case when parse_calls >= prev_parses then parse_calls - prev_parses else parse_calls end) /\n      nullif(extract(epoch from collected_at - prev_collected_at), 0) end) as parses_per_second\n  from ordered\n  group by collected_at\n), per_minute as (\n  select date_bin(interval '1 minute', collected_at, timestamptz '1970-01-01 00:00:00+00') as bucket,\n    sum(executions_per_second * interval_seconds) / nullif(sum(interval_seconds), 0) as executions_per_second,\n    sum(rows_per_second * interval_seconds) / nullif(sum(interval_seconds), 0) as rows_per_second,\n    sum(parses_per_second * interval_seconds) / nullif(sum(interval_seconds), 0) as parses_per_second\n  from per_scrape\n  group by 1\n)\nselect bucket as \"time\", metric, value::double precision\nfrom per_minute\ncross join lateral (values\n  ('Executions / s', executions_per_second),\n  ('Rows Processed / s', rows_per_second),\n  ('Parse Calls / s', parses_per_second)\n) series(metric, value)\norder by 1, 2;\n",
           "refId": "A"
         }
       ],
-      "title": "Selected SQL Workload Delta",
+      "title": "Selected SQL Workload Rate (1m Average)",
       "type": "timeseries"
     },
     {
@@ -516,7 +516,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "Delta operations",
+            "axisLabel": "Operations / second",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
@@ -554,13 +554,13 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "ops"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "Buffer Gets"
+              "options": "Buffer Gets / s"
             },
             "properties": [
               {
@@ -575,7 +575,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Disk Reads"
+              "options": "Disk Reads / s"
             },
             "properties": [
               {
@@ -590,7 +590,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Direct Writes"
+              "options": "Direct Writes / s"
             },
             "properties": [
               {
@@ -635,11 +635,11 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "with ordered as (\n  select collected_at, inst_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(buffer_gets, 0) as buffer_gets, coalesce(disk_reads, 0) as disk_reads,\n    coalesce(direct_writes, 0) as direct_writes,\n    lag(coalesce(buffer_gets, 0)) over w as prev_buffer_gets,\n    lag(coalesce(disk_reads, 0)) over w as prev_disk_reads,\n    lag(coalesce(direct_writes, 0)) over w as prev_direct_writes\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and sql_id = nullif(${sql_id:sqlstring}, '')\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), per_time as (\n  select collected_at,\n    sum(case when prev_buffer_gets is null then 0 when buffer_gets >= prev_buffer_gets then buffer_gets - prev_buffer_gets else buffer_gets end) as buffer_gets_delta,\n    sum(case when prev_disk_reads is null then 0 when disk_reads >= prev_disk_reads then disk_reads - prev_disk_reads else disk_reads end) as disk_reads_delta,\n    sum(case when prev_direct_writes is null then 0 when direct_writes >= prev_direct_writes then direct_writes - prev_direct_writes else direct_writes end) as direct_writes_delta\n  from ordered group by collected_at\n)\nselect collected_at as \"time\", metric, value::double precision\nfrom per_time\ncross join lateral (values\n  ('Buffer Gets', buffer_gets_delta), ('Disk Reads', disk_reads_delta), ('Direct Writes', direct_writes_delta)\n) series(metric, value)\norder by 1, 2;",
+          "rawSql": "with ordered as (\n  select collected_at, inst_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(buffer_gets, 0) as buffer_gets,\n    coalesce(disk_reads, 0) as disk_reads,\n    coalesce(direct_writes, 0) as direct_writes,\n    lag(collected_at) over w as prev_collected_at,\n    lag(coalesce(buffer_gets, 0)) over w as prev_buffer_gets,\n    lag(coalesce(disk_reads, 0)) over w as prev_disk_reads,\n    lag(coalesce(direct_writes, 0)) over w as prev_direct_writes\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and sql_id = nullif(${sql_id:sqlstring}, '')\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), per_scrape as (\n  select collected_at,\n    max(extract(epoch from collected_at - prev_collected_at)) as interval_seconds,\n    sum(case when prev_buffer_gets is null then null else\n      (case when buffer_gets >= prev_buffer_gets then buffer_gets - prev_buffer_gets else buffer_gets end) /\n      nullif(extract(epoch from collected_at - prev_collected_at), 0) end) as buffer_gets_per_second,\n    sum(case when prev_disk_reads is null then null else\n      (case when disk_reads >= prev_disk_reads then disk_reads - prev_disk_reads else disk_reads end) /\n      nullif(extract(epoch from collected_at - prev_collected_at), 0) end) as disk_reads_per_second,\n    sum(case when prev_direct_writes is null then null else\n      (case when direct_writes >= prev_direct_writes then direct_writes - prev_direct_writes else direct_writes end) /\n      nullif(extract(epoch from collected_at - prev_collected_at), 0) end) as direct_writes_per_second\n  from ordered\n  group by collected_at\n), per_minute as (\n  select date_bin(interval '1 minute', collected_at, timestamptz '1970-01-01 00:00:00+00') as bucket,\n    sum(buffer_gets_per_second * interval_seconds) / nullif(sum(interval_seconds), 0) as buffer_gets_per_second,\n    sum(disk_reads_per_second * interval_seconds) / nullif(sum(interval_seconds), 0) as disk_reads_per_second,\n    sum(direct_writes_per_second * interval_seconds) / nullif(sum(interval_seconds), 0) as direct_writes_per_second\n  from per_scrape\n  group by 1\n)\nselect bucket as \"time\", metric, value::double precision\nfrom per_minute\ncross join lateral (values\n  ('Buffer Gets / s', buffer_gets_per_second),\n  ('Disk Reads / s', disk_reads_per_second),\n  ('Direct Writes / s', direct_writes_per_second)\n) series(metric, value)\norder by 1, 2;\n",
           "refId": "A"
         }
       ],
-      "title": "Selected SQL I/O Delta",
+      "title": "Selected SQL I/O Rate (1m Average)",
       "type": "timeseries"
     },
     {
@@ -953,6 +953,6 @@
   "timezone": "",
   "title": "Oracle SQL Top Consumers",
   "uid": "oracle-sql-top-consumers",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }
