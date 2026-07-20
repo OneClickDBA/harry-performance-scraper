@@ -416,7 +416,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select source_database,\n       inst_id,\n       session_id,\n       session_serial_number,\n       max(sql_id) as sql_id,\n       round(sum(sample_duration_micro) / 1000000.0, 3) as active_seconds,\n       round(sum(sample_duration_micro) filter (where session_state = 'ON CPU') / 1000000.0, 3) as cpu_seconds,\n       count(*) as observations,\n       max(wait_class) as last_wait_class,\n       max(event) as last_event,\n       max(machine) as machine,\n       max(program) as program,\n       max(module) as module,\n       max(sample_source) as sample_source\nfrom oracle_database_activity_samples\nwhere $__timeFilter(sample_time)\n  and source_database = ${source_database:sqlstring}\n  and sample_source = ${activity_source:sqlstring}\ngroup by source_database, inst_id, session_id, session_serial_number\norder by active_seconds desc\nlimit 25;",
+          "rawSql": "select inst_id,\n       session_id,\n       session_serial_number,\n       max(sql_id) as sql_id,\n       round(sum(sample_duration_micro) / 1000000.0, 3) as active_seconds,\n       round(sum(sample_duration_micro) filter (where session_state = 'ON CPU') / 1000000.0, 3) as cpu_seconds,\n       count(*) as observations,\n       max(wait_class) as last_wait_class,\n       max(event) as last_event,\n       max(machine) as machine,\n       max(program) as program,\n       max(module) as module,\n       max(sample_source) as sample_source\nfrom oracle_database_activity_samples\nwhere $__timeFilter(sample_time)\n  and source_database = ${source_database:sqlstring}\n  and sample_source = ${activity_source:sqlstring}\ngroup by inst_id, session_id, session_serial_number\norder by active_seconds desc\nlimit 25;",
           "refId": "A"
         }
       ],
@@ -573,7 +573,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select sample_time,\n       sample_source,\n       sample_duration_micro,\n       source_database,\n       inst_id,\n       session_id,\n       session_serial_number,\n       sql_id,\n       case when session_state = 'ON CPU' then 'CPU + CPU Wait' else coalesce(wait_class, 'Other') end as activity_class,\n       event,\n       machine,\n       program,\n       module,\n       action\nfrom oracle_database_activity_samples\nwhere $__timeFilter(sample_time)\n  and source_database = ${source_database:sqlstring}\n  and sample_source = ${activity_source:sqlstring}\norder by sample_time desc\nlimit 100;",
+          "rawSql": "select sample_time,\n       sample_source,\n       sample_duration_micro,\n       inst_id,\n       session_id,\n       session_serial_number,\n       sql_id,\n       case when session_state = 'ON CPU' then 'CPU + CPU Wait' else coalesce(wait_class, 'Other') end as activity_class,\n       event,\n       machine,\n       program,\n       module,\n       action\nfrom oracle_database_activity_samples\nwhere $__timeFilter(sample_time)\n  and source_database = ${source_database:sqlstring}\n  and sample_source = ${activity_source:sqlstring}\norder by sample_time desc\nlimit 100;",
           "refId": "A"
         }
       ],
