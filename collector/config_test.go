@@ -36,6 +36,37 @@ func TestConnectConfigGetConnMaxLifetime(t *testing.T) {
 	})
 }
 
+func TestActivityConfigDefaultsToSessionSampling(t *testing.T) {
+	cfg := ActivityConfig{}
+	if got := cfg.GetSource(); got != "session" {
+		t.Fatalf("source = %q, want session", got)
+	}
+	if got := cfg.GetInterval(); got != 2*time.Second {
+		t.Fatalf("interval = %s, want 2s", got)
+	}
+	if got := cfg.GetQueryTimeout(); got != 2*time.Second {
+		t.Fatalf("query timeout = %s, want 2s", got)
+	}
+}
+
+func TestMetricsConfigurationRejectsInvalidActivitySource(t *testing.T) {
+	configPath := writeScraperConfig(t, `
+databases:
+  default:
+    username: scott
+    password: tiger
+    url: localhost:1521/freepdb1
+performance:
+  activity:
+    source: automatic
+`)
+
+	_, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
+	if err == nil || !strings.Contains(err.Error(), "performance.activity.source") {
+		t.Fatalf("expected invalid activity source error, got %v", err)
+	}
+}
+
 func TestConnectConfigGetConnMaxIdleTime(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
 		cfg := ConnectConfig{}

@@ -164,6 +164,13 @@ func main() {
 		"interval", m.Performance.SQLPlans.GetInterval(),
 		"top_n", m.Performance.SQLPlans.GetTopN(),
 		"query_timeout", m.Performance.SQLPlans.GetQueryTimeout())
+	logger.Info("Database activity collection configuration",
+		"source", m.Performance.Activity.GetSource(),
+		"interval", m.Performance.Activity.GetInterval(),
+		"query_timeout", m.Performance.Activity.GetQueryTimeout())
+	if m.Performance.Activity.GetSource() == "ash" {
+		logger.Warn("Oracle ASH collection is enabled; the operator is responsible for verifying Oracle Diagnostics Pack licensing")
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -256,6 +263,7 @@ func main() {
 
 	go scraper.InitializeDatabases()
 	go scraper.RunScheduledScrapes(ctx, sink)
+	go scraper.RunActivitySampling(ctx, sink)
 
 	select {
 	case <-ctx.Done():

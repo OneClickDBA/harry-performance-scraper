@@ -49,7 +49,7 @@ digraph oracle_to_postgresql_tables {
     label=<
       <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
         <TR><TD BGCOLOR="#f3d99b"><B>Oracle sources for SQL samples</B></TD></TR>
-        <TR><TD ALIGN="LEFT">GV$SQL</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$SQLSTATS</TD></TR>
       </TABLE>
     >
   ];
@@ -90,8 +90,8 @@ digraph oracle_to_postgresql_tables {
     label=<
       <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
         <TR><TD BGCOLOR="#f3d99b"><B>Oracle sources for database activity samples</B></TD></TR>
-        <TR><TD ALIGN="LEFT">GV$ACTIVE_SESSION_HISTORY</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$SESSION fallback</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$SESSION (default)</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$ACTIVE_SESSION_HISTORY (optional, Diagnostics Pack)</TD></TR>
       </TABLE>
     >
   ];
@@ -147,9 +147,9 @@ digraph oracle_to_postgresql_tables {
 
   oracle_metric_sources -> pg_oracle_metric_samples [label="additional metric definitions"];
   oracle_sql_sources -> pg_oracle_sql_samples [label="performance sampler"];
-  oracle_sql_sources -> pg_oracle_sql_texts [label="SQL_FULLTEXT dictionary"];
+  oracle_sql_plan_sources -> pg_oracle_sql_texts [label="bounded SQL_FULLTEXT dictionary"];
   oracle_sql_plan_sources -> pg_oracle_sql_plans [label="bounded cursor-plan collector"];
   oracle_session_sources -> pg_oracle_session_samples [label="performance sampler"];
   oracle_blocking_session_sources -> pg_oracle_blocking_session_samples [label="blocking sampler"];
-  oracle_database_activity_sources -> pg_oracle_database_activity_samples [label="DAH / ASH sampler"];
+  oracle_database_activity_sources -> pg_oracle_database_activity_samples [label="independent activity sampler"];
 }

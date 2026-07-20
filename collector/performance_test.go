@@ -4,53 +4,34 @@
 package collector
 
 import (
+	"database/sql"
 	"strings"
 	"testing"
 	"time"
 )
 
-func TestDatabaseActivitySamplesFromSessionsIncludesActiveSignals(t *testing.T) {
-	active := "ACTIVE"
-	inactive := "INACTIVE"
-	sqlID := "f4hwbrtqu4v3g"
-	userIO := "User I/O"
-	idle := "Idle"
-
-	samples := databaseActivitySamplesFromSessions([]SessionSample{
-		{
-			Database: "first",
-			InstID:   1,
-			SID:      10,
-			Status:   &active,
-		},
-		{
-			Database: "second",
-			InstID:   1,
-			SID:      20,
-			Status:   &inactive,
-			SQLID:    &sqlID,
-		},
-		{
-			Database:  "third",
-			InstID:    1,
-			SID:       30,
-			Status:    &inactive,
-			WaitClass: &userIO,
-		},
-		{
-			Database:  "idle",
-			InstID:    1,
-			SID:       40,
-			Status:    &inactive,
-			WaitClass: &idle,
-		},
-	}, time.Unix(100, 0))
-
-	if got, want := len(samples), 3; got != want {
-		t.Fatalf("len(samples) = %d, want %d", got, want)
+func TestNativeActivityAndSQLQueriesAvoidASHAndSQLTextByDefault(t *testing.T) {
+	if strings.Contains(strings.ToLower(sessionActivityQuery), "active_session_history") {
+		t.Fatal("default session activity query must not access Oracle ASH")
 	}
-	if samples[1].SQLID == nil || *samples[1].SQLID != sqlID {
-		t.Fatalf("samples[1].SQLID = %v, want %q", samples[1].SQLID, sqlID)
+	if !strings.Contains(strings.ToLower(sqlPerformanceQuery), "gv$sqlstats") {
+		t.Fatal("frequent SQL counter query must use GV$SQLSTATS")
+	}
+	if strings.Contains(strings.ToLower(sqlPerformanceQuery), "sql_fulltext") {
+		t.Fatal("frequent SQL counter query must not retrieve SQL_FULLTEXT")
+	}
+	if !strings.Contains(strings.ToLower(sqlDetailQuery), "gv$sql") ||
+		!strings.Contains(strings.ToLower(sqlDetailQuery), "candidate_rank <= :1") {
+		t.Fatal("SQL detail query must be bounded and use GV$SQL")
+	}
+}
+
+func TestNullableDurationUsesOracleValueOrConfiguredInterval(t *testing.T) {
+	if got := nullableDuration(sql.NullInt64{Int64: 1_250_000, Valid: true}, 2*time.Second); got != 1_250_000 {
+		t.Fatalf("duration = %d, want Oracle value", got)
+	}
+	if got := nullableDuration(sql.NullInt64{}, 2*time.Second); got != 2_000_000 {
+		t.Fatalf("duration = %d, want configured fallback", got)
 	}
 }
 

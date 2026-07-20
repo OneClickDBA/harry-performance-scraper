@@ -27,6 +27,11 @@ metrics:
     - /scraper/more-txeventq-metrics.toml
 
 performance:
+  activity:
+    # WARNING: source: ash requires you to verify Oracle Diagnostics Pack licensing.
+    source: session
+    interval: 2s
+    queryTimeout: 2s
   sqlPlans:
     enabled: true
     interval: 2m

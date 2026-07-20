@@ -56,6 +56,13 @@ type SQLSample struct {
 	SQLFullText          *string
 }
 
+type SQLTextSample struct {
+	CollectedAt time.Time
+	Database    string
+	SQLID       string
+	SQLFullText string
+}
+
 type SQLPlanKey struct {
 	InstID        int64
 	SQLID         string
@@ -164,10 +171,20 @@ type DatabaseActivitySample struct {
 	PGAAllocated          *int64
 	TempSpaceAllocated    *int64
 	ConID                 *int64
+	SampleSource          string
+	SampleDurationMicro   int64
+	SQLPlanHashValue      *int64
+	SQLFullPlanHashValue  *int64
+	SQLPlanLineID         *int64
+	ServiceHash           *int64
+	ServiceName           *string
+	ClientIdentifier      *string
 }
 
 type PerformanceSamples struct {
 	SQL              []SQLSample
+	SQLDetails       []SQLSample
+	SQLTexts         []SQLTextSample
 	SQLPlans         []SQLPlanOperation
 	Sessions         []SessionSample
 	BlockingSessions []BlockingSessionSample
@@ -175,7 +192,7 @@ type PerformanceSamples struct {
 }
 
 func (p PerformanceSamples) Count() int {
-	return len(p.SQL) + len(p.SQLPlans) + len(p.Sessions) + len(p.BlockingSessions) + len(p.DatabaseActivity)
+	return len(p.SQL) + len(p.SQLTexts) + len(p.SQLPlans) + len(p.Sessions) + len(p.BlockingSessions) + len(p.DatabaseActivity)
 }
 
 type SampleSink interface {

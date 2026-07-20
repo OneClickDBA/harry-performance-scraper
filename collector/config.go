@@ -111,7 +111,35 @@ type MetricsConfig struct {
 }
 
 type PerformanceConfig struct {
-	SQLPlans SQLPlanConfig `yaml:"sqlPlans"`
+	Activity ActivityConfig `yaml:"activity"`
+	SQLPlans SQLPlanConfig  `yaml:"sqlPlans"`
+}
+
+type ActivityConfig struct {
+	Source       string         `yaml:"source"`
+	Interval     *time.Duration `yaml:"interval"`
+	QueryTimeout *time.Duration `yaml:"queryTimeout"`
+}
+
+func (c ActivityConfig) GetSource() string {
+	if strings.TrimSpace(c.Source) == "" {
+		return "session"
+	}
+	return strings.ToLower(c.Source)
+}
+
+func (c ActivityConfig) GetInterval() time.Duration {
+	if c.Interval == nil {
+		return 2 * time.Second
+	}
+	return *c.Interval
+}
+
+func (c ActivityConfig) GetQueryTimeout() time.Duration {
+	if c.QueryTimeout == nil {
+		return 2 * time.Second
+	}
+	return *c.QueryTimeout
 }
 
 type SQLPlanConfig struct {
@@ -509,6 +537,17 @@ func (m *MetricsConfiguration) validate(logger *slog.Logger) error {
 }
 
 func (m *MetricsConfiguration) validatePerformanceConfig() error {
+	switch m.Performance.Activity.GetSource() {
+	case "session", "ash":
+	default:
+		return fmt.Errorf("performance.activity.source must be session or ash")
+	}
+	if m.Performance.Activity.GetInterval() <= 0 {
+		return fmt.Errorf("performance.activity.interval must be greater than zero")
+	}
+	if m.Performance.Activity.GetQueryTimeout() <= 0 {
+		return fmt.Errorf("performance.activity.queryTimeout must be greater than zero")
+	}
 	if !m.Performance.SQLPlans.GetEnabled() {
 		return nil
 	}

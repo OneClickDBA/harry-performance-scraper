@@ -23,6 +23,8 @@ type Scraper struct {
 	planCacheMu            sync.Mutex
 	lastPlanCollection     map[string]time.Time
 	knownPlans             map[string]map[SQLPlanKey]struct{}
+	activityWatermarkMu    sync.Mutex
+	activityWatermarks     map[string]time.Time
 }
 
 type Database struct {

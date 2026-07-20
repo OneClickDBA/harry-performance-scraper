@@ -62,6 +62,7 @@ func NewScraper(logger *slog.Logger, m *MetricsConfiguration) *Scraper {
 		allConstLabels:         allConstLabels,
 		lastPlanCollection:     map[string]time.Time{},
 		knownPlans:             map[string]map[SQLPlanKey]struct{}{},
+		activityWatermarks:     map[string]time.Time{},
 	}
 	metricsToScrape, err := e.loadMetricsToScrape()
 	if err != nil {
@@ -281,6 +282,8 @@ func (e *Scraper) scrapeDatabaseSamples(sampleCh chan<- []MetricSample, performa
 
 func appendPerformanceSamples(performance *PerformanceSamples, databasePerformance PerformanceSamples) {
 	performance.SQL = append(performance.SQL, databasePerformance.SQL...)
+	performance.SQLDetails = append(performance.SQLDetails, databasePerformance.SQLDetails...)
+	performance.SQLTexts = append(performance.SQLTexts, databasePerformance.SQLTexts...)
 	performance.SQLPlans = append(performance.SQLPlans, databasePerformance.SQLPlans...)
 	performance.Sessions = append(performance.Sessions, databasePerformance.Sessions...)
 	performance.BlockingSessions = append(performance.BlockingSessions, databasePerformance.BlockingSessions...)

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dodger-one/oracledb-performance-scraper/collector"
@@ -28,6 +29,8 @@ type Sink struct {
 	sessionSamplesTable   pgx.Identifier
 	blockingSessionsTable pgx.Identifier
 	databaseActivityTable pgx.Identifier
+	retentionMu           sync.Mutex
+	lastRetentionCleanup  time.Time
 }
 
 func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfig) (*Sink, error) {
@@ -260,20 +263,40 @@ create table if not exists %s (
 	machine text,
 	pga_allocated bigint,
 	temp_space_allocated bigint,
-	con_id bigint
+	con_id bigint,
+	sample_source text not null,
+	sample_duration_micro bigint not null,
+	sql_plan_hash_value bigint,
+	sql_full_plan_hash_value bigint,
+	sql_plan_line_id bigint,
+	service_hash bigint,
+	service_name text,
+	client_identifier text
 ) partition by range (sample_time);
 
 create unique index if not exists oracle_database_activity_samples_unique_idx on %s (sample_time, source_database, inst_id, sample_id, session_id, session_serial_number_key);
 create index if not exists oracle_database_activity_samples_sample_time_idx on %s (sample_time);
 create index if not exists oracle_database_activity_samples_sql_id_idx on %s (source_database, sql_id, sample_time);
 create index if not exists oracle_database_activity_samples_wait_class_idx on %s (source_database, wait_class, sample_time);
+
+alter table %s add column if not exists sample_source text not null default 'LEGACY';
+alter table %s add column if not exists sample_duration_micro bigint not null default 2000000;
+alter table %s add column if not exists sql_plan_hash_value bigint;
+alter table %s add column if not exists sql_full_plan_hash_value bigint;
+alter table %s add column if not exists sql_plan_line_id bigint;
+alter table %s add column if not exists service_hash bigint;
+alter table %s add column if not exists service_name text;
+alter table %s add column if not exists client_identifier text;
+create index if not exists oracle_database_activity_samples_source_idx on %s (source_database, sample_source, sample_time);
 `, samples, samples, samples, samples,
 		sqlTexts, sqlTexts,
 		sqlPlans, sqlPlans, sqlPlans,
 		sqlSamples, sqlSamples, sqlSamples, sqlSamples,
 		sessionSamples, sessionSamples, sessionSamples, sessionSamples,
 		blockingSessions, blockingSessions, blockingSessions,
-		databaseActivity, databaseActivity, databaseActivity, databaseActivity, databaseActivity)
+		databaseActivity, databaseActivity, databaseActivity, databaseActivity, databaseActivity,
+		databaseActivity, databaseActivity, databaseActivity, databaseActivity, databaseActivity,
+		databaseActivity, databaseActivity, databaseActivity, databaseActivity)
 
 	if _, err := s.pool.Exec(ctx, ddl); err != nil {
 		return fmt.Errorf("migrate postgresql schema: %w", err)
@@ -344,9 +367,15 @@ func (s *Sink) WriteSamples(ctx context.Context, samples []collector.MetricSampl
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit postgresql transaction: %w", err)
 	}
-	s.logger.Info("Wrote scrape samples to PostgreSQL",
+	logWrite := s.logger.Info
+	if len(samples) == 0 && len(performance.SQL) == 0 && len(performance.SQLPlans) == 0 &&
+		len(performance.Sessions) == 0 && len(performance.BlockingSessions) == 0 {
+		logWrite = s.logger.Debug
+	}
+	logWrite("Wrote scrape samples to PostgreSQL",
 		"samples", len(samples),
 		"sql_samples", len(performance.SQL),
+		"sql_texts", len(performance.SQLTexts),
 		"sql_plan_operations", len(performance.SQLPlans),
 		"session_samples", len(performance.Sessions),
 		"blocking_session_samples", len(performance.BlockingSessions),
@@ -461,6 +490,23 @@ func collectSQLTextUpdates(performance collector.PerformanceSamples) (map[sqlTex
 		}
 		texts[key] = record
 	}
+	for _, sample := range performance.SQLTexts {
+		addReference(sample.Database, sample.SQLID, sample.CollectedAt)
+		key := sqlTextKey{database: sample.Database, sqlID: sample.SQLID}
+		record, ok := texts[key]
+		if !ok {
+			texts[key] = sqlTextRecord{fullText: sample.SQLFullText, firstSeen: sample.CollectedAt, lastSeen: sample.CollectedAt}
+			continue
+		}
+		if sample.CollectedAt.Before(record.firstSeen) {
+			record.firstSeen = sample.CollectedAt
+		}
+		if !sample.CollectedAt.Before(record.lastSeen) {
+			record.fullText = sample.SQLFullText
+			record.lastSeen = sample.CollectedAt
+		}
+		texts[key] = record
+	}
 	for _, sample := range performance.Sessions {
 		addOptionalReference(sample.Database, sample.SQLID, sample.CollectedAt)
 		addOptionalReference(sample.Database, sample.PrevSQLID, sample.CollectedAt)
@@ -542,7 +588,10 @@ func (s *Sink) writeSQLPlans(ctx context.Context, tx pgx.Tx, performance collect
 		}
 	}
 
-	references := collectSQLPlanReferences(performance.SQL)
+	referenceSamples := make([]collector.SQLSample, 0, len(performance.SQL)+len(performance.SQLDetails))
+	referenceSamples = append(referenceSamples, performance.SQL...)
+	referenceSamples = append(referenceSamples, performance.SQLDetails...)
+	references := collectSQLPlanReferences(referenceSamples)
 	if len(references) == 0 {
 		return nil
 	}
@@ -755,12 +804,20 @@ func (s *Sink) writeDatabaseActivitySamples(ctx context.Context, tx pgx.Tx, samp
 		machine,
 		pga_allocated,
 		temp_space_allocated,
-		con_id
+		con_id,
+		sample_source,
+		sample_duration_micro,
+		sql_plan_hash_value,
+		sql_full_plan_hash_value,
+		sql_plan_line_id,
+		service_hash,
+		service_name,
+		client_identifier
 	) values (
 		$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
 		$11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
 		$21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
-		$31, $32
+		$31, $32, $33, $34, $35, $36, $37, $38, $39, $40
 	) on conflict do nothing`, table)
 
 	batch := &pgx.Batch{}
@@ -798,6 +855,14 @@ func (s *Sink) writeDatabaseActivitySamples(ctx context.Context, tx pgx.Tx, samp
 			sample.PGAAllocated,
 			sample.TempSpaceAllocated,
 			sample.ConID,
+			sample.SampleSource,
+			sample.SampleDurationMicro,
+			sample.SQLPlanHashValue,
+			sample.SQLFullPlanHashValue,
+			sample.SQLPlanLineID,
+			sample.ServiceHash,
+			sample.ServiceName,
+			sample.ClientIdentifier,
 		)
 	}
 
@@ -905,6 +970,12 @@ func (s *Sink) cleanupRetention(ctx context.Context) {
 	if s.retention <= 0 {
 		return
 	}
+	s.retentionMu.Lock()
+	defer s.retentionMu.Unlock()
+	if !s.lastRetentionCleanup.IsZero() && time.Since(s.lastRetentionCleanup) < time.Hour {
+		return
+	}
+	s.lastRetentionCleanup = time.Now()
 	cutoff := time.Now().UTC().Add(-s.retention)
 	dropped, err := s.dropExpiredPartitions(ctx, cutoff)
 	if err != nil {

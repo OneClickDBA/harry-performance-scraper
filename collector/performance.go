@@ -18,10 +18,10 @@ const sqlPerformanceQuery = `
 select
 	q.inst_id,
 	q.sql_id,
-	q.child_number,
+	cast(null as number) as child_number,
 	q.plan_hash_value,
-	q.parsing_schema_name,
-	q.module,
+	cast(null as varchar2(128)) as parsing_schema_name,
+	cast(null as varchar2(64)) as module,
 	q.executions,
 	q.elapsed_time,
 	q.cpu_time,
@@ -37,12 +37,21 @@ select
 	q.loads,
 	q.invalidations,
 	q.parse_calls,
-	q.last_active_time,
-	q.sql_fulltext
-from gv$sql q
+	q.last_active_time
+from gv$sqlstats q
 where q.sql_id is not null
-order by q.elapsed_time desc
-fetch first 100 rows only`
+	and q.last_active_time >= :1
+order by q.last_active_time desc`
+
+const sqlDetailQuery = `
+select inst_id, sql_id, child_number, plan_hash_value, sql_fulltext
+from (
+	select q.inst_id, q.sql_id, q.child_number, q.plan_hash_value, q.sql_fulltext,
+		row_number() over (order by q.elapsed_time desc) as candidate_rank
+	from gv$sql q
+	where q.sql_id is not null
+)
+where candidate_rank <= :1`
 
 const sqlPlanQueryPrefix = `
 select
@@ -118,43 +127,6 @@ left join gv$session bs
 	and bs.sid = s.blocking_session
 where s.blocking_session is not null`
 
-const databaseActivityHistoryQuery = `
-select
-	ash.sample_id,
-	ash.sample_time,
-	ash.inst_id,
-	ash.session_id,
-	ash.session_serial# as session_serial_number,
-	ash.session_type,
-	ash.user_id,
-	ash.sql_id,
-	ash.sql_child_number,
-	ash.sql_exec_id,
-	ash.sql_exec_start,
-	ash.top_level_sql_id,
-	ash.session_state,
-	ash.event,
-	ash.wait_class,
-	ash.wait_time,
-	ash.time_waited,
-	ash.blocking_session,
-	ash.blocking_session_serial# as blocking_session_serial_number,
-	ash.blocking_inst_id,
-	ash.current_obj# as current_object_id,
-	ash.current_file# as current_file_number,
-	ash.current_block# as current_block_number,
-	ash.program,
-	ash.module,
-	ash.action,
-	ash.machine,
-	ash.pga_allocated,
-	ash.temp_space_allocated,
-	ash.con_id
-from gv$active_session_history ash
-where ash.sample_time >= systimestamp - interval '2' minute
-	and ash.session_type = 'FOREGROUND'
-order by ash.sample_time`
-
 func (e *Scraper) ScrapePerformanceSamples(d *Database, tick *time.Time) (PerformanceSamples, error) {
 	collectedAt := time.Now()
 	if tick != nil {
@@ -174,18 +146,32 @@ func (e *Scraper) ScrapePerformanceSamples(d *Database, tick *time.Time) (Perfor
 	if blockingErr != nil {
 		blockingErr = fmt.Errorf("scrape blocking sessions: %w", blockingErr)
 	}
-	databaseActivitySamples, databaseActivityErr := e.scrapeDatabaseActivitySamples(d, collectedAt, timeout)
-	if databaseActivityErr != nil {
-		databaseActivityErr = fmt.Errorf("scrape database activity history: %w", databaseActivityErr)
-	}
 	var sqlPlans []SQLPlanOperation
+	var sqlTexts []SQLTextSample
+	var sqlDetails []SQLSample
 	var sqlPlanErr error
-	if len(sqlSamples) > 0 && e.shouldCollectSQLPlans(d.Name, collectedAt) {
-		candidates := e.uncachedSQLPlanCandidates(d.Name, sqlSamples, e.Performance.SQLPlans.GetTopN())
+	if e.shouldCollectSQLPlans(d.Name, collectedAt) {
+		detailSamples, detailErr := e.scrapeSQLDetails(d, collectedAt, e.Performance.SQLPlans.GetTopN(), e.Performance.SQLPlans.GetQueryTimeout())
+		sqlDetails = detailSamples
+		if detailErr != nil {
+			sqlPlanErr = fmt.Errorf("scrape SQL text and plan candidates: %w", detailErr)
+		}
+		for _, detail := range detailSamples {
+			if detail.SQLFullText != nil && strings.TrimSpace(*detail.SQLFullText) != "" {
+				sqlTexts = append(sqlTexts, SQLTextSample{
+					CollectedAt: detail.CollectedAt,
+					Database:    detail.Database,
+					SQLID:       detail.SQLID,
+					SQLFullText: *detail.SQLFullText,
+				})
+			}
+		}
+		candidates := e.uncachedSQLPlanCandidates(d.Name, detailSamples, e.Performance.SQLPlans.GetTopN())
 		if len(candidates) > 0 {
-			sqlPlans, sqlPlanErr = e.scrapeSQLPlans(d, collectedAt, candidates, e.Performance.SQLPlans.GetQueryTimeout())
-			if sqlPlanErr != nil {
-				sqlPlanErr = fmt.Errorf("scrape SQL execution plans: %w", sqlPlanErr)
+			var planErr error
+			sqlPlans, planErr = e.scrapeSQLPlans(d, collectedAt, candidates, e.Performance.SQLPlans.GetQueryTimeout())
+			if planErr != nil {
+				sqlPlanErr = errors.Join(sqlPlanErr, fmt.Errorf("scrape SQL execution plans: %w", planErr))
 			} else {
 				e.markSQLPlansCollected(d.Name, sqlPlans)
 				e.logger.Debug("Scraped SQL execution plans",
@@ -196,26 +182,14 @@ func (e *Scraper) ScrapePerformanceSamples(d *Database, tick *time.Time) (Perfor
 			}
 		}
 	}
-	ashSamples := len(databaseActivitySamples)
-	sessionDerivedActivitySamples := 0
-	if len(databaseActivitySamples) == 0 && len(sessionSamples) > 0 {
-		databaseActivitySamples = databaseActivitySamplesFromSessions(sessionSamples, collectedAt)
-		sessionDerivedActivitySamples = len(databaseActivitySamples)
-	}
-	e.logger.Info("Scraped database activity samples",
-		"database", d.Name,
-		"ash_samples", ashSamples,
-		"session_samples", len(sessionSamples),
-		"session_derived_database_activity_samples", sessionDerivedActivitySamples,
-		"database_activity_samples", len(databaseActivitySamples),
-	)
 	return PerformanceSamples{
 		SQL:              sqlSamples,
+		SQLDetails:       sqlDetails,
+		SQLTexts:         sqlTexts,
 		SQLPlans:         sqlPlans,
 		Sessions:         sessionSamples,
 		BlockingSessions: blockingSamples,
-		DatabaseActivity: databaseActivitySamples,
-	}, errors.Join(err, sqlPlanErr, sessionErr, blockingErr, databaseActivityErr)
+	}, errors.Join(err, sqlPlanErr, sessionErr, blockingErr)
 }
 
 func (e *Scraper) shouldCollectSQLPlans(database string, collectedAt time.Time) bool {
@@ -389,7 +363,11 @@ func (e *Scraper) scrapeSQLSamples(d *Database, collectedAt time.Time, timeout t
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	rows, unlock, err := d.QueryContext(ctx, sqlPerformanceQuery)
+	lookback := 2 * e.scrapeInterval()
+	if lookback < time.Minute {
+		lookback = time.Minute
+	}
+	rows, unlock, err := d.QueryContext(ctx, sqlPerformanceQuery, collectedAt.Add(-lookback))
 	if ctx.Err() == context.DeadlineExceeded {
 		return nil, fmt.Errorf("Oracle query timed out")
 	}
@@ -406,7 +384,7 @@ func (e *Scraper) scrapeSQLSamples(d *Database, collectedAt time.Time, timeout t
 		var userIOWait, applicationWait, concurrencyWait, clusterWait sql.NullInt64
 		var bufferGets, diskReads, directWrites, rowsProcessed, fetches sql.NullInt64
 		var loads, invalidations, parseCalls sql.NullInt64
-		var parsingSchema, module, sqlFullText sql.NullString
+		var parsingSchema, module sql.NullString
 		var lastActiveTime sql.NullTime
 
 		if err := rows.Scan(
@@ -432,7 +410,6 @@ func (e *Scraper) scrapeSQLSamples(d *Database, collectedAt time.Time, timeout t
 			&invalidations,
 			&parseCalls,
 			&lastActiveTime,
-			&sqlFullText,
 		); err != nil {
 			return nil, err
 		}
@@ -459,6 +436,36 @@ func (e *Scraper) scrapeSQLSamples(d *Database, collectedAt time.Time, timeout t
 		sample.Invalidations = int64Ptr(invalidations)
 		sample.ParseCalls = int64Ptr(parseCalls)
 		sample.LastActiveTime = timePtr(lastActiveTime)
+		samples = append(samples, sample)
+	}
+	return samples, rows.Err()
+}
+
+func (e *Scraper) scrapeSQLDetails(d *Database, collectedAt time.Time, limit int, timeout time.Duration) ([]SQLSample, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	rows, unlock, err := d.QueryContext(ctx, sqlDetailQuery, limit)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("Oracle query timed out")
+		}
+		return nil, err
+	}
+	defer unlock()
+	defer rows.Close()
+
+	var samples []SQLSample
+	for rows.Next() {
+		var sample SQLSample
+		var childNumber, planHashValue sql.NullInt64
+		var sqlFullText sql.NullString
+		if err := rows.Scan(&sample.InstID, &sample.SQLID, &childNumber, &planHashValue, &sqlFullText); err != nil {
+			return nil, err
+		}
+		sample.CollectedAt = collectedAt
+		sample.Database = d.Name
+		sample.ChildNumber = int64Ptr(childNumber)
+		sample.PlanHashValue = int64Ptr(planHashValue)
 		sample.SQLFullText = stringPtr(sqlFullText)
 		samples = append(samples, sample)
 	}
@@ -589,160 +596,6 @@ func (e *Scraper) scrapeBlockingSessionSamples(d *Database, collectedAt time.Tim
 		samples = append(samples, sample)
 	}
 	return samples, rows.Err()
-}
-
-func (e *Scraper) scrapeDatabaseActivitySamples(d *Database, collectedAt time.Time, timeout time.Duration) ([]DatabaseActivitySample, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	rows, unlock, err := d.QueryContext(ctx, databaseActivityHistoryQuery)
-	if ctx.Err() == context.DeadlineExceeded {
-		return nil, fmt.Errorf("Oracle query timed out")
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer unlock()
-	defer rows.Close()
-
-	var samples []DatabaseActivitySample
-	for rows.Next() {
-		var sample DatabaseActivitySample
-		var sessionSerialNumber, userID, sqlChildNumber, sqlExecID sql.NullInt64
-		var waitTimeMicro, timeWaitedMicro, blockingSession, blockingSessionSerial sql.NullInt64
-		var blockingInstID, currentObjectID, currentFileNumber, currentBlockNumber sql.NullInt64
-		var pgaAllocated, tempSpaceAllocated, conID sql.NullInt64
-		var sessionType, sqlID, topLevelSQLID, sessionState, event, waitClass sql.NullString
-		var program, module, action, machine sql.NullString
-		var sqlExecStart sql.NullTime
-
-		if err := rows.Scan(
-			&sample.SampleID,
-			&sample.SampleTime,
-			&sample.InstID,
-			&sample.SessionID,
-			&sessionSerialNumber,
-			&sessionType,
-			&userID,
-			&sqlID,
-			&sqlChildNumber,
-			&sqlExecID,
-			&sqlExecStart,
-			&topLevelSQLID,
-			&sessionState,
-			&event,
-			&waitClass,
-			&waitTimeMicro,
-			&timeWaitedMicro,
-			&blockingSession,
-			&blockingSessionSerial,
-			&blockingInstID,
-			&currentObjectID,
-			&currentFileNumber,
-			&currentBlockNumber,
-			&program,
-			&module,
-			&action,
-			&machine,
-			&pgaAllocated,
-			&tempSpaceAllocated,
-			&conID,
-		); err != nil {
-			return nil, err
-		}
-
-		sample.CollectedAt = collectedAt
-		sample.Database = d.Name
-		sample.SessionSerialNumber = int64Ptr(sessionSerialNumber)
-		sample.SessionType = stringPtr(sessionType)
-		sample.UserID = int64Ptr(userID)
-		sample.SQLID = stringPtr(sqlID)
-		sample.SQLChildNumber = int64Ptr(sqlChildNumber)
-		sample.SQLExecID = int64Ptr(sqlExecID)
-		sample.SQLExecStart = timePtr(sqlExecStart)
-		sample.TopLevelSQLID = stringPtr(topLevelSQLID)
-		sample.SessionState = stringPtr(sessionState)
-		sample.Event = stringPtr(event)
-		sample.WaitClass = stringPtr(waitClass)
-		sample.WaitTimeMicro = int64Ptr(waitTimeMicro)
-		sample.TimeWaitedMicro = int64Ptr(timeWaitedMicro)
-		sample.BlockingSession = int64Ptr(blockingSession)
-		sample.BlockingSessionSerial = int64Ptr(blockingSessionSerial)
-		sample.BlockingInstID = int64Ptr(blockingInstID)
-		sample.CurrentObjectID = int64Ptr(currentObjectID)
-		sample.CurrentFileNumber = int64Ptr(currentFileNumber)
-		sample.CurrentBlockNumber = int64Ptr(currentBlockNumber)
-		sample.Program = stringPtr(program)
-		sample.Module = stringPtr(module)
-		sample.Action = stringPtr(action)
-		sample.Machine = stringPtr(machine)
-		sample.PGAAllocated = int64Ptr(pgaAllocated)
-		sample.TempSpaceAllocated = int64Ptr(tempSpaceAllocated)
-		sample.ConID = int64Ptr(conID)
-		samples = append(samples, sample)
-	}
-	return samples, rows.Err()
-}
-
-func databaseActivitySamplesFromSessions(sessionSamples []SessionSample, collectedAt time.Time) []DatabaseActivitySample {
-	samples := make([]DatabaseActivitySample, 0, len(sessionSamples))
-	sampleID := collectedAt.UnixNano()
-	for _, session := range sessionSamples {
-		if !sessionLooksActiveForDatabaseActivity(session) {
-			continue
-		}
-		sample := DatabaseActivitySample{
-			CollectedAt:         collectedAt,
-			Database:            session.Database,
-			SampleID:            sampleID,
-			SampleTime:          collectedAt,
-			InstID:              session.InstID,
-			SessionID:           session.SID,
-			SessionSerialNumber: session.SerialNumber,
-			SQLID:               session.SQLID,
-			SQLChildNumber:      session.SQLChildNumber,
-			SessionState:        sessionStateFromSession(session),
-			Event:               session.Event,
-			WaitClass:           session.WaitClass,
-			BlockingSession:     session.BlockingSession,
-			BlockingInstID:      session.BlockingInstance,
-			Program:             session.Program,
-			Module:              session.Module,
-			Action:              session.Action,
-			Machine:             session.Machine,
-		}
-		samples = append(samples, sample)
-	}
-	return samples
-}
-
-func sessionLooksActiveForDatabaseActivity(session SessionSample) bool {
-	if stringPtrEqual(session.Status, "ACTIVE") {
-		return true
-	}
-	if session.SQLID != nil && *session.SQLID != "" {
-		return true
-	}
-	if session.WaitClass != nil && *session.WaitClass != "" && *session.WaitClass != "Idle" {
-		return true
-	}
-	if session.BlockingSession != nil {
-		return true
-	}
-	return false
-}
-
-func sessionStateFromSession(session SessionSample) *string {
-	if session.WaitClass == nil || *session.WaitClass == "" || *session.WaitClass == "Idle" {
-		state := "ON CPU"
-		return &state
-	}
-	state := "WAITING"
-	return &state
-}
-
-func stringPtrEqual(value *string, expected string) bool {
-	return value != nil && *value == expected
 }
 
 func int64Ptr(value sql.NullInt64) *int64 {

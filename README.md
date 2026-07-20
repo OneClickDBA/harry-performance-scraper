@@ -23,8 +23,14 @@ codebase.
 Oracle DB Performance Scraper is a PostgreSQL-backed Oracle monitoring
 scraper built from the Oracle application observability codebase. It
 collects Oracle database metrics, SQL/session performance samples, blocking
-session data, and Database Activity History style samples, then stores them in
+session data, and sampled database activity, then stores them in
 PostgreSQL for Grafana dashboards and longer-term analysis.
+
+> **⚠ Oracle Diagnostics Pack**
+>
+> The Oracle ASH collector is **DISABLED by default**. Enabling it requires
+> that **YOU verify your Oracle Diagnostics Pack licensing**. The default
+> `session` activity source samples `GV$SESSION` and does not query Oracle ASH.
 
 This project is not a Prometheus metrics endpoint. The scraper runs on a schedule,
 writes samples to PostgreSQL, and exposes only a small health endpoint.
@@ -36,7 +42,8 @@ writes samples to PostgreSQL, and exposes only a small health endpoint.
 - Optionally collect additional SQL-derived metrics from TOML or YAML
   definition files such as `oracle-operational-metrics.toml`.
 - Collect direct performance samples from Oracle dynamic performance views such
-  as `GV$SQL`, `GV$SESSION`, and `GV$ACTIVE_SESSION_HISTORY`.
+  as `GV$SQLSTATS`, `GV$SQL`, and `GV$SESSION`, with explicitly enabled ASH enrichment for
+  licensed databases.
 - Store samples in PostgreSQL range-partitioned tables.
 - Use PostgreSQL retention by dropping old daily partitions.
 - Visualize data through Grafana dashboards backed directly by PostgreSQL.
@@ -59,7 +66,10 @@ Tables are created automatically when `output.postgresql.autoMigrate: true` is
 set. Daily partitions are created on demand before samples are written. Complete
 SQL text is normalized into the non-partitioned `oracle_sql_texts` lookup table
 instead of being duplicated in every SQL sample.
-Execution-plan operations from `GV$SQL_PLAN` are deduplicated in the
+Frequent SQL counter collection uses `GV$SQLSTATS`, including statements too
+short to appear reliably in session samples. Complete text and child cursor
+details are fetched from `GV$SQL` only for a bounded candidate set on the slower
+plan collection interval. Execution-plan operations from `GV$SQL_PLAN` are deduplicated in the
 non-partitioned `oracle_sql_plans` lookup table and retained while their cursor
 plan remains referenced by SQL samples.
 
@@ -98,6 +108,10 @@ metrics:
     - /etc/oracledb-monitor/oracle-operational-metrics.toml
 
 performance:
+  activity:
+    source: session
+    interval: 2s
+    queryTimeout: 2s
   sqlPlans:
     enabled: true
     interval: 2m
