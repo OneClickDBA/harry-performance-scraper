@@ -20,6 +20,9 @@ func TestNativeActivityAndSQLQueriesAvoidASHAndSQLTextByDefault(t *testing.T) {
 	if strings.Contains(strings.ToLower(sqlPerformanceQuery), "sql_fulltext") {
 		t.Fatal("frequent SQL counter query must not retrieve SQL_FULLTEXT")
 	}
+	if !strings.Contains(strings.ToLower(sqlPerformanceQuery), "last_active_time >= sysdate - (:1 / 86400)") {
+		t.Fatal("frequent SQL counter lookback must use the monitored database clock")
+	}
 	detailQuery, detailArgs := buildSQLDetailQuery([]string{"sql1", "sql2"})
 	if !strings.Contains(strings.ToLower(detailQuery), "gv$sql") ||
 		!strings.Contains(strings.ToLower(detailQuery), "where q.sql_id in (:1, :2)") ||

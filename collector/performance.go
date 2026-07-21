@@ -41,7 +41,7 @@ select
 	q.last_active_time
 from gv$sqlstats q
 where q.sql_id is not null
-	and q.last_active_time >= :1
+	and q.last_active_time >= sysdate - (:1 / 86400)
 order by q.last_active_time desc`
 
 const sqlDetailQueryPrefix = `
@@ -549,7 +549,7 @@ func (e *Scraper) scrapeSQLSamples(d *Database, collectedAt time.Time, timeout t
 	if lookback < time.Minute {
 		lookback = time.Minute
 	}
-	rows, unlock, err := d.QueryContext(ctx, sqlPerformanceQuery, collectedAt.Add(-lookback))
+	rows, unlock, err := d.QueryContext(ctx, sqlPerformanceQuery, lookback.Seconds())
 	if ctx.Err() == context.DeadlineExceeded {
 		return nil, fmt.Errorf("Oracle query timed out")
 	}
