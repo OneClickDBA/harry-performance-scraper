@@ -20,3 +20,4 @@ minikube_tests.sh
 # Documentation is maintained in oracledb-performance-scraper-web.
 /docs/
 /site/
+db-sample-schemas-23.3/
