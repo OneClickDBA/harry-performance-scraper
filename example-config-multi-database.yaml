@@ -105,8 +105,13 @@ metrics:
   ## Optional SQL-derived metric definition files. Order matters: later files
   ## override metrics with the same generated identifier from earlier files.
   definitions:
-    - oracle-operational-metrics.toml
     - custom-metrics-example/custom-metrics.toml
+
+operational:
+  ## Native typed operational collection is enabled by default.
+  enabled: true
+  interval: 1m
+  queryTimeout: 10s
 
 performance:
   activity:

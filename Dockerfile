@@ -75,7 +75,6 @@ ENV LD_LIBRARY_PATH=/usr/lib/oracle/23/client64/lib
 ENV PATH=$PATH:/usr/lib/oracle/23/client64/bin
 
 COPY --from=build /tmp/oracledb_performance_scraper /oracledb_performance_scraper
-ADD ./oracle-operational-metrics.toml /oracle-operational-metrics.toml
 
 # create the mount point for alert log exports (default location)
 RUN mkdir /log && chown 1000:1000 /log
@@ -90,7 +89,6 @@ ENTRYPOINT ["/oracledb_performance_scraper"]
 FROM ${BASE_IMAGE:-ghcr.io/oracle/oraclelinux:8-slim} AS scraper-goora
 
 COPY --from=build /tmp/oracledb_performance_scraper /oracledb_performance_scraper
-ADD ./oracle-operational-metrics.toml /oracle-operational-metrics.toml
 
 # create the mount point for alert log exports (default location)
 RUN mkdir /log && chown 1000:1000 /log

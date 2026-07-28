@@ -4,12 +4,48 @@
 package postgresql
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dodger-one/oracledb-performance-scraper/collector"
 	"github.com/jackc/pgx/v5"
 )
+
+func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
+	sqlSamples := pgx.Identifier{"monitoring", "oracle_sql_samples"}
+	sink := &Sink{
+		databaseStatusTable: siblingIdentifier(sqlSamples, "oracle_database_status_samples"),
+		instanceTable:       siblingIdentifier(sqlSamples, "oracle_instance_samples"),
+		resourceLimitTable:  siblingIdentifier(sqlSamples, "oracle_resource_limit_samples"),
+		tablespaceTable:     siblingIdentifier(sqlSamples, "oracle_tablespace_samples"),
+		asmDiskgroupTable:   siblingIdentifier(sqlSamples, "oracle_asm_diskgroup_samples"),
+		systemCounterTable:  siblingIdentifier(sqlSamples, "oracle_system_counter_samples"),
+		waitClassTable:      siblingIdentifier(sqlSamples, "oracle_wait_class_samples"),
+		systemMetricTable:   siblingIdentifier(sqlSamples, "oracle_system_metric_samples"),
+		scrapeStatusTable:   siblingIdentifier(sqlSamples, "oracle_scrape_status"),
+	}
+	ddl := sink.operationalSchemaDDL()
+	if strings.Contains(ddl, "%!") {
+		t.Fatalf("operational DDL contains an unresolved format directive: %s", ddl)
+	}
+	for _, table := range []string{
+		"oracle_database_status_samples",
+		"oracle_instance_samples",
+		"oracle_resource_limit_samples",
+		"oracle_tablespace_samples",
+		"oracle_asm_diskgroup_samples",
+		"oracle_system_counter_samples",
+		"oracle_wait_class_samples",
+		"oracle_system_metric_samples",
+		"oracle_scrape_status",
+		"oracle_latest_scrape_status",
+	} {
+		if !strings.Contains(ddl, pgx.Identifier{"monitoring", table}.Sanitize()) {
+			t.Fatalf("operational DDL does not contain schema-qualified %s", table)
+		}
+	}
+}
 
 func TestPartitionDay(t *testing.T) {
 	tests := []struct {

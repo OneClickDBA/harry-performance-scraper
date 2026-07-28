@@ -39,8 +39,10 @@ writes samples to PostgreSQL, and exposes only a small health endpoint.
 
 - Collect native SQL, session, blocking, and database activity samples by
   default.
-- Optionally collect additional SQL-derived metrics from TOML or YAML
-  definition files such as `oracle-operational-metrics.toml`.
+- Collect native operational status, capacity, resource-limit, system-counter,
+  wait-class, and collector-health samples by default.
+- Optionally collect user-defined SQL-derived metrics from TOML or YAML
+  definition files.
 - Collect direct performance samples from Oracle dynamic performance views such
   as `GV$SQLSTATS`, `GV$SQL`, and `GV$SESSION`, with explicitly enabled ASH enrichment for
   licensed databases.
@@ -61,6 +63,15 @@ The scraper writes to PostgreSQL tables such as:
 - `oracle_session_samples`
 - `oracle_blocking_session_samples`
 - `oracle_database_activity_samples`
+- `oracle_database_status_samples`
+- `oracle_instance_samples`
+- `oracle_resource_limit_samples`
+- `oracle_tablespace_samples`
+- `oracle_asm_diskgroup_samples`
+- `oracle_system_counter_samples`
+- `oracle_wait_class_samples`
+- `oracle_system_metric_samples`
+- `oracle_scrape_status`
 
 Tables are created automatically when `output.postgresql.autoMigrate: true` is
 set. Daily partitions are created on demand before samples are written. Complete
@@ -105,8 +116,11 @@ databases:
 
 metrics:
   scrapeInterval: 15s
-  definitions:
-    - /etc/oracledb-monitor/oracle-operational-metrics.toml
+
+operational:
+  enabled: true
+  interval: 1m
+  queryTimeout: 10s
 
 performance:
   activity:
@@ -144,6 +158,18 @@ PostgreSQL datasource and imports dashboards from:
 - `docker-compose/grafana/dashboards/oracle-sessions-and-blocking.json`
 - `docker-compose/grafana/dashboards/database-activity-history.json`
 - `docker-compose/grafana/dashboards/oracle-sql-performance.json`
+- `docker-compose/grafana/dashboards/oracle-sql-top-consumers.json`
+- `docker-compose/grafana/dashboards/oracle-operational-overview.json`
+
+The Compose stack also provisions starter Grafana alert rules from
+`docker-compose/grafana/alerting/`. Configure a real contact point and
+notification policy before relying on them.
+
+> **Monitoring-system availability**
+>
+> PostgreSQL-backed Grafana alerts cannot report that Grafana, PostgreSQL, or
+> the scraper itself is completely unavailable. Production deployments need an
+> independent external availability check for all three components.
 
 ## Local Testing
 

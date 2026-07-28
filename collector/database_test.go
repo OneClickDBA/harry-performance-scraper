@@ -333,9 +333,11 @@ func TestScrapeDatabaseSkipsWhileStartupInProgress(t *testing.T) {
 	errChan := make(chan error, 1)
 	sampleCh := make(chan []MetricSample, 1)
 	performanceCh := make(chan PerformanceSamples, 1)
+	operationalCh := make(chan OperationalSamples, 1)
+	statusCh := make(chan []ScrapeStatusSample, 2)
 	now := time.Now()
 
-	scraper.scrapeDatabaseSamples(sampleCh, performanceCh, errChan, database, &now)
+	scraper.scrapeDatabaseSamples(sampleCh, performanceCh, operationalCh, statusCh, errChan, database, &now)
 
 	select {
 	case err := <-errChan:
@@ -380,17 +382,22 @@ func TestScrapeDatabaseRunsAdditionalMetricsSerially(t *testing.T) {
 	}
 	database.startupReady.Store(true)
 	database.initCache(metrics)
+	operationalEnabled := false
 	scraper := &Scraper{
-		logger:               logger,
-		metricsToScrape:      metrics,
-		MetricsConfiguration: &MetricsConfiguration{},
+		logger:          logger,
+		metricsToScrape: metrics,
+		MetricsConfiguration: &MetricsConfiguration{
+			Operational: OperationalConfig{Enabled: &operationalEnabled},
+		},
 	}
 
 	errChan := make(chan error, len(metrics)+1)
 	sampleCh := make(chan []MetricSample, len(metrics))
 	performanceCh := make(chan PerformanceSamples, 1)
+	operationalCh := make(chan OperationalSamples, 1)
+	statusCh := make(chan []ScrapeStatusSample, 4)
 	now := time.Now()
-	scraper.scrapeDatabaseSamples(sampleCh, performanceCh, errChan, database, &now)
+	scraper.scrapeDatabaseSamples(sampleCh, performanceCh, operationalCh, statusCh, errChan, database, &now)
 
 	if maximum := tracker.maximum.Load(); maximum != 1 {
 		t.Fatalf("expected at most one concurrent query per database, got %d", maximum)
@@ -459,6 +466,7 @@ func newTestScheduledScraper(t *testing.T, scrapeInterval time.Duration) (*Scrap
 	}
 	database.initCache(metricsToScrape)
 
+	operationalEnabled := false
 	return &Scraper{
 		mu:              &sync.Mutex{},
 		metricsToScrape: metricsToScrape,
@@ -470,6 +478,7 @@ func newTestScheduledScraper(t *testing.T, scrapeInterval time.Duration) (*Scrap
 				DatabaseLabel:  "database",
 				ScrapeInterval: &scrapeInterval,
 			},
+			Operational: OperationalConfig{Enabled: &operationalEnabled},
 		},
 	}, database
 }
@@ -480,7 +489,8 @@ type recordingSink struct {
 	mu     sync.Mutex
 }
 
-func (s *recordingSink) WriteSamples(_ context.Context, samples []MetricSample, _ PerformanceSamples, _ ScrapeSummary) error {
+func (s *recordingSink) WriteSamples(_ context.Context, batch SampleBatch, _ ScrapeSummary) error {
+	samples := batch.AdditionalMetrics
 	s.mu.Lock()
 	s.last = append([]MetricSample(nil), samples...)
 	s.mu.Unlock()

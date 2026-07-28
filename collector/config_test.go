@@ -227,6 +227,66 @@ databases:
 	if got := cfg.Performance.SQLPlans.GetQueryTimeout(); got != 10*time.Second {
 		t.Fatalf("expected default SQL plan query timeout of 10s, got %s", got)
 	}
+	if !cfg.Operational.GetEnabled() {
+		t.Fatal("expected operational collection to be enabled by default")
+	}
+	if got := cfg.Operational.GetInterval(); got != time.Minute {
+		t.Fatalf("expected default operational interval of 1m, got %s", got)
+	}
+	if got := cfg.Operational.GetQueryTimeout(); got != 10*time.Second {
+		t.Fatalf("expected default operational query timeout of 10s, got %s", got)
+	}
+}
+
+func TestLoadMetricsConfigurationAcceptsOperationalSettings(t *testing.T) {
+	configPath := writeScraperConfig(t, `
+databases:
+  default:
+    username: scott
+    password: tiger
+    url: localhost:1521/freepdb1
+operational:
+  enabled: true
+  interval: 2m
+  queryTimeout: 20s
+`)
+
+	cfg, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
+	if err != nil {
+		t.Fatalf("expected config to load, got %v", err)
+	}
+	if got := cfg.Operational.GetInterval(); got != 2*time.Minute {
+		t.Fatalf("operational interval = %s, want 2m", got)
+	}
+	if got := cfg.Operational.GetQueryTimeout(); got != 20*time.Second {
+		t.Fatalf("operational query timeout = %s, want 20s", got)
+	}
+}
+
+func TestLoadMetricsConfigurationRejectsInvalidOperationalSettings(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		settings string
+		wantErr  string
+	}{
+		{name: "interval", settings: "  interval: 0s\n", wantErr: "operational.interval must be greater than zero"},
+		{name: "timeout", settings: "  queryTimeout: 0s\n", wantErr: "operational.queryTimeout must be greater than zero"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			configPath := writeScraperConfig(t, `
+databases:
+  default:
+    username: scott
+    password: tiger
+    url: localhost:1521/freepdb1
+operational:
+`+tt.settings)
+			_, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
 }
 
 func TestLoadMetricsConfigurationAcceptsSQLPlanSettings(t *testing.T) {
@@ -297,7 +357,7 @@ databases:
     url: localhost:1521/freepdb1
 metrics:
   definitions:
-    - /etc/oracledb-monitor/oracle-operational-metrics.toml
+    - /etc/oracledb-monitor/application-capacity-metrics.toml
     - /etc/oracledb-monitor/application-metrics.toml
 `)
 
@@ -306,7 +366,7 @@ metrics:
 		t.Fatalf("expected config to load, got %v", err)
 	}
 	want := []string{
-		"/etc/oracledb-monitor/oracle-operational-metrics.toml",
+		"/etc/oracledb-monitor/application-capacity-metrics.toml",
 		"/etc/oracledb-monitor/application-metrics.toml",
 	}
 	if strings.Join(cfg.Metrics.Definitions, ",") != strings.Join(want, ",") {

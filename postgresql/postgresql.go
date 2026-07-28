@@ -29,6 +29,15 @@ type Sink struct {
 	sessionSamplesTable   pgx.Identifier
 	blockingSessionsTable pgx.Identifier
 	databaseActivityTable pgx.Identifier
+	databaseStatusTable   pgx.Identifier
+	instanceTable         pgx.Identifier
+	resourceLimitTable    pgx.Identifier
+	tablespaceTable       pgx.Identifier
+	asmDiskgroupTable     pgx.Identifier
+	systemCounterTable    pgx.Identifier
+	waitClassTable        pgx.Identifier
+	systemMetricTable     pgx.Identifier
+	scrapeStatusTable     pgx.Identifier
 	retentionMu           sync.Mutex
 	lastRetentionCleanup  time.Time
 }
@@ -63,6 +72,15 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 		sessionSamplesTable:   identifier(cfg.SessionSamplesTable, "oracle_session_samples"),
 		blockingSessionsTable: identifier(cfg.BlockingSessionsTable, "oracle_blocking_session_samples"),
 		databaseActivityTable: identifier(cfg.DatabaseActivityTable, "oracle_database_activity_samples"),
+		databaseStatusTable:   siblingIdentifier(sqlSamplesTable, "oracle_database_status_samples"),
+		instanceTable:         siblingIdentifier(sqlSamplesTable, "oracle_instance_samples"),
+		resourceLimitTable:    siblingIdentifier(sqlSamplesTable, "oracle_resource_limit_samples"),
+		tablespaceTable:       siblingIdentifier(sqlSamplesTable, "oracle_tablespace_samples"),
+		asmDiskgroupTable:     siblingIdentifier(sqlSamplesTable, "oracle_asm_diskgroup_samples"),
+		systemCounterTable:    siblingIdentifier(sqlSamplesTable, "oracle_system_counter_samples"),
+		waitClassTable:        siblingIdentifier(sqlSamplesTable, "oracle_wait_class_samples"),
+		systemMetricTable:     siblingIdentifier(sqlSamplesTable, "oracle_system_metric_samples"),
+		scrapeStatusTable:     siblingIdentifier(sqlSamplesTable, "oracle_scrape_status"),
 	}
 
 	if err := pool.Ping(ctx); err != nil {
@@ -301,20 +319,226 @@ create index if not exists oracle_database_activity_samples_source_idx on %s (so
 	if _, err := s.pool.Exec(ctx, ddl); err != nil {
 		return fmt.Errorf("migrate postgresql schema: %w", err)
 	}
+	return s.migrateOperationalSchema(ctx)
+}
+
+func (s *Sink) migrateOperationalSchema(ctx context.Context) error {
+	ddl := s.operationalSchemaDDL()
+	if _, err := s.pool.Exec(ctx, ddl); err != nil {
+		return fmt.Errorf("migrate PostgreSQL operational schema: %w", err)
+	}
 	return nil
 }
 
-func (s *Sink) WriteSamples(ctx context.Context, samples []collector.MetricSample, performance collector.PerformanceSamples, summary collector.ScrapeSummary) error {
+func (s *Sink) operationalSchemaDDL() string {
+	databaseStatus := s.databaseStatusTable.Sanitize()
+	instances := s.instanceTable.Sanitize()
+	resourceLimits := s.resourceLimitTable.Sanitize()
+	tablespaces := s.tablespaceTable.Sanitize()
+	asmDiskgroups := s.asmDiskgroupTable.Sanitize()
+	systemCounters := s.systemCounterTable.Sanitize()
+	waitClasses := s.waitClassTable.Sanitize()
+	systemMetrics := s.systemMetricTable.Sanitize()
+	scrapeStatus := s.scrapeStatusTable.Sanitize()
+
+	return fmt.Sprintf(`
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	inst_id bigint not null,
+	instance_name text not null,
+	instance_status text not null,
+	database_status text not null,
+	startup_time timestamptz not null,
+	open_mode text not null,
+	database_role text not null,
+	cdb text not null,
+	con_id bigint not null,
+	con_name text not null,
+	platform_name text not null
+) partition by range (collected_at);
+create index if not exists oracle_database_status_database_time_idx
+	on %s (source_database, collected_at desc);
+
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	inst_id bigint not null,
+	user_sessions bigint not null,
+	active_user_sessions bigint not null,
+	background_sessions bigint not null,
+	process_count bigint not null,
+	cpu_count bigint,
+	sga_max_bytes bigint,
+	pga_aggregate_limit bigint
+) partition by range (collected_at);
+create index if not exists oracle_instance_database_time_idx
+	on %s (source_database, inst_id, collected_at desc);
+
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	inst_id bigint not null,
+	resource_name text not null,
+	current_value bigint not null,
+	max_value bigint not null,
+	initial_limit bigint,
+	limit_value bigint,
+	limit_unlimited boolean not null
+) partition by range (collected_at);
+create index if not exists oracle_resource_limit_database_time_idx
+	on %s (source_database, resource_name, inst_id, collected_at desc);
+
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	tablespace_name text not null,
+	contents text not null,
+	used_bytes bigint not null,
+	free_bytes bigint not null,
+	max_bytes bigint not null,
+	used_percent double precision not null
+) partition by range (collected_at);
+create index if not exists oracle_tablespace_database_time_idx
+	on %s (source_database, tablespace_name, collected_at desc);
+
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	inst_id bigint not null,
+	diskgroup_name text not null,
+	total_bytes bigint not null,
+	free_bytes bigint not null,
+	usable_bytes bigint
+) partition by range (collected_at);
+create index if not exists oracle_asm_diskgroup_database_time_idx
+	on %s (source_database, diskgroup_name, inst_id, collected_at desc);
+
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	inst_id bigint not null,
+	con_id bigint not null,
+	stat_name text not null,
+	cumulative_value bigint not null,
+	delta_value bigint,
+	interval_seconds double precision,
+	counter_reset boolean not null
+) partition by range (collected_at);
+create index if not exists oracle_system_counter_database_time_idx
+	on %s (source_database, stat_name, inst_id, con_id, collected_at desc);
+
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	inst_id bigint not null,
+	con_id bigint not null,
+	wait_class text not null,
+	cumulative_wait_micro bigint not null,
+	delta_wait_micro bigint,
+	interval_seconds double precision,
+	counter_reset boolean not null
+) partition by range (collected_at);
+create index if not exists oracle_wait_class_database_time_idx
+	on %s (source_database, wait_class, inst_id, con_id, collected_at desc);
+
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	inst_id bigint not null,
+	con_id bigint not null,
+	metric_name text not null,
+	value double precision not null,
+	unit text
+) partition by range (collected_at);
+create index if not exists oracle_system_metric_database_time_idx
+	on %s (source_database, metric_name, inst_id, con_id, collected_at desc);
+
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	collector text not null,
+	success boolean not null,
+	duration_seconds double precision not null,
+	sample_count bigint not null,
+	error_message text
+) partition by range (collected_at);
+create index if not exists oracle_scrape_status_database_collector_time_idx
+	on %s (source_database, collector, collected_at desc);
+
+create or replace view %s as
+select distinct on (source_database, collector)
+	collected_at, source_database, collector, success, duration_seconds, sample_count, error_message
+from %s
+order by source_database, collector, collected_at desc;
+
+create or replace view %s as
+select distinct on (source_database, tablespace_name)
+	collected_at, source_database, tablespace_name, contents, used_bytes, free_bytes, max_bytes, used_percent
+from %s
+order by source_database, tablespace_name, collected_at desc;
+
+create or replace view %s as
+select distinct on (source_database, resource_name, inst_id)
+	collected_at, source_database, inst_id, resource_name, current_value, max_value,
+	initial_limit, limit_value, limit_unlimited,
+	case when limit_value > 0 then current_value * 100.0 / limit_value end as used_percent
+from %s
+order by source_database, resource_name, inst_id, collected_at desc;
+
+create or replace view %s as
+select distinct on (source_database, diskgroup_name, inst_id)
+	collected_at, source_database, inst_id, diskgroup_name, total_bytes, free_bytes, usable_bytes,
+	case when total_bytes > 0 then (total_bytes - free_bytes) * 100.0 / total_bytes end as used_percent
+from %s
+order by source_database, diskgroup_name, inst_id, collected_at desc;
+
+create or replace view %s as
+select collected_at, source_database, inst_id, con_id, stat_name, cumulative_value, delta_value,
+	interval_seconds, counter_reset,
+	case when interval_seconds > 0 and not counter_reset
+		then delta_value / interval_seconds
+	end as value_per_second
+from %s;
+
+create or replace view %s as
+select collected_at, source_database, inst_id, con_id, wait_class, cumulative_wait_micro,
+	delta_wait_micro, interval_seconds, counter_reset,
+	case when interval_seconds > 0 and not counter_reset
+		then delta_wait_micro / interval_seconds
+	end as wait_micro_per_second
+from %s;
+`,
+		databaseStatus, databaseStatus,
+		instances, instances,
+		resourceLimits, resourceLimits,
+		tablespaces, tablespaces,
+		asmDiskgroups, asmDiskgroups,
+		systemCounters, systemCounters,
+		waitClasses, waitClasses,
+		systemMetrics, systemMetrics,
+		scrapeStatus, scrapeStatus,
+		siblingIdentifier(s.scrapeStatusTable, "oracle_latest_scrape_status").Sanitize(), scrapeStatus,
+		siblingIdentifier(s.tablespaceTable, "oracle_latest_tablespace_samples").Sanitize(), tablespaces,
+		siblingIdentifier(s.resourceLimitTable, "oracle_latest_resource_limit_samples").Sanitize(), resourceLimits,
+		siblingIdentifier(s.asmDiskgroupTable, "oracle_latest_asm_diskgroup_samples").Sanitize(), asmDiskgroups,
+		siblingIdentifier(s.systemCounterTable, "oracle_system_counter_rates").Sanitize(), systemCounters,
+		siblingIdentifier(s.waitClassTable, "oracle_wait_class_rates").Sanitize(), waitClasses,
+	)
+}
+
+func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, summary collector.ScrapeSummary) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin postgresql transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
-	if err := s.ensureWritePartitions(ctx, tx, samples, performance); err != nil {
+	if err := s.ensureWritePartitions(ctx, tx, batch); err != nil {
 		return err
 	}
 
+	samples := batch.AdditionalMetrics
 	if len(samples) > 0 {
 		rows := make([][]any, 0, len(samples))
 		for _, sample := range samples {
@@ -345,22 +569,28 @@ func (s *Sink) WriteSamples(ctx context.Context, samples []collector.MetricSampl
 		}
 	}
 
-	if err := s.writeSQLTexts(ctx, tx, performance); err != nil {
+	if err := s.writeSQLTexts(ctx, tx, batch.Performance); err != nil {
 		return err
 	}
-	if err := s.writeSQLPlans(ctx, tx, performance); err != nil {
+	if err := s.writeSQLPlans(ctx, tx, batch.Performance); err != nil {
 		return err
 	}
-	if err := s.writeSQLSamples(ctx, tx, performance.SQL); err != nil {
+	if err := s.writeSQLSamples(ctx, tx, batch.Performance.SQL); err != nil {
 		return err
 	}
-	if err := s.writeSessionSamples(ctx, tx, performance.Sessions); err != nil {
+	if err := s.writeSessionSamples(ctx, tx, batch.Performance.Sessions); err != nil {
 		return err
 	}
-	if err := s.writeBlockingSessionSamples(ctx, tx, performance.BlockingSessions); err != nil {
+	if err := s.writeBlockingSessionSamples(ctx, tx, batch.Performance.BlockingSessions); err != nil {
 		return err
 	}
-	if err := s.writeDatabaseActivitySamples(ctx, tx, performance.DatabaseActivity); err != nil {
+	if err := s.writeDatabaseActivitySamples(ctx, tx, batch.Performance.DatabaseActivity); err != nil {
+		return err
+	}
+	if err := s.writeOperationalSamples(ctx, tx, batch.Operational); err != nil {
+		return err
+	}
+	if err := s.writeScrapeStatuses(ctx, tx, batch.ScrapeStatuses); err != nil {
 		return err
 	}
 
@@ -368,18 +598,19 @@ func (s *Sink) WriteSamples(ctx context.Context, samples []collector.MetricSampl
 		return fmt.Errorf("commit postgresql transaction: %w", err)
 	}
 	logWrite := s.logger.Info
-	if len(samples) == 0 && len(performance.SQL) == 0 && len(performance.SQLPlans) == 0 &&
-		len(performance.Sessions) == 0 && len(performance.BlockingSessions) == 0 {
+	if batch.Count() == 0 {
 		logWrite = s.logger.Debug
 	}
 	logWrite("Wrote scrape samples to PostgreSQL",
 		"samples", len(samples),
-		"sql_samples", len(performance.SQL),
-		"sql_texts", len(performance.SQLTexts),
-		"sql_plan_operations", len(performance.SQLPlans),
-		"session_samples", len(performance.Sessions),
-		"blocking_session_samples", len(performance.BlockingSessions),
-		"database_activity_samples", len(performance.DatabaseActivity),
+		"sql_samples", len(batch.Performance.SQL),
+		"sql_texts", len(batch.Performance.SQLTexts),
+		"sql_plan_operations", len(batch.Performance.SQLPlans),
+		"session_samples", len(batch.Performance.Sessions),
+		"blocking_session_samples", len(batch.Performance.BlockingSessions),
+		"database_activity_samples", len(batch.Performance.DatabaseActivity),
+		"operational_samples", batch.Operational.Count(),
+		"scrape_statuses", len(batch.ScrapeStatuses),
 		"errors", summary.TotalErrors,
 		"duration", summary.DurationSeconds)
 	s.cleanupRetention(ctx)
@@ -876,7 +1107,155 @@ func (s *Sink) writeDatabaseActivitySamples(ctx context.Context, tx pgx.Tx, samp
 	return nil
 }
 
-func (s *Sink) ensureWritePartitions(ctx context.Context, tx pgx.Tx, samples []collector.MetricSample, performance collector.PerformanceSamples) error {
+func copyRows(
+	ctx context.Context,
+	tx pgx.Tx,
+	table pgx.Identifier,
+	columns []string,
+	rows [][]any,
+	description string,
+) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	if _, err := tx.CopyFrom(ctx, table, columns, pgx.CopyFromRows(rows)); err != nil {
+		return fmt.Errorf("copy %s: %w", description, err)
+	}
+	return nil
+}
+
+func (s *Sink) writeOperationalSamples(ctx context.Context, tx pgx.Tx, samples collector.OperationalSamples) error {
+	rows := make([][]any, 0, len(samples.DatabaseStatus))
+	for _, sample := range samples.DatabaseStatus {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.InstID, sample.InstanceName,
+			sample.InstanceStatus, sample.DatabaseStatus, sample.StartupTime, sample.OpenMode,
+			sample.DatabaseRole, sample.CDB, sample.ConID, sample.ConName, sample.PlatformName,
+		})
+	}
+	if err := copyRows(ctx, tx, s.databaseStatusTable, []string{
+		"collected_at", "source_database", "inst_id", "instance_name", "instance_status",
+		"database_status", "startup_time", "open_mode", "database_role", "cdb", "con_id",
+		"con_name", "platform_name",
+	}, rows, "database status samples"); err != nil {
+		return err
+	}
+
+	rows = make([][]any, 0, len(samples.Instances))
+	for _, sample := range samples.Instances {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.InstID, sample.UserSessions,
+			sample.ActiveUserSessions, sample.BackgroundSessions, sample.ProcessCount,
+			sample.CPUCount, sample.SGAMaxBytes, sample.PGAAggregateLimit,
+		})
+	}
+	if err := copyRows(ctx, tx, s.instanceTable, []string{
+		"collected_at", "source_database", "inst_id", "user_sessions", "active_user_sessions",
+		"background_sessions", "process_count", "cpu_count", "sga_max_bytes", "pga_aggregate_limit",
+	}, rows, "instance samples"); err != nil {
+		return err
+	}
+
+	rows = make([][]any, 0, len(samples.ResourceLimits))
+	for _, sample := range samples.ResourceLimits {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.InstID, sample.ResourceName,
+			sample.CurrentValue, sample.MaxValue, sample.InitialLimit, sample.LimitValue,
+			sample.LimitUnlimited,
+		})
+	}
+	if err := copyRows(ctx, tx, s.resourceLimitTable, []string{
+		"collected_at", "source_database", "inst_id", "resource_name", "current_value",
+		"max_value", "initial_limit", "limit_value", "limit_unlimited",
+	}, rows, "resource limit samples"); err != nil {
+		return err
+	}
+
+	rows = make([][]any, 0, len(samples.Tablespaces))
+	for _, sample := range samples.Tablespaces {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.Tablespace, sample.Contents,
+			sample.UsedBytes, sample.FreeBytes, sample.MaxBytes, sample.UsedPercent,
+		})
+	}
+	if err := copyRows(ctx, tx, s.tablespaceTable, []string{
+		"collected_at", "source_database", "tablespace_name", "contents", "used_bytes",
+		"free_bytes", "max_bytes", "used_percent",
+	}, rows, "tablespace samples"); err != nil {
+		return err
+	}
+
+	rows = make([][]any, 0, len(samples.ASMDiskgroups))
+	for _, sample := range samples.ASMDiskgroups {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.InstID, sample.Name,
+			sample.TotalBytes, sample.FreeBytes, sample.UsableBytes,
+		})
+	}
+	if err := copyRows(ctx, tx, s.asmDiskgroupTable, []string{
+		"collected_at", "source_database", "inst_id", "diskgroup_name", "total_bytes",
+		"free_bytes", "usable_bytes",
+	}, rows, "ASM diskgroup samples"); err != nil {
+		return err
+	}
+
+	rows = make([][]any, 0, len(samples.SystemCounters))
+	for _, sample := range samples.SystemCounters {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.InstID, sample.ConID, sample.StatName,
+			sample.CumulativeValue, sample.DeltaValue, sample.IntervalSeconds, sample.CounterReset,
+		})
+	}
+	if err := copyRows(ctx, tx, s.systemCounterTable, []string{
+		"collected_at", "source_database", "inst_id", "con_id", "stat_name", "cumulative_value",
+		"delta_value", "interval_seconds", "counter_reset",
+	}, rows, "system counter samples"); err != nil {
+		return err
+	}
+
+	rows = make([][]any, 0, len(samples.WaitClasses))
+	for _, sample := range samples.WaitClasses {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.InstID, sample.ConID, sample.WaitClass,
+			sample.CumulativeWaitMicro, sample.DeltaWaitMicro, sample.IntervalSeconds, sample.CounterReset,
+		})
+	}
+	if err := copyRows(ctx, tx, s.waitClassTable, []string{
+		"collected_at", "source_database", "inst_id", "con_id", "wait_class",
+		"cumulative_wait_micro", "delta_wait_micro", "interval_seconds", "counter_reset",
+	}, rows, "wait class samples"); err != nil {
+		return err
+	}
+
+	rows = make([][]any, 0, len(samples.SystemMetrics))
+	for _, sample := range samples.SystemMetrics {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.InstID, sample.ConID,
+			sample.MetricName, sample.Value, sample.Unit,
+		})
+	}
+	return copyRows(ctx, tx, s.systemMetricTable, []string{
+		"collected_at", "source_database", "inst_id", "con_id", "metric_name", "value", "unit",
+	}, rows, "system metric samples")
+}
+
+func (s *Sink) writeScrapeStatuses(ctx context.Context, tx pgx.Tx, statuses []collector.ScrapeStatusSample) error {
+	rows := make([][]any, 0, len(statuses))
+	for _, status := range statuses {
+		rows = append(rows, []any{
+			status.CollectedAt, status.Database, status.Collector, status.Success,
+			status.DurationSeconds, status.SampleCount, status.ErrorMessage,
+		})
+	}
+	return copyRows(ctx, tx, s.scrapeStatusTable, []string{
+		"collected_at", "source_database", "collector", "success", "duration_seconds",
+		"sample_count", "error_message",
+	}, rows, "scrape status samples")
+}
+
+func (s *Sink) ensureWritePartitions(ctx context.Context, tx pgx.Tx, batch collector.SampleBatch) error {
+	samples := batch.AdditionalMetrics
+	performance := batch.Performance
 	metricTimes := make([]time.Time, 0, len(samples))
 	for _, sample := range samples {
 		metricTimes = append(metricTimes, sample.CollectedAt)
@@ -917,7 +1296,35 @@ func (s *Sink) ensureWritePartitions(ctx context.Context, tx pgx.Tx, samples []c
 		return fmt.Errorf("ensure database activity sample partitions: %w", err)
 	}
 
+	operationalTables := []struct {
+		table pgx.Identifier
+		times []time.Time
+	}{
+		{table: s.databaseStatusTable, times: collectedTimes(batch.Operational.DatabaseStatus, func(v collector.DatabaseStatusSample) time.Time { return v.CollectedAt })},
+		{table: s.instanceTable, times: collectedTimes(batch.Operational.Instances, func(v collector.InstanceSample) time.Time { return v.CollectedAt })},
+		{table: s.resourceLimitTable, times: collectedTimes(batch.Operational.ResourceLimits, func(v collector.ResourceLimitSample) time.Time { return v.CollectedAt })},
+		{table: s.tablespaceTable, times: collectedTimes(batch.Operational.Tablespaces, func(v collector.TablespaceSample) time.Time { return v.CollectedAt })},
+		{table: s.asmDiskgroupTable, times: collectedTimes(batch.Operational.ASMDiskgroups, func(v collector.ASMDiskgroupSample) time.Time { return v.CollectedAt })},
+		{table: s.systemCounterTable, times: collectedTimes(batch.Operational.SystemCounters, func(v collector.SystemCounterSample) time.Time { return v.CollectedAt })},
+		{table: s.waitClassTable, times: collectedTimes(batch.Operational.WaitClasses, func(v collector.WaitClassSample) time.Time { return v.CollectedAt })},
+		{table: s.systemMetricTable, times: collectedTimes(batch.Operational.SystemMetrics, func(v collector.SystemMetricSample) time.Time { return v.CollectedAt })},
+		{table: s.scrapeStatusTable, times: collectedTimes(batch.ScrapeStatuses, func(v collector.ScrapeStatusSample) time.Time { return v.CollectedAt })},
+	}
+	for _, operationalTable := range operationalTables {
+		if err := ensureDailyPartitions(ctx, tx, operationalTable.table, operationalTable.times); err != nil {
+			return fmt.Errorf("ensure %s partitions: %w", operationalTable.table.Sanitize(), err)
+		}
+	}
+
 	return nil
+}
+
+func collectedTimes[T any](values []T, getTime func(T) time.Time) []time.Time {
+	times := make([]time.Time, 0, len(values))
+	for _, value := range values {
+		times = append(times, getTime(value))
+	}
+	return times
 }
 
 func ensureDailyPartitions(ctx context.Context, tx pgx.Tx, parent pgx.Identifier, times []time.Time) error {
@@ -1044,6 +1451,15 @@ func (s *Sink) partitionedTables() []pgx.Identifier {
 		s.sessionSamplesTable,
 		s.blockingSessionsTable,
 		s.databaseActivityTable,
+		s.databaseStatusTable,
+		s.instanceTable,
+		s.resourceLimitTable,
+		s.tablespaceTable,
+		s.asmDiskgroupTable,
+		s.systemCounterTable,
+		s.waitClassTable,
+		s.systemMetricTable,
+		s.scrapeStatusTable,
 	}
 }
 

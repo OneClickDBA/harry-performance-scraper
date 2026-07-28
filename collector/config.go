@@ -32,6 +32,7 @@ type MetricsConfiguration struct {
 	ListenAddress string                    `yaml:"listenAddress"`
 	Databases     map[string]DatabaseConfig `yaml:"databases"`
 	Metrics       MetricsConfig             `yaml:"metrics"`
+	Operational   OperationalConfig         `yaml:"operational"`
 	Performance   PerformanceConfig         `yaml:"performance"`
 	Output        OutputConfig              `yaml:"output"`
 	Logging       LoggingConfig             `yaml:"log"`
@@ -113,6 +114,33 @@ type MetricsConfig struct {
 type PerformanceConfig struct {
 	Activity ActivityConfig `yaml:"activity"`
 	SQLPlans SQLPlanConfig  `yaml:"sqlPlans"`
+}
+
+type OperationalConfig struct {
+	Enabled      *bool          `yaml:"enabled"`
+	Interval     *time.Duration `yaml:"interval"`
+	QueryTimeout *time.Duration `yaml:"queryTimeout"`
+}
+
+func (c OperationalConfig) GetEnabled() bool {
+	if c.Enabled == nil {
+		return true
+	}
+	return *c.Enabled
+}
+
+func (c OperationalConfig) GetInterval() time.Duration {
+	if c.Interval == nil {
+		return time.Minute
+	}
+	return *c.Interval
+}
+
+func (c OperationalConfig) GetQueryTimeout() time.Duration {
+	if c.QueryTimeout == nil {
+		return 10 * time.Second
+	}
+	return *c.QueryTimeout
 }
 
 type ActivityConfig struct {
@@ -530,8 +558,24 @@ func (m *MetricsConfiguration) validate(logger *slog.Logger) error {
 	if err := m.validateLoggingConfig(); err != nil {
 		return err
 	}
+	if err := m.validateOperationalConfig(); err != nil {
+		return err
+	}
 	if err := m.validatePerformanceConfig(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (m *MetricsConfiguration) validateOperationalConfig() error {
+	if !m.Operational.GetEnabled() {
+		return nil
+	}
+	if m.Operational.GetInterval() <= 0 {
+		return fmt.Errorf("operational.interval must be greater than zero")
+	}
+	if m.Operational.GetQueryTimeout() <= 0 {
+		return fmt.Errorf("operational.queryTimeout must be greater than zero")
 	}
 	return nil
 }

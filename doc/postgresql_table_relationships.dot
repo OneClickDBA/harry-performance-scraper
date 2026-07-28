@@ -50,6 +50,42 @@ digraph postgresql_table_relationships {
     label="oracle_database_activity_samples\l\lPartitioned by RANGE (sample_time)\lcollected_at\lsource_database\lsample_id\lsample_time\linst_id\lsession_id\lsession_serial_number\lsession_serial_number_key generated\lsession_type\luser_id\lsql_id\lsql_child_number\lsql_exec_id\lsql_exec_start\ltop_level_sql_id\lsession_state\levent\lwait_class\lwait_time_micro\ltime_waited_micro\lblocking_session\lblocking_session_serial_number\lblocking_inst_id\lcurrent_object_id\lcurrent_file_number\lcurrent_block_number\lprogram\lmodule\laction\lmachine\lpga_allocated\ltemp_space_allocated\lcon_id\lsample_source\lsample_duration_micro\lsql_plan_hash_value\lsql_full_plan_hash_value\lsql_plan_line_id\lservice_hash\lservice_name\lclient_identifier\l\lUnique\lsample_time, source_database, inst_id, sample_id, session_id, session_serial_number_key\l\lIndexes\lsample_time\lsource_database, sql_id, sample_time\lsource_database, wait_class, sample_time\lsource_database, sample_source, sample_time\l"
   ];
 
+  oracle_database_status_samples [
+    label="oracle_database_status_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\linstance_name\linstance_status\ldatabase_status\lstartup_time\lopen_mode\ldatabase_role\lcdb\lcon_id\lcon_name\lplatform_name\l\lIndexes\lsource_database, collected_at desc\l"
+  ];
+
+  oracle_instance_samples [
+    label="oracle_instance_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\luser_sessions\lactive_user_sessions\lbackground_sessions\lprocess_count\lcpu_count\lsga_max_bytes\lpga_aggregate_limit\l\lIndexes\lsource_database, inst_id, collected_at desc\l"
+  ];
+
+  oracle_resource_limit_samples [
+    label="oracle_resource_limit_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lresource_name\lcurrent_value\lmax_value\linitial_limit\llimit_value\llimit_unlimited\l\lIndexes\lsource_database, resource_name, inst_id, collected_at desc\l"
+  ];
+
+  oracle_tablespace_samples [
+    label="oracle_tablespace_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\ltablespace_name\lcontents\lused_bytes\lfree_bytes\lmax_bytes\lused_percent\l\lIndexes\lsource_database, tablespace_name, collected_at desc\l"
+  ];
+
+  oracle_asm_diskgroup_samples [
+    label="oracle_asm_diskgroup_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\ldiskgroup_name\ltotal_bytes\lfree_bytes\lusable_bytes\l\lIndexes\lsource_database, diskgroup_name, inst_id, collected_at desc\l"
+  ];
+
+  oracle_system_counter_samples [
+    label="oracle_system_counter_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lcon_id\lstat_name\lcumulative_value\ldelta_value\linterval_seconds\lcounter_reset\l\lIndexes\lsource_database, stat_name, inst_id, con_id, collected_at desc\l"
+  ];
+
+  oracle_wait_class_samples [
+    label="oracle_wait_class_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lcon_id\lwait_class\lcumulative_wait_micro\ldelta_wait_micro\linterval_seconds\lcounter_reset\l\lIndexes\lsource_database, wait_class, inst_id, con_id, collected_at desc\l"
+  ];
+
+  oracle_system_metric_samples [
+    label="oracle_system_metric_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lcon_id\lmetric_name\lvalue\lunit\l\lIndexes\lsource_database, metric_name, inst_id, con_id, collected_at desc\l"
+  ];
+
+  oracle_scrape_status [
+    label="oracle_scrape_status\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\lcollector\lsuccess\lduration_seconds\lsample_count\lerror_message\l\lIndexes\lsource_database, collector, collected_at desc\l"
+  ];
+
   // Logical relationships used by dashboards and analysis queries.
   oracle_session_samples -> oracle_sql_samples [
     label="logical: source_database, sql_id, sql_child_number",
@@ -113,6 +149,48 @@ digraph postgresql_table_relationships {
 
   oracle_database_activity_samples -> oracle_session_samples [
     label="logical: source_database, inst_id, session_id, session_serial_number",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_instance_samples -> oracle_database_status_samples [
+    label="logical: source_database, inst_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_resource_limit_samples -> oracle_instance_samples [
+    label="logical: source_database, inst_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_asm_diskgroup_samples -> oracle_database_status_samples [
+    label="logical: source_database, inst_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_system_counter_samples -> oracle_instance_samples [
+    label="logical: source_database, inst_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_wait_class_samples -> oracle_instance_samples [
+    label="logical: source_database, inst_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_system_metric_samples -> oracle_instance_samples [
+    label="logical: source_database, inst_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_scrape_status -> oracle_database_status_samples [
+    label="logical: source_database",
     style=dashed,
     color="#666666"
   ];

@@ -28,6 +28,129 @@ type ScrapeSummary struct {
 	SampleCount     int
 }
 
+type DatabaseStatusSample struct {
+	CollectedAt    time.Time
+	Database       string
+	InstID         int64
+	InstanceName   string
+	InstanceStatus string
+	DatabaseStatus string
+	StartupTime    time.Time
+	OpenMode       string
+	DatabaseRole   string
+	CDB            string
+	ConID          int64
+	ConName        string
+	PlatformName   string
+}
+
+type InstanceSample struct {
+	CollectedAt        time.Time
+	Database           string
+	InstID             int64
+	UserSessions       int64
+	ActiveUserSessions int64
+	BackgroundSessions int64
+	ProcessCount       int64
+	CPUCount           *int64
+	SGAMaxBytes        *int64
+	PGAAggregateLimit  *int64
+}
+
+type ResourceLimitSample struct {
+	CollectedAt    time.Time
+	Database       string
+	InstID         int64
+	ResourceName   string
+	CurrentValue   int64
+	MaxValue       int64
+	InitialLimit   *int64
+	LimitValue     *int64
+	LimitUnlimited bool
+}
+
+type TablespaceSample struct {
+	CollectedAt time.Time
+	Database    string
+	Tablespace  string
+	Contents    string
+	UsedBytes   int64
+	FreeBytes   int64
+	MaxBytes    int64
+	UsedPercent float64
+}
+
+type ASMDiskgroupSample struct {
+	CollectedAt time.Time
+	Database    string
+	InstID      int64
+	Name        string
+	TotalBytes  int64
+	FreeBytes   int64
+	UsableBytes *int64
+}
+
+type SystemCounterSample struct {
+	CollectedAt     time.Time
+	Database        string
+	InstID          int64
+	ConID           int64
+	StatName        string
+	CumulativeValue int64
+	DeltaValue      *int64
+	IntervalSeconds *float64
+	CounterReset    bool
+}
+
+type WaitClassSample struct {
+	CollectedAt         time.Time
+	Database            string
+	InstID              int64
+	ConID               int64
+	WaitClass           string
+	CumulativeWaitMicro int64
+	DeltaWaitMicro      *int64
+	IntervalSeconds     *float64
+	CounterReset        bool
+}
+
+type SystemMetricSample struct {
+	CollectedAt time.Time
+	Database    string
+	InstID      int64
+	ConID       int64
+	MetricName  string
+	Value       float64
+	Unit        *string
+}
+
+type ScrapeStatusSample struct {
+	CollectedAt     time.Time
+	Database        string
+	Collector       string
+	Success         bool
+	DurationSeconds float64
+	SampleCount     int
+	ErrorMessage    *string
+}
+
+type OperationalSamples struct {
+	DatabaseStatus []DatabaseStatusSample
+	Instances      []InstanceSample
+	ResourceLimits []ResourceLimitSample
+	Tablespaces    []TablespaceSample
+	ASMDiskgroups  []ASMDiskgroupSample
+	SystemCounters []SystemCounterSample
+	WaitClasses    []WaitClassSample
+	SystemMetrics  []SystemMetricSample
+}
+
+func (o OperationalSamples) Count() int {
+	return len(o.DatabaseStatus) + len(o.Instances) + len(o.ResourceLimits) +
+		len(o.Tablespaces) + len(o.ASMDiskgroups) + len(o.SystemCounters) +
+		len(o.WaitClasses) + len(o.SystemMetrics)
+}
+
 type SQLSample struct {
 	CollectedAt          time.Time
 	Database             string
@@ -191,11 +314,22 @@ type PerformanceSamples struct {
 	DatabaseActivity []DatabaseActivitySample
 }
 
+type SampleBatch struct {
+	AdditionalMetrics []MetricSample
+	Performance       PerformanceSamples
+	Operational       OperationalSamples
+	ScrapeStatuses    []ScrapeStatusSample
+}
+
+func (b SampleBatch) Count() int {
+	return len(b.AdditionalMetrics) + b.Performance.Count() + b.Operational.Count() + len(b.ScrapeStatuses)
+}
+
 func (p PerformanceSamples) Count() int {
 	return len(p.SQL) + len(p.SQLTexts) + len(p.SQLPlans) + len(p.Sessions) + len(p.BlockingSessions) + len(p.DatabaseActivity)
 }
 
 type SampleSink interface {
-	WriteSamples(ctx context.Context, samples []MetricSample, performance PerformanceSamples, summary ScrapeSummary) error
+	WriteSamples(ctx context.Context, batch SampleBatch, summary ScrapeSummary) error
 	Close()
 }

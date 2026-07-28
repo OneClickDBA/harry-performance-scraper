@@ -1,0 +1,393 @@
+---
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Oracle operational alerts
+    folder: Oracle DB Performance Scraper
+    interval: 1m
+    rules:
+      - uid: oracle_scrape_stale
+        title: Oracle scraper data is stale
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: grafana-postgresql-datasource
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  source_database,
+                  extract(
+                    epoch from (now() - collected_at)
+                  )::double precision as value
+                from oracle_latest_scrape_status
+                where collector = 'connectivity'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [180]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: >-
+            Oracle scraper data is stale for
+            {{ $labels.source_database }}
+          description: >-
+            No connectivity result has been stored for more than three
+            minutes. Verify the scraper, PostgreSQL, Grafana, and their host
+            services.
+        labels:
+          severity: critical
+          service: oracledb-performance-scraper
+        isPaused: false
+
+      - uid: oracle_connectivity_failed
+        title: Oracle database connectivity failed
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: grafana-postgresql-datasource
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  source_database,
+                  case when success then 0.0 else 1.0 end as value
+                from oracle_latest_scrape_status
+                where collector = 'connectivity'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: >-
+            Oracle connectivity failed for
+            {{ $labels.source_database }}
+          description: >-
+            The scraper cannot connect to the configured Oracle database.
+        labels:
+          severity: critical
+          service: oracledb-performance-scraper
+        isPaused: false
+
+      - uid: oracle_tablespace_pressure
+        title: Oracle tablespace usage is high
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: grafana-postgresql-datasource
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  source_database,
+                  tablespace_name,
+                  used_percent::double precision as value
+                from oracle_latest_tablespace_samples
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [90]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: >-
+            Tablespace {{ $labels.tablespace_name }} is above 90% on
+            {{ $labels.source_database }}
+          description: >-
+            Review autoextend, maximum size, free storage, and expected growth
+            before allocating space.
+        labels:
+          severity: warning
+          service: oracledb-performance-scraper
+        isPaused: false
+
+      - uid: oracle_resource_pressure
+        title: Oracle resource limit usage is high
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: grafana-postgresql-datasource
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  source_database,
+                  resource_name,
+                  inst_id::text as inst_id,
+                  used_percent::double precision as value
+                from oracle_latest_resource_limit_samples
+                where not limit_unlimited
+                  and limit_value > 0
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [85]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: >-
+            Oracle resource {{ $labels.resource_name }} is above 85% on
+            {{ $labels.source_database }}
+          description: >-
+            Current utilization is approaching the configured Oracle resource
+            limit.
+        labels:
+          severity: warning
+          service: oracledb-performance-scraper
+        isPaused: false
+
+      - uid: oracle_asm_pressure
+        title: Oracle ASM diskgroup usage is high
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: grafana-postgresql-datasource
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  source_database,
+                  diskgroup_name,
+                  used_percent::double precision as value
+                from oracle_latest_asm_diskgroup_samples
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [90]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: >-
+            ASM diskgroup {{ $labels.diskgroup_name }} is above 90% on
+            {{ $labels.source_database }}
+          description: >-
+            Review usable capacity, redundancy, rebalance activity, and
+            expected growth.
+        labels:
+          severity: warning
+          service: oracledb-performance-scraper
+        isPaused: false

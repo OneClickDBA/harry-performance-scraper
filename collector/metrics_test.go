@@ -78,28 +78,6 @@ func TestLoadMetricsToScrapeWithoutDefinitions(t *testing.T) {
 	}
 }
 
-func TestOperationalMetricDefinitionFilesLoad(t *testing.T) {
-	for _, definitionFile := range []string{
-		"../oracle-operational-metrics.toml",
-		"../oracle-operational-metrics.yaml",
-	} {
-		t.Run(definitionFile, func(t *testing.T) {
-			metrics := &Metrics{}
-			if err := loadMetricsConfig(definitionFile, metrics); err != nil {
-				t.Fatalf("expected operational definitions to load: %v", err)
-			}
-			if len(metrics.Metric) == 0 {
-				t.Fatal("expected operational definitions to contain metrics")
-			}
-			for _, metric := range metrics.Metric {
-				if metric.Context == "top_sql" {
-					t.Fatal("operational definitions must not include generic top SQL collection")
-				}
-			}
-		})
-	}
-}
-
 func TestMetricGetLabels(t *testing.T) {
 	tests := []struct {
 		name     string

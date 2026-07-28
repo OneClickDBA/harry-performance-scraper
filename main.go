@@ -168,6 +168,10 @@ func main() {
 		"source", m.Performance.Activity.GetSource(),
 		"interval", m.Performance.Activity.GetInterval(),
 		"query_timeout", m.Performance.Activity.GetQueryTimeout())
+	logger.Info("Operational collection configuration",
+		"enabled", m.Operational.GetEnabled(),
+		"interval", m.Operational.GetInterval(),
+		"query_timeout", m.Operational.GetQueryTimeout())
 	if m.Performance.Activity.GetSource() == "ash" {
 		logger.Warn("Oracle ASH collection is enabled; the operator is responsible for verifying Oracle Diagnostics Pack licensing")
 	}

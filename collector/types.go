@@ -28,6 +28,9 @@ type Scraper struct {
 	sqlConsumerDeltas       map[string]map[string]sqlCounterValues
 	activityWatermarkMu     sync.Mutex
 	activityWatermarks      map[string]time.Time
+	operationalMu           sync.Mutex
+	lastOperationalScrape   map[string]time.Time
+	operationalCounters     map[operationalCounterKey]operationalCounterSnapshot
 }
 
 type Database struct {

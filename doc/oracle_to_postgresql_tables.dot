@@ -25,21 +25,87 @@ digraph oracle_to_postgresql_tables {
       <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
         <TR><TD BGCOLOR="#f3d99b"><B>Oracle sources for additional metric samples</B></TD></TR>
         <TR><TD ALIGN="LEFT">DUAL</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$ASM_DISKGROUP_STAT</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$CON_SYSMETRIC</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$DATABASE</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$DATAFILE</TD></TR>
+        <TR><TD ALIGN="LEFT">User-defined Oracle SQL queries</TD></TR>
+      </TABLE>
+    >
+  ];
+
+  oracle_operational_identity_sources [
+    shape=plain,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
+        <TR><TD BGCOLOR="#f3d99b"><B>Database and instance status</B></TD></TR>
         <TR><TD ALIGN="LEFT">GV$INSTANCE</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$PARAMETER</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$PROCESS</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$RESOURCE_LIMIT</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$DATABASE</TD></TR>
+      </TABLE>
+    >
+  ];
+
+  oracle_operational_instance_sources [
+    shape=plain,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
+        <TR><TD BGCOLOR="#f3d99b"><B>Instance utilization</B></TD></TR>
         <TR><TD ALIGN="LEFT">GV$SESSION</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$SYSSTAT</TD></TR>
-        <TR><TD ALIGN="LEFT">GV$SYSTEM_WAIT_CLASS</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$PROCESS</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$PARAMETER</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$INSTANCE</TD></TR>
+      </TABLE>
+    >
+  ];
+
+  oracle_operational_resource_sources [
+    shape=plain,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
+        <TR><TD BGCOLOR="#f3d99b"><B>Resource limits</B></TD></TR>
+        <TR><TD ALIGN="LEFT">GV$RESOURCE_LIMIT</TD></TR>
+      </TABLE>
+    >
+  ];
+
+  oracle_operational_tablespace_sources [
+    shape=plain,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
+        <TR><TD BGCOLOR="#f3d99b"><B>Tablespace capacity</B></TD></TR>
         <TR><TD ALIGN="LEFT">DBA_TABLESPACE_USAGE_METRICS</TD></TR>
         <TR><TD ALIGN="LEFT">DBA_TABLESPACES</TD></TR>
         <TR><TD ALIGN="LEFT">DBA_TEMP_FREE_SPACE</TD></TR>
-        <TR><TD ALIGN="LEFT">Additional examples: GV$SQL, USER_SEGMENTS, DBA_SEGMENTS,<BR/>GV$AQ_SHARDED_SUBSCRIBER_STAT, GV$PERSISTENT_QUEUES</TD></TR>
+      </TABLE>
+    >
+  ];
+
+  oracle_operational_asm_sources [
+    shape=plain,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
+        <TR><TD BGCOLOR="#f3d99b"><B>ASM capacity</B></TD></TR>
+        <TR><TD ALIGN="LEFT">GV$ASM_DISKGROUP_STAT</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$DATAFILE</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$INSTANCE</TD></TR>
+      </TABLE>
+    >
+  ];
+
+  oracle_operational_counter_sources [
+    shape=plain,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
+        <TR><TD BGCOLOR="#f3d99b"><B>Counters, waits, and ratios</B></TD></TR>
+        <TR><TD ALIGN="LEFT">GV$SYSSTAT</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$SYSTEM_WAIT_CLASS</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$CON_SYSMETRIC</TD></TR>
+      </TABLE>
+    >
+  ];
+
+  scraper_status_sources [
+    shape=plain,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
+        <TR><TD BGCOLOR="#f3d99b"><B>Scraper collection outcomes</B></TD></TR>
+        <TR><TD ALIGN="LEFT">Connectivity and collector results</TD></TR>
       </TABLE>
     >
   ];
@@ -143,6 +209,15 @@ digraph oracle_to_postgresql_tables {
       fillcolor="#e8f1ff",
       label="oracle_database_activity_samples"
     ];
+    pg_oracle_database_status_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_database_status_samples"];
+    pg_oracle_instance_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_instance_samples"];
+    pg_oracle_resource_limit_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_resource_limit_samples"];
+    pg_oracle_tablespace_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_tablespace_samples"];
+    pg_oracle_asm_diskgroup_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_asm_diskgroup_samples"];
+    pg_oracle_system_counter_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_system_counter_samples"];
+    pg_oracle_wait_class_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_wait_class_samples"];
+    pg_oracle_system_metric_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_system_metric_samples"];
+    pg_oracle_scrape_status [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_scrape_status"];
   }
 
   oracle_metric_sources -> pg_oracle_metric_samples [label="additional metric definitions"];
@@ -152,4 +227,13 @@ digraph oracle_to_postgresql_tables {
   oracle_session_sources -> pg_oracle_session_samples [label="performance sampler"];
   oracle_blocking_session_sources -> pg_oracle_blocking_session_samples [label="blocking sampler"];
   oracle_database_activity_sources -> pg_oracle_database_activity_samples [label="independent activity sampler"];
+  oracle_operational_identity_sources -> pg_oracle_database_status_samples [label="native operational collector"];
+  oracle_operational_instance_sources -> pg_oracle_instance_samples [label="native operational collector"];
+  oracle_operational_resource_sources -> pg_oracle_resource_limit_samples [label="native operational collector"];
+  oracle_operational_tablespace_sources -> pg_oracle_tablespace_samples [label="native operational collector"];
+  oracle_operational_asm_sources -> pg_oracle_asm_diskgroup_samples [label="native operational collector"];
+  oracle_operational_counter_sources -> pg_oracle_system_counter_samples [label="selected counters plus deltas"];
+  oracle_operational_counter_sources -> pg_oracle_wait_class_samples [label="wait time plus deltas"];
+  oracle_operational_counter_sources -> pg_oracle_system_metric_samples [label="selected bounded metrics"];
+  scraper_status_sources -> pg_oracle_scrape_status [label="all collector outcomes"];
 }

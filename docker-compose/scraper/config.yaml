@@ -58,9 +58,13 @@ metrics:
   scrapeInterval: 15s
   ## Optional SQL-derived metric definition files.
   definitions:
-    - /oracle-operational-metrics.toml
     - /scraper/txeventq-metrics.toml
     - /scraper/more-txeventq-metrics.toml
+
+operational:
+  enabled: true
+  interval: 1m
+  queryTimeout: 10s
 
 performance:
   activity:

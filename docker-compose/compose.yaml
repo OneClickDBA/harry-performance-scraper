@@ -35,6 +35,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-oracledb_monitoring}
     volumes:
       - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/alerting:/etc/grafana/provisioning/alerting
       - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
       - ./grafana/dashboards:/var/lib/grafana/dashboards
 

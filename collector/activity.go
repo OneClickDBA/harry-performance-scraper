@@ -134,17 +134,20 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 	close(results)
 
 	performance := PerformanceSamples{}
+	var statuses []ScrapeStatusSample
 	latestASH := map[string]time.Time{}
 	totalErrors := 0
 	for result := range results {
 		if result.err != nil {
 			totalErrors++
+			statuses = append(statuses, newScrapeStatus(sampledAt, result.database, "activity", sampledAt, 0, result.err))
 			e.logger.Error("Error scraping database activity",
 				"database", result.database,
 				"source", e.Performance.Activity.GetSource(),
 				"error", result.err)
 			continue
 		}
+		statuses = append(statuses, newScrapeStatus(sampledAt, result.database, "activity", sampledAt, len(result.samples), nil))
 		performance.DatabaseActivity = append(performance.DatabaseActivity, result.samples...)
 		for _, sample := range result.samples {
 			if sample.SampleSource == "ASH" && sample.SampleTime.After(latestASH[result.database]) {
@@ -152,13 +155,16 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 			}
 		}
 	}
-	if len(performance.DatabaseActivity) == 0 {
+	if len(performance.DatabaseActivity) == 0 && len(statuses) == 0 {
 		return
 	}
 
 	startedAt := time.Now()
 	summary := ScrapeSummary{StartedAt: startedAt, TotalErrors: totalErrors}
-	if err := sink.WriteSamples(ctx, nil, performance, summary); err != nil {
+	if err := sink.WriteSamples(ctx, SampleBatch{
+		Performance:    performance,
+		ScrapeStatuses: statuses,
+	}, summary); err != nil {
 		e.logger.Error("Failed to write database activity samples", "error", err)
 		return
 	}
