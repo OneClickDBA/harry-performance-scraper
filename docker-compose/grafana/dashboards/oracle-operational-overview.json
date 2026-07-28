@@ -6,7 +6,20 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Alerting Overview",
+      "tooltip": "Open global Oracle alerts",
+      "type": "link",
+      "url": "/d/oracle-alerting-overview/oracle-alerting-overview"
+    }
+  ],
   "liveNow": false,
   "panels": [
     {

@@ -74,6 +74,8 @@ groups:
         execErrState: Alerting
         for: 1m
         annotations:
+          __dashboardUid__: oracle-alerting-overview
+          __panelId__: "3"
           summary: >-
             Oracle scraper data is stale for
             {{ $labels.source_database }}
@@ -151,6 +153,8 @@ groups:
         execErrState: Alerting
         for: 2m
         annotations:
+          __dashboardUid__: oracle-alerting-overview
+          __panelId__: "3"
           summary: >-
             Oracle connectivity failed for
             {{ $labels.source_database }}
@@ -226,6 +230,8 @@ groups:
         execErrState: Alerting
         for: 5m
         annotations:
+          __dashboardUid__: oracle-alerting-overview
+          __panelId__: "4"
           summary: >-
             Tablespace {{ $labels.tablespace_name }} is above 90% on
             {{ $labels.source_database }}
@@ -305,6 +311,8 @@ groups:
         execErrState: Alerting
         for: 5m
         annotations:
+          __dashboardUid__: oracle-alerting-overview
+          __panelId__: "4"
           summary: >-
             Oracle resource {{ $labels.resource_name }} is above 85% on
             {{ $labels.source_database }}
@@ -381,6 +389,8 @@ groups:
         execErrState: Alerting
         for: 5m
         annotations:
+          __dashboardUid__: oracle-alerting-overview
+          __panelId__: "4"
           summary: >-
             ASM diskgroup {{ $labels.diskgroup_name }} is above 90% on
             {{ $labels.source_database }}

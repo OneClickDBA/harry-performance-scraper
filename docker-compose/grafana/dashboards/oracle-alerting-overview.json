@@ -1,0 +1,747 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Global Oracle alert state and operational context across every monitored database.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Oracle Operational Overview",
+      "tooltip": "Open the per-database operational dashboard",
+      "type": "link",
+      "url": "/d/oracle-operational-overview/oracle-operational-overview"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": null,
+      "description": "Authoritative Grafana alert state for all Oracle databases. Sorted by operational importance.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "alertInstanceLabelFilter": "{service=\"oracledb-performance-scraper\"}",
+        "alertName": "",
+        "dashboardAlerts": false,
+        "datasource": "",
+        "folder": {
+          "id": 0,
+          "title": "Oracle DB Performance Scraper"
+        },
+        "groupBy": [],
+        "groupMode": "default",
+        "maxItems": 100,
+        "showInstances": true,
+        "sortOrder": 3,
+        "stateFilter": {
+          "error": true,
+          "firing": true,
+          "noData": true,
+          "normal": false,
+          "pending": true
+        },
+        "viewMode": "list"
+      },
+      "pluginVersion": "9.5.0",
+      "title": "Active Oracle Alerts",
+      "type": "alertlist"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "description": "Latest result from every scraper collector across every configured Oracle database.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "success"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "false": {
+                        "color": "red",
+                        "text": "Failed"
+                      },
+                      "true": {
+                        "color": "green",
+                        "text": "OK"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "source_database"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Open Oracle Operational Overview",
+                    "url": "/d/oracle-operational-overview/oracle-operational-overview?${__url_time_range}&var-source_database=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_collection"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "data_age_seconds"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "duration_seconds"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 2,
+      "options": {
+        "footer": {
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  source_database,\n  collector,\n  success,\n  collected_at as last_collection,\n  extract(epoch from (now() - collected_at))::double precision as data_age_seconds,\n  round(duration_seconds::numeric, 3) as duration_seconds,\n  sample_count,\n  error_message\nfrom oracle_latest_scrape_status\norder by success, data_age_seconds desc, source_database, collector;",
+          "refId": "A"
+        }
+      ],
+      "title": "Collector Health Across All Databases",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "description": "Collectors whose latest result failed or is more than three minutes old.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "FAILED": {
+                        "color": "red",
+                        "text": "FAILED"
+                      },
+                      "STALE": {
+                        "color": "orange",
+                        "text": "STALE"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "source_database"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Open Oracle Operational Overview",
+                    "url": "/d/oracle-operational-overview/oracle-operational-overview?${__url_time_range}&var-source_database=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "data_age_seconds"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_collection"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "id": 3,
+      "options": {
+        "footer": {
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  source_database,\n  collector,\n  case when not success then 'FAILED' else 'STALE' end as state,\n  collected_at as last_collection,\n  extract(epoch from (now() - collected_at))::double precision as data_age_seconds,\n  error_message\nfrom oracle_latest_scrape_status\nwhere not success\n   or collected_at < now() - interval '3 minutes'\norder by success, collected_at, source_database, collector;",
+          "refId": "A"
+        }
+      ],
+      "title": "Failed or Stale Collectors",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "description": "Tablespaces, Oracle resource limits, and ASM diskgroups at watch or alert thresholds.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "ALERT THRESHOLD": {
+                        "color": "red",
+                        "text": "ALERT THRESHOLD"
+                      },
+                      "WATCH": {
+                        "color": "orange",
+                        "text": "WATCH"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "used_percent"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "alert_threshold"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "source_database"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Open Oracle Operational Overview",
+                    "url": "/d/oracle-operational-overview/oracle-operational-overview?${__url_time_range}&var-source_database=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "id": 4,
+      "options": {
+        "footer": {
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with capacity as (\n  select\n    source_database,\n    'Tablespace'::text as category,\n    tablespace_name as object_name,\n    null::text as inst_id,\n    used_percent,\n    90.0::double precision as alert_threshold\n  from oracle_latest_tablespace_samples\n  where used_percent >= 80\n  union all\n  select\n    source_database,\n    'Resource limit',\n    resource_name,\n    inst_id::text,\n    used_percent,\n    85.0::double precision\n  from oracle_latest_resource_limit_samples\n  where not limit_unlimited\n    and limit_value > 0\n    and used_percent >= 75\n  union all\n  select\n    source_database,\n    'ASM diskgroup',\n    diskgroup_name,\n    inst_id::text,\n    used_percent,\n    90.0::double precision\n  from oracle_latest_asm_diskgroup_samples\n  where used_percent >= 80\n)\nselect\n  source_database,\n  category,\n  object_name,\n  inst_id,\n  used_percent,\n  alert_threshold,\n  case\n    when used_percent > alert_threshold then 'ALERT THRESHOLD'\n    else 'WATCH'\n  end as state\nfrom capacity\norder by (used_percent / alert_threshold) desc, source_database, category, object_name;",
+          "refId": "A"
+        }
+      ],
+      "title": "Current Capacity Risks",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "description": "Latest database and instance state across all monitored Oracle databases.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance_status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "MOUNTED": {
+                        "color": "orange",
+                        "text": "MOUNTED"
+                      },
+                      "OPEN": {
+                        "color": "green",
+                        "text": "OPEN"
+                      },
+                      "OPEN MIGRATE": {
+                        "color": "orange",
+                        "text": "OPEN MIGRATE"
+                      },
+                      "STARTED": {
+                        "color": "red",
+                        "text": "STARTED"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "database_status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "ACTIVE": {
+                        "color": "green",
+                        "text": "ACTIVE"
+                      },
+                      "INSTANCE RECOVERY": {
+                        "color": "orange",
+                        "text": "INSTANCE RECOVERY"
+                      },
+                      "SUSPENDED": {
+                        "color": "red",
+                        "text": "SUSPENDED"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "source_database"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Open Oracle Operational Overview",
+                    "url": "/d/oracle-operational-overview/oracle-operational-overview?${__url_time_range}&var-source_database=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "startup_time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_observation"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 5,
+      "options": {
+        "footer": {
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select distinct on (source_database, inst_id)\n  source_database,\n  inst_id,\n  instance_name,\n  instance_status,\n  database_status,\n  open_mode,\n  database_role,\n  con_name,\n  startup_time,\n  collected_at as last_observation\nfrom oracle_database_status_samples\norder by source_database, inst_id, collected_at desc;",
+          "refId": "A"
+        }
+      ],
+      "title": "Database and Instance State",
+      "type": "table"
+    },
+    {
+      "datasource": null,
+      "description": "Oracle alert rules whose current instances are normal.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 6,
+      "options": {
+        "alertInstanceLabelFilter": "{service=\"oracledb-performance-scraper\"}",
+        "alertName": "",
+        "dashboardAlerts": false,
+        "datasource": "",
+        "folder": {
+          "id": 0,
+          "title": "Oracle DB Performance Scraper"
+        },
+        "groupBy": [],
+        "groupMode": "default",
+        "maxItems": 100,
+        "showInstances": true,
+        "sortOrder": 1,
+        "stateFilter": {
+          "error": false,
+          "firing": false,
+          "noData": false,
+          "normal": true,
+          "pending": false
+        },
+        "viewMode": "list"
+      },
+      "pluginVersion": "9.5.0",
+      "title": "Normal Oracle Alert Rules",
+      "type": "alertlist"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 36,
+  "style": "dark",
+  "tags": [
+    "oracle",
+    "alerting",
+    "operational"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Oracle Alerting Overview",
+  "uid": "oracle-alerting-overview",
+  "version": 1,
+  "weekStart": ""
+}

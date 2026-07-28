@@ -160,6 +160,7 @@ PostgreSQL datasource and imports dashboards from:
 - `docker-compose/grafana/dashboards/oracle-sql-performance.json`
 - `docker-compose/grafana/dashboards/oracle-sql-top-consumers.json`
 - `docker-compose/grafana/dashboards/oracle-operational-overview.json`
+- `docker-compose/grafana/dashboards/oracle-alerting-overview.json`
 
 The Compose stack also provisions starter Grafana alert rules from
 `docker-compose/grafana/alerting/`. Configure a real contact point and
