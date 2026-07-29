@@ -18,7 +18,7 @@ groups:
             datasourceUid: PostgreSQL
             model:
               datasource:
-                type: grafana-postgresql-datasource
+                type: postgres
                 uid: PostgreSQL
               editorMode: code
               format: time_series
@@ -99,7 +99,7 @@ groups:
             datasourceUid: PostgreSQL
             model:
               datasource:
-                type: grafana-postgresql-datasource
+                type: postgres
                 uid: PostgreSQL
               editorMode: code
               format: time_series
@@ -176,7 +176,7 @@ groups:
             datasourceUid: PostgreSQL
             model:
               datasource:
-                type: grafana-postgresql-datasource
+                type: postgres
                 uid: PostgreSQL
               editorMode: code
               format: time_series
@@ -254,7 +254,7 @@ groups:
             datasourceUid: PostgreSQL
             model:
               datasource:
-                type: grafana-postgresql-datasource
+                type: postgres
                 uid: PostgreSQL
               editorMode: code
               format: time_series
@@ -335,7 +335,7 @@ groups:
             datasourceUid: PostgreSQL
             model:
               datasource:
-                type: grafana-postgresql-datasource
+                type: postgres
                 uid: PostgreSQL
               editorMode: code
               format: time_series
