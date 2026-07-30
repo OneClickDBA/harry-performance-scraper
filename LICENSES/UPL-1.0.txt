@@ -1,25 +1,3 @@
-Harry — OracleDB Performance Scraper
-
-Copyright (c) 2026 Ciberterminal S.L.
-All rights reserved except as expressly granted under the license below.
-
-Harry is developed and maintained by Jorge Holgado on behalf of
-Ciberterminal S.L.
-
-Except for upstream and third-party portions identified in
-THIRD_PARTY_NOTICES.md, the original components and fork-specific
-modifications developed for Harry are licensed under the Universal
-Permissive License, Version 1.0.
-
-Upstream and third-party portions remain subject to their respective
-copyright notices and license terms. Nothing in this license transfers
-ownership of those portions to Ciberterminal S.L.
-
-The Harry name, logo, mascot, visual identity, and associated branding
-are not licensed under the software license. See TRADEMARKS.md.
-
----
-
 The Universal Permissive License (UPL), Version 1.0
 
 Subject to the condition set forth below, permission is hereby granted to any

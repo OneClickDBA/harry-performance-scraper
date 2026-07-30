@@ -10,7 +10,7 @@
     * [Documentation](#documentation)
     * [Developer](#developer)
     * [Security](#security)
-    * [License](#license)
+    * [Copyright and licensing](#copyright-and-licensing)
 
 <!-- vim-markdown-toc -->
 
@@ -205,12 +205,29 @@ for example in environment files, a wallet, or a supported vault integration.
 Please consult the [security guide](./SECURITY.md) for responsible security
 vulnerability disclosure.
 
-## License
+## Copyright and licensing
 
-Portions Copyright (c) 2016 Seth Miller.
-Portions Copyright (c) 2021, 2026, Oracle and/or its affiliates.
-Fork-specific modifications Copyright (c) 2026 Jorge Holgado
-<dodger@oneclickdba.com>.
+Copyright (c) 2026 Ciberterminal S.L.
 
-Released under the MIT License and the Universal Permissive License v1.0 as
-shown at <https://oss.oracle.com/licenses/upl/>. See `LICENSE.txt`.
+Harry — OracleDB Performance Scraper includes software derived from:
+
+- `iamseth/oracledb_exporter`, originally developed by Seth Miller and
+  distributed under the MIT License.
+- `oracle/oracle-db-appdev-monitoring`, developed by Oracle and/or its
+  affiliates and distributed under the Universal Permissive License,
+  Version 1.0.
+
+The copyright notices and license terms applicable to those upstream
+components are preserved in `THIRD_PARTY_NOTICES.md` and the corresponding
+license files under `LICENSES/`.
+
+Original modifications and components developed specifically for Harry are
+Copyright (c) 2026 Ciberterminal S.L. and are distributed under the license
+identified in `LICENSE`.
+
+The licenses covering the software do not grant permission to use the Harry
+name, logo, visual identity, or other project branding. See `TRADEMARKS.md`.
+
+Oracle and Oracle Database are trademarks or registered trademarks of Oracle
+and/or its affiliates. Harry is an independent project and is not affiliated
+with, endorsed by, or sponsored by Oracle.
