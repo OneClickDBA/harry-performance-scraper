@@ -1,232 +1,102 @@
-<!-- vim-markdown-toc GFM -->
+# Harry - OracleDB Performance Scraper
 
-* [Oracle DB Performance Scraper](#oracle-db-performance-scraper)
-    * [Current Focus](#current-focus)
-    * [Storage Model](#storage-model)
-    * [Build](#build)
-    * [Minimal Configuration Shape](#minimal-configuration-shape)
-    * [Grafana](#grafana)
-    * [Local Testing](#local-testing)
-    * [Documentation](#documentation)
-    * [Developer](#developer)
-    * [Security](#security)
-    * [Copyright and licensing](#copyright-and-licensing)
+<p align="center">
+  <img width="256" src="https://oneclickdba.github.io/oracledb-performance-scraper-web/img/harry/harry.png" alt="Harry - OracleDB Performance Scraper">
+</p>
 
-<!-- vim-markdown-toc -->
+Harry is a PostgreSQL-backed Oracle Database performance and operational
+monitoring scraper. It collects SQL, session, blocking, database activity,
+capacity, resource, and collector-health data, then stores it in PostgreSQL for
+Grafana dashboards, alerting, and historical analysis.
 
-# Oracle DB Performance Scraper
+The project is developed at
+[OneClickDBA/oracledb-performance-scraper](https://github.com/OneClickDBA/oracledb-performance-scraper)
+and originated as a heavily modified fork of Oracle's application observability
+codebase. Harry is not a Prometheus exporter: it writes structured samples
+directly to PostgreSQL and exposes only a small health endpoint.
 
-This project lives at [dodger-one/oracledb-performance-scraper](https://github.com/dodger-one/oracledb-performance-scraper)
-and started as a heavily modified fork of Oracle's application observability
-codebase.
-
-Oracle DB Performance Scraper is a PostgreSQL-backed Oracle monitoring
-scraper built from the Oracle application observability codebase. It
-collects Oracle database metrics, SQL/session performance samples, blocking
-session data, and sampled database activity, then stores them in
-PostgreSQL for Grafana dashboards and longer-term analysis.
-
-> **⚠ Oracle Diagnostics Pack**
+> **Oracle Diagnostics Pack**
 >
-> The Oracle ASH collector is **DISABLED by default**. Enabling it requires
-> that **YOU verify your Oracle Diagnostics Pack licensing**. The default
-> `session` activity source samples `GV$SESSION` and does not query Oracle ASH.
+> The Oracle ASH collector is **disabled by default**. Enabling it requires that
+> **you verify your Oracle Diagnostics Pack licensing**. The default `session`
+> activity source samples `GV$SESSION` and does not query Oracle ASH.
 
-This project is not a Prometheus metrics endpoint. The scraper runs on a schedule,
-writes samples to PostgreSQL, and exposes only a small health endpoint.
+## Features
 
-## Current Focus
+- Native SQL, session, blocking, database activity, and operational collection.
+- Frequent `GV$SQLSTATS` sampling for both long-running and high-frequency SQL.
+- Bounded SQL text and execution-plan collection from `GV$SQL` and
+  `GV$SQL_PLAN`.
+- PostgreSQL range-partitioned storage with automatic retention.
+- Grafana dashboards and PostgreSQL-backed operational alerts.
+- Optional user-defined additional metrics from TOML or YAML definitions.
+- Docker Compose testing and production-style Linux service deployment.
 
-- Collect native SQL, session, blocking, and database activity samples by
-  default.
-- Collect native operational status, capacity, resource-limit, system-counter,
-  wait-class, and collector-health samples by default.
-- Optionally collect user-defined SQL-derived metrics from TOML or YAML
-  definition files.
-- Collect direct performance samples from Oracle dynamic performance views such
-  as `GV$SQLSTATS`, `GV$SQL`, and `GV$SESSION`, with explicitly enabled ASH enrichment for
-  licensed databases.
-- Store samples in PostgreSQL range-partitioned tables.
-- Use PostgreSQL retention by dropping old daily partitions.
-- Visualize data through Grafana dashboards backed directly by PostgreSQL.
-- Run either with Docker Compose for testing or as a normal Linux service on
-  real servers.
+## Getting Started
 
-## Storage Model
+The complete documentation is published at the
+[Harry documentation site](https://oneclickdba.github.io/oracledb-performance-scraper-web/).
+Start with:
 
-The scraper writes to PostgreSQL tables such as:
+- [Installation and basic configuration](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/getting-started/basics)
+- [Configuration reference](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/configuration/config-file)
+- [Collection and storage model](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/getting-started/collection-model)
+- [Grafana dashboards](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/getting-started/grafana-dashboards)
+- [Builds and releases](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/releases/builds)
 
-- `oracle_metric_samples`
-- `oracle_sql_samples`
-- `oracle_sql_texts`
-- `oracle_sql_plans`
-- `oracle_session_samples`
-- `oracle_blocking_session_samples`
-- `oracle_database_activity_samples`
-- `oracle_database_status_samples`
-- `oracle_instance_samples`
-- `oracle_resource_limit_samples`
-- `oracle_tablespace_samples`
-- `oracle_asm_diskgroup_samples`
-- `oracle_system_counter_samples`
-- `oracle_wait_class_samples`
-- `oracle_system_metric_samples`
-- `oracle_scrape_status`
-
-Tables are created automatically when `output.postgresql.autoMigrate: true` is
-set. Daily partitions are created on demand before samples are written. Complete
-SQL text is normalized into the non-partitioned `oracle_sql_texts` lookup table
-instead of being duplicated in every SQL sample.
-Frequent SQL counter collection uses `GV$SQLSTATS`, including statements too
-short to appear reliably in session samples. The scraper accumulates interval
-deltas and selects the top elapsed-time SQL IDs for the slower, bounded detail
-pass. Complete text and child cursor details are then fetched from `GV$SQL`.
-Execution-plan operations from `GV$SQL_PLAN` are deduplicated in the
-non-partitioned `oracle_sql_plans` lookup table and retained while their cursor
-plan remains referenced by SQL samples.
+The Docusaurus source is maintained separately in
+[OneClickDBA/oracledb-performance-scraper-web](https://github.com/OneClickDBA/oracledb-performance-scraper-web).
+PostgreSQL schema and Oracle-to-PostgreSQL data-flow diagrams remain in
+[`doc/`](doc/) because they are maintained alongside the implementation.
 
 ## Build
 
-The default build uses the `godror` driver and requires Oracle Instant Client at
-runtime:
+The default build uses the `godror` driver and requires Oracle Instant Client
+at runtime:
 
 ```bash
 go build -o oracledb_performance_scraper ./
 ```
 
-For a no-CGO build without Oracle Instant Client:
+For a no-CGO build using the `go-ora` driver:
 
 ```bash
 go build -tags goora -o oracledb_performance_scraper ./
 ```
 
-## Minimal Configuration Shape
-
-```yaml
-databases:
-  prod:
-    username: ${ORACLE_USERNAME}
-    password: ${ORACLE_PASSWORD}
-    url: ${ORACLE_CONNECT_STRING}
-    queryTimeout: 10
-    connMaxLifetime: 30m
-    connMaxIdleTime: 5m
-    maxOpenConns: 10
-    maxIdleConns: 10
-
-metrics:
-  scrapeInterval: 15s
-
-operational:
-  enabled: true
-  interval: 1m
-  queryTimeout: 10s
-
-performance:
-  activity:
-    source: session
-    interval: 2s
-    queryTimeout: 2s
-  sqlPlans:
-    enabled: true
-    interval: 2m
-    topN: 20
-    queryTimeout: 10s
-
-output:
-  postgresql:
-    url: ${POSTGRES_URL}
-    autoMigrate: true
-    retention: 720h
-
-log:
-  level: info
-  format: logfmt
-  disable: 1
-
-web:
-  listenAddresses: [":9161"]
-```
-
-`metrics.scrapeInterval` defaults to `15s` when omitted.
-
-## Grafana
-
-Grafana reads PostgreSQL directly. The Docker Compose test stack provisions the
-PostgreSQL datasource and imports dashboards from:
-
-- `docker-compose/grafana/dashboards/oracle-sessions-and-blocking.json`
-- `docker-compose/grafana/dashboards/database-activity-history.json`
-- `docker-compose/grafana/dashboards/oracle-sql-performance.json`
-- `docker-compose/grafana/dashboards/oracle-sql-top-consumers.json`
-- `docker-compose/grafana/dashboards/oracle-operational-overview.json`
-- `docker-compose/grafana/dashboards/oracle-alerting-overview.json`
-
-The Compose stack also provisions starter Grafana alert rules from
-`docker-compose/grafana/alerting/`. Configure a real contact point and
-notification policy before relying on them.
-
-> **Monitoring-system availability**
->
-> PostgreSQL-backed Grafana alerts cannot report that Grafana, PostgreSQL, or
-> the scraper itself is completely unavailable. Production deployments need an
-> independent external availability check for all three components.
-
-## Local Testing
-
-The `docker-compose/` stack is intended for local testing only. It includes
-Oracle test databases, PostgreSQL, Grafana, and the scraper service.
-
-For production-like manual deployment without containers, see:
-
-- `BUILD_ON_REAL_SERVERS.md`
-
-## Documentation
-
-The detailed documentation is published at the
-[Oracle DB Performance Scraper documentation site](https://dodger-one.github.io/oracledb-performance-scraper-web/).
-Its Docusaurus sources are maintained in the separate
-[oracledb-performance-scraper-web repository](https://github.com/dodger-one/oracledb-performance-scraper-web).
-
-PostgreSQL schema and Oracle-to-PostgreSQL data-flow diagrams remain in `doc/`
-because they are maintained alongside the implementation.
-
-## Developer
-
-Oracle DB Performance Scraper is developed and maintained by Jorge Holgado
-<dodger@oneclickdba.com>.
-
-## Security
+## Production Considerations
 
 Use a dedicated Oracle monitoring user with only the grants required for the
-views you need to scrape. Store production credentials outside the YAML file,
-for example in environment files, a wallet, or a supported vault integration.
+enabled collectors. Keep production credentials outside the YAML file, using
+environment files, an Oracle wallet, or a supported vault integration.
 
-Please consult the [security guide](./SECURITY.md) for responsible security
-vulnerability disclosure.
+PostgreSQL-backed Grafana alerts cannot report a complete failure of Grafana,
+PostgreSQL, the scraper, or the notification path. Production deployments need
+an independent external availability check for the monitoring stack. See
+[Grafana Alerting](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/configuration/grafana-alerting)
+for provisioning and operational requirements.
 
-## Copyright and licensing
+## Project Information
 
-Copyright (c) 2026 Ciberterminal S.L.
+Harry is developed and maintained by Jorge Holgado
+<dodger@oneclickdba.com>.
 
-Harry — OracleDB Performance Scraper includes software derived from:
+- Report security vulnerabilities according to [SECURITY.md](SECURITY.md).
+- Project license: [LICENSE.txt](LICENSE.txt).
+- Third-party notices: [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
+- Upstream license texts: [`LICENSES/`](LICENSES/).
+- Name and visual identity terms: [TRADEMARKS.md](TRADEMARKS.md).
 
-- `iamseth/oracledb_exporter`, originally developed by Seth Miller and
-  distributed under the MIT License.
-- `oracle/oracle-db-appdev-monitoring`, developed by Oracle and/or its
-  affiliates and distributed under the Universal Permissive License,
-  Version 1.0.
-
-The copyright notices and license terms applicable to those upstream
-components are preserved in `THIRD_PARTY_NOTICES.md` and the corresponding
-license files under `LICENSES/`.
+Harry includes software derived from
+[`iamseth/oracledb_exporter`](https://github.com/iamseth/oracledb_exporter),
+distributed under the MIT License, and
+[`oracle/oracle-db-appdev-monitoring`](https://github.com/oracle/oracle-db-appdev-monitoring),
+distributed under the Universal Permissive License, Version 1.0.
 
 Original modifications and components developed specifically for Harry are
-Copyright (c) 2026 Ciberterminal S.L. and are distributed under the license
-identified in `LICENSE`.
-
-The licenses covering the software do not grant permission to use the Harry
-name, logo, visual identity, or other project branding. See `TRADEMARKS.md`.
+Copyright (c) 2026 Ciberterminal S.L. and are distributed under the terms in
+[LICENSE.txt](LICENSE.txt). The software licenses do not grant permission to use
+the Harry name, logo, or visual identity.
 
 Oracle and Oracle Database are trademarks or registered trademarks of Oracle
 and/or its affiliates. Harry is an independent project and is not affiliated
