@@ -773,7 +773,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Database Activity History (DAH)",
+  "title": "Oracle Database Activity History (DAH)",
   "uid": "database-activity-history-dah",
   "version": 1,
   "weekStart": ""

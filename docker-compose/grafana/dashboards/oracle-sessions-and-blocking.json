@@ -466,7 +466,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Current Sessions and Blocking",
+  "title": "Oracle Current Sessions and Blocking",
   "uid": "oracle-db-performance",
   "version": 1,
   "weekStart": ""
