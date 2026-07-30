@@ -1,6 +1,6 @@
 digraph postgresql_table_relationships {
   graph [
-    label="Oracle DB Performance Scraper - PostgreSQL Partitioned Table Relationships",
+    label="Harry - Performance Scraper for Oracle Database - PostgreSQL Partitioned Table Relationships",
     labelloc=t,
     fontsize=20,
     rankdir=LR,

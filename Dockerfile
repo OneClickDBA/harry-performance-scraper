@@ -57,7 +57,7 @@ RUN CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build --tags=${T
 
 FROM ${BASE_IMAGE:-ghcr.io/oracle/oraclelinux:8-slim} AS scraper-godror
 LABEL org.opencontainers.image.authors="Jorge Holgado <jholgado@ciberterminal.net>, Oracle America, Inc."
-LABEL org.opencontainers.image.description="Harry - OracleDB Performance Scraper"
+LABEL org.opencontainers.image.description="Harry - Performance Scraper for Oracle Database"
 
 ARG VERSION
 ENV VERSION=${VERSION:-1.0.0}

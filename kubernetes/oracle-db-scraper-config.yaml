@@ -1,4 +1,4 @@
-# Example Oracle DB Performance Scraper Configuration file.
+# Example configuration for Harry - Performance Scraper for Oracle Database.
 # Environment variables of the form ${VAR_NAME} will be expanded.
 
 databases:

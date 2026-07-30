@@ -4,7 +4,7 @@ apiVersion: 1
 groups:
   - orgId: 1
     name: Oracle operational alerts
-    folder: Oracle DB Performance Scraper
+    folder: Harry - Performance Scraper for Oracle Database
     interval: 1m
     rules:
       - uid: oracle_scrape_stale

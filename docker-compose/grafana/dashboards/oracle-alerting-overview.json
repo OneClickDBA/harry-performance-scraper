@@ -63,7 +63,7 @@
         "datasource": "",
         "folder": {
           "id": 0,
-          "title": "Oracle DB Performance Scraper"
+          "title": "Harry - Performance Scraper for Oracle Database"
         },
         "groupBy": [],
         "groupMode": "default",
@@ -702,7 +702,7 @@
         "datasource": "",
         "folder": {
           "id": 0,
-          "title": "Oracle DB Performance Scraper"
+          "title": "Harry - Performance Scraper for Oracle Database"
         },
         "groupBy": [],
         "groupMode": "default",

@@ -9,7 +9,7 @@
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 2699)">
 <title>postgresql_table_relationships</title>
 <polygon fill="white" stroke="none" points="-4,4 -4,-2699 2823.25,-2699 2823.25,4 -4,4"/>
-<text xml:space="preserve" text-anchor="middle" x="1409.62" y="-2672" font-family="Times,serif" font-size="20.00">Oracle DB Performance Scraper &#45; PostgreSQL Partitioned Table Relationships</text>
+<text xml:space="preserve" text-anchor="middle" x="1409.62" y="-2672" font-family="Times,serif" font-size="20.00">Harry &#45; Performance Scraper for Oracle Database &#45; PostgreSQL Partitioned Table Relationships</text>
 <!-- oracle_metric_samples -->
 <g id="node1" class="node">
 <title>oracle_metric_samples</title>

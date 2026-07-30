@@ -1,7 +1,7 @@
-# Harry - OracleDB Performance Scraper
+# Harry - Performance Scraper for Oracle Database
 
 <p align="center">
-  <img width="256" src="https://oneclickdba.github.io/oracledb-performance-scraper-web/img/harry/harry.png" alt="Harry - OracleDB Performance Scraper">
+  <img width="256" src="https://oneclickdba.github.io/oracledb-performance-scraper-web/img/harry/harry.png" alt="Harry - Performance Scraper for Oracle Database">
 </p>
 
 Harry is a PostgreSQL-backed Oracle Database performance and operational

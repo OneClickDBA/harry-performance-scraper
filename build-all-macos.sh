@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# This script builds release artifacts for the Oracle DB Performance Scraper.
+# This script builds release artifacts for Harry - Performance Scraper for Oracle Database.
 # You must have a working docker socket, and docker or aliased docker command.
 # It is designed to run on MacOS aarch64, creating the darwin-arm64 on the local host.
 # Artifacts for linux-arm64, linux-amd64 are built in containers.

@@ -87,7 +87,7 @@ func newLogger(levelValue, formatValue string, output io.Writer) (*slog.Logger, 
 func landingPageHTML(healthPath string) string {
 	escapedVersion := html.EscapeString(Version)
 	escapedHealthPath := html.EscapeString(healthPath)
-	return "<html><head><title>Oracle DB Performance Scraper " + escapedVersion + "</title></head><body><h1>Oracle DB Performance Scraper " + escapedVersion + "</h1><p>Writing Oracle metrics to PostgreSQL.</p><p><a href='" + escapedHealthPath + "'>Health</a></p></body></html>"
+	return "<html><head><title>Harry - Performance Scraper for Oracle Database " + escapedVersion + "</title></head><body><h1>Harry - Performance Scraper for Oracle Database " + escapedVersion + "</h1><p>Writing Oracle metrics to PostgreSQL.</p><p><a href='" + escapedHealthPath + "'>Health</a></p></body></html>"
 }
 
 func landingPageHandler(healthPath string) http.HandlerFunc {

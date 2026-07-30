@@ -1,7 +1,7 @@
 # Contributing to Harry
 
-Thank you for your interest in contributing to Harry — OracleDB Performance
-Scraper. Contributions may include bug reports, feature proposals,
+Thank you for your interest in contributing to Harry - Performance Scraper for
+Oracle Database. Contributions may include bug reports, feature proposals,
 documentation improvements, testing, and code.
 
 ## Opening issues
