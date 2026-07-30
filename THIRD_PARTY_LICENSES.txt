@@ -1,3 +1,72 @@
+===============================================================================
+HARRY — ORACLEDB PERFORMANCE SCRAPER
+THIRD-PARTY AND UPSTREAM SOFTWARE NOTICES
+===============================================================================
+
+Harry — OracleDB Performance Scraper is developed and maintained by Jorge
+Holgado on behalf of Ciberterminal S.L.
+
+Original Harry components and fork-specific modifications:
+Copyright (c) 2026 Ciberterminal S.L.
+
+PURPOSE AND SCOPE
+
+This file identifies copyright notices, license terms, and attribution
+information for upstream and third-party software incorporated into or
+distributed with Harry — OracleDB Performance Scraper.
+
+This file does not transfer ownership of any upstream or third-party software
+to Ciberterminal S.L. Each component remains owned by its respective copyright
+holder and remains subject to its applicable license terms. If any summary in
+this file differs from the complete license text applicable to a component,
+the complete license text controls.
+
+PROJECT LICENSING
+
+Except for upstream and third-party portions identified in this file or
+elsewhere in the repository, the original components and fork-specific
+modifications developed for Harry are Copyright (c) 2026 Ciberterminal S.L.
+and are licensed under the Universal Permissive License, Version 1.0
+(SPDX-License-Identifier: UPL-1.0), as set out in LICENSE.txt.
+
+Harry contains software derived from the following upstream projects:
+
+1. Oracle DB Exporter
+   Original project: https://github.com/iamseth/oracledb_exporter
+   Copyright (c) 2016 Seth Miller <seth@sethmiller.me>
+   Licensed under the MIT License (SPDX-License-Identifier: MIT).
+
+2. Oracle Database Application Observability / Monitoring
+   Upstream project:
+   https://github.com/oracle/oracle-db-appdev-monitoring
+   Copyright Oracle and/or its affiliates.
+   Oracle-originated portions are licensed under the Universal Permissive
+   License, Version 1.0 (SPDX-License-Identifier: UPL-1.0).
+
+All copyright notices, license notices, attribution notices, and disclaimers
+applicable to the upstream projects and third-party dependencies are preserved
+below. Nothing in Harry's UPL-1.0 licensing removes, replaces, or restricts any
+notice or obligation applicable to those portions.
+
+NO TRADEMARK LICENSE
+
+The software licenses referenced in this file do not grant permission to use
+the Harry name, logo, mascot, visual identity, or associated project branding.
+Those assets are not licensed as part of the software. See TRADEMARKS.md.
+
+Oracle and Oracle Database are trademarks or registered trademarks of Oracle
+and/or its affiliates. Harry is an independent project and is not affiliated
+with, endorsed by, or sponsored by Oracle.
+
+GENERATED DEPENDENCY INVENTORY
+
+The dependency inventory and license texts below were generated from the
+project's Go module dependency graph. They must be retained when distributing
+the corresponding software. Regenerating this inventory must not remove the
+project-specific notices above.
+
+===============================================================================
+
 === Public License Template ===
 
 ------------------------------ Top-Level License -------------------------------
