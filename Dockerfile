@@ -56,8 +56,16 @@ ENV VERSION=${VERSION:-1.0.0}
 RUN CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build --tags=${TAGS} -v -ldflags "-X main.Version=${VERSION} -s -w" -o /tmp/oracledb_performance_scraper
 
 FROM ${BASE_IMAGE:-ghcr.io/oracle/oraclelinux:8-slim} AS scraper-godror
-LABEL org.opencontainers.image.authors="Jorge Holgado <jholgado@ciberterminal.net>, Oracle America, Inc."
-LABEL org.opencontainers.image.description="Harry - Performance Scraper for Oracle Database"
+
+LABEL org.opencontainers.image.title="Harry"
+LABEL org.opencontainers.image.description="Harry — OracleDB Performance Scraper"
+LABEL org.opencontainers.image.authors="Jorge Holgado <dodger@oneclickdba.com>"
+LABEL org.opencontainers.image.vendor="Ciberterminal S.L."
+LABEL org.opencontainers.image.licenses="UPL-1.0 AND MIT"
+LABEL org.opencontainers.image.source="https://github.com/OneClickDBA/oracledb-performance-scraper"
+LABEL org.opencontainers.image.documentation="https://oneclickdba.github.io/oracledb-performance-scraper-web/"
+LABEL org.opencontainers.image.url="https://oneclickdba.com/"
+
 
 ARG VERSION
 ENV VERSION=${VERSION:-1.0.0}
