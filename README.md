@@ -79,7 +79,7 @@ for provisioning and operational requirements.
 ## Project Information
 
 Harry is developed and maintained by Jorge Holgado
-<dodger@oneclickdba.com>.
+<jholgado@ciberterminal.net>.
 
 - Report security vulnerabilities according to [SECURITY.md](SECURITY.md).
 - Project license: [LICENSE.txt](LICENSE.txt).

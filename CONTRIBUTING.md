@@ -1,50 +1,113 @@
-# Contributing to This Repository
+# Contributing to Harry
 
-We welcome your contributions! There are multiple ways to contribute.
+Thank you for your interest in contributing to Harry — OracleDB Performance
+Scraper. Contributions may include bug reports, feature proposals,
+documentation improvements, testing, and code.
 
 ## Opening issues
 
-For bugs or enhancement requests, please file a GitHub issue unless the problem is security-related. When filing a bug, remember that the more specific the bug is, the more likely it is to be fixed. If you think you've found a security
-vulnerability, then do not raise a GitHub issue. Instead, follow the instructions in our
-[security policy](./SECURITY.md).
+For bugs or enhancement requests, please open a GitHub issue unless the problem
+is security-related.
+
+When reporting a bug, include enough information to reproduce it whenever
+possible, such as the Harry version or commit, relevant configuration, expected
+behaviour, actual behaviour, and sanitized logs.
+
+Do not report security vulnerabilities in a public issue. Instead, follow the
+instructions in our [security policy](./SECURITY.md).
+
+## Contributor License Agreement
+
+Before any code or other copyrightable contribution can be accepted, the
+contributor must complete the project's applicable Contributor License
+Agreement (CLA).
+
+The CLA preserves a clear chain of ownership and gives Ciberterminal S.L. the
+rights necessary to maintain, distribute, sublicense, relicense, and transfer
+the project while allowing contributors to retain ownership of their
+contributions.
+
+By submitting a contribution, you represent that:
+
+- You have the legal right to submit the contribution.
+- The contribution does not violate any employment agreement, confidentiality
+  obligation, or third-party intellectual-property right.
+- If the contribution is made on behalf of, or is owned by, an employer or
+  another organization, that organization has authorized the contribution and
+  has completed the applicable corporate CLA.
+
+A pull request may be opened before the CLA is completed, but it will not be
+merged until the applicable individual or corporate CLA has been accepted by
+Ciberterminal S.L.
+
+Instructions for completing the CLA will be provided in the pull request. The
+CLA itself is a legal document separate from this contribution guide.
 
 ## Contributing code
 
-We welcome your code contributions. Before submitting code by using a pull request,
-you must sign the [Oracle Contributor Agreement][OCA] (OCA), and your commits must include the following line, using the name and e-mail address you used to sign the OCA:
+All commits must include a Developer Certificate of Origin sign-off using the
+contributor's real name and an email address attributable to them:
 
 ```text
 Signed-off-by: Your Name <you@example.org>
 ```
 
-You can add this line automatically to pull requests by committing with `--sign-off`
-or `-s`. For example:
+You can add this line automatically by committing with `--signoff` or `-s`:
 
 ```text
 git commit --signoff
 ```
 
-Only pull requests from committers that can be verified as having signed the OCA
-can be accepted.
+The sign-off certifies that you have the right to submit the contribution under
+the terms described in the [Developer Certificate of Origin][DCO].
+
+The sign-off does not replace the CLA. Both requirements must be satisfied
+before a contribution can be merged.
 
 ## Pull request process
 
-1. Ensure there is an issue created to track and discuss the fix or enhancement that you intend to submit.
-2. Fork this repository.
-3. Create a branch in your fork to implement the changes. Oracle recommends using
-   the issue number as part of your branch name. For example: `1234-fixes`
-4. Submit any required public documentation changes to the separate
-   [documentation repository](https://github.com/dodger-one/oracledb-performance-scraper-web).
-5. Ensure that any samples are updated, if the base image has been changed.
-6. Submit the pull request. *Do not leave the pull request blank*. Explain exactly
-   what your changes are meant to do, and provide simple steps to indicate how to validate
-   your changes. Ensure that you reference the issue that you created as well.
-7. Before the changes are merged, Oracle will assign the pull request to 2 or 3 people for review. 
+1. Search the existing issues and pull requests to avoid duplicating work.
+2. For a non-trivial change, open an issue first so the proposal can be
+   discussed before implementation.
+3. Fork the repository and create a focused branch for the change.
+4. Keep each pull request limited to one logical change.
+5. Add or update tests and documentation where applicable. Public
+   documentation changes may also require an update to the separate
+   [documentation repository][DOCS].
+6. Ensure that your changes do not introduce source code, data, credentials,
+   confidential material, or other content that you are not authorized to
+   contribute.
+7. Submit the pull request with a clear description of what changed, why it
+   changed, and how reviewers can validate it. Reference the related issue.
+8. Address review feedback and ensure that all required checks pass.
+
+Acceptance of a contribution is at the discretion of the Harry maintainers.
+Submitting a pull request does not guarantee that it will be merged.
+
+## Licensing
+
+Accepted contributions become part of Harry and are distributed under the
+project's applicable open-source license, currently the Universal Permissive
+License, Version 1.0, subject to the CLA.
+
+Third-party code must not be copied into the repository unless its license is
+compatible with Harry, all required notices are preserved, and the inclusion
+has been approved by a maintainer.
+
+The software license does not grant permission to use the Harry name, logo,
+mascot, visual identity, or associated branding. See
+[TRADEMARKS.md](./TRADEMARKS.md).
 
 ## Code of conduct
 
-Follow the [Golden Rule](https://en.wikipedia.org/wiki/Golden_Rule). If you'd
-like more specific guidelines, see the [Contributor Covenant Code of Conduct][COC].
+Be respectful and constructive. Follow the
+[Contributor Covenant Code of Conduct][COC].
 
-[OCA]: https://oca.opensource.oracle.com
-[COC]: https://www.contributor-covenant.org/version/1/4/code-of-conduct/
+## Questions
+
+If you are unsure whether a proposed contribution is appropriate, open an issue
+before investing substantial time in it.
+
+[COC]: https://www.contributor-covenant.org/version/2/1/code_of_conduct/
+[DCO]: https://developercertificate.org/
+[DOCS]: https://github.com/dodger-one/oracledb-performance-scraper-web
