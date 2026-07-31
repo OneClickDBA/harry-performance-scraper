@@ -13,6 +13,7 @@ GOFLAGS        := -ldflags "$(LDFLAGS) -s -w" --tags $(TAGS)
 BUILD_ARGS      = --build-arg VERSION=$(VERSION)
 OUTDIR          = ./dist
 COMPOSE_CONFIG_FILE ?= config.yaml
+GO_LICENSES     ?= go-licenses
 
 IMAGE_NAME     ?= harry-performance-scraper
 IMAGE_ID       ?= $(IMAGE_NAME):$(VERSION)
@@ -77,6 +78,13 @@ govulncheck:
 	@echo "Run govulncheck"
 	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
+.PHONY: licenses licenses-check
+licenses:
+	GO_LICENSES_BIN="$(GO_LICENSES)" ./scripts/generate-third-party-licenses.sh
+
+licenses-check:
+	GO_LICENSES_BIN="$(GO_LICENSES)" ./scripts/generate-third-party-licenses.sh --check
+
 local-build: go-build
 	@true
 
@@ -137,4 +145,4 @@ podman-push:
 podman-release: podman-build podman-push
 
 .PHONY: version build deps go-test clean docker-compose-up docker-compose-down docker docker-arm docker-platform docker-amd \
-        podman-build podman-push podman-release govulncheck
+        podman-build podman-push podman-release govulncheck licenses licenses-check

@@ -96,6 +96,20 @@ Third-party code must not be copied into the repository unless its license is
 compatible with Harry, all required notices are preserved, and the inclusion
 has been approved by a maintainer.
 
+`THIRD_PARTY_LICENSES.txt` is generated and must not be edited manually. After
+changing Go dependencies or imports, install the pinned generator and refresh
+the notice:
+
+```bash
+go install github.com/google/go-licenses/v2@v2.0.1
+make licenses
+make licenses-check
+```
+
+Edit `thirdparty/NOTICE_HEADER.txt` for project-specific attribution changes and
+`thirdparty/licenses.tpl` for generated inventory formatting, then regenerate
+the notice. Commit the source changes and generated file together.
+
 The software license does not grant permission to use the Harry name, logo,
 mascot, visual identity, or associated branding. See
 [TRADEMARKS.md](./TRADEMARKS.md).
