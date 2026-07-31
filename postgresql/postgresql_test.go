@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dodger-one/oracledb-performance-scraper/collector"
+	"github.com/OneClickDBA/harry-performance-scraper/collector"
 	"github.com/jackc/pgx/v5"
 )
 

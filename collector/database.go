@@ -316,7 +316,7 @@ func initdb(logger *slog.Logger, dbname string, dbconfig DatabaseConfig, db *sql
 	defer cancel()
 	if _, err := db.ExecContext(ctx, `
 			begin
-			dbms_application_info.set_client_info('oracledb_performance_scraper');
+			dbms_application_info.set_client_info('harry-scraper');
 			end;`); err != nil {
 		logger.Info("Could not set CLIENT_INFO.", "database", dbname)
 	}

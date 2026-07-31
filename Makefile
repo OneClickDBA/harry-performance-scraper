@@ -7,14 +7,14 @@ TAGS           ?= godror
 PLATFORM       ?= amd64
 DOCKER_TARGET  ?= scraper-godror
 CGO_ENABLED    ?= 1
-VERSION        ?= 2.4.0
+VERSION        ?= 0.0.0-dev
 LDFLAGS        := -X main.Version=$(VERSION)
 GOFLAGS        := -ldflags "$(LDFLAGS) -s -w" --tags $(TAGS)
 BUILD_ARGS      = --build-arg VERSION=$(VERSION)
 OUTDIR          = ./dist
 COMPOSE_CONFIG_FILE ?= config.yaml
 
-IMAGE_NAME     ?= oracledb-performance-scraper
+IMAGE_NAME     ?= harry-performance-scraper
 IMAGE_ID       ?= $(IMAGE_NAME):$(VERSION)
 IMAGE_ID_LATEST?= $(IMAGE_NAME):latest
 
@@ -34,9 +34,9 @@ version:
 .PHONY: go-build
 go-build:
 	@echo "Build $(OS_TYPE)"
-	mkdir -p $(OUTDIR)/oracledb_performance_scraper-$(VERSION).$(GOOS)-$(GOARCH)/
-	go build $(GOFLAGS) -o $(OUTDIR)/oracledb_performance_scraper-$(VERSION).$(GOOS)-$(GOARCH)/oracledb_performance_scraper$(EXT)
-	(cd dist ; tar cfz oracledb_performance_scraper-$(VERSION).$(GOOS)-$(GOARCH).tar.gz oracledb_performance_scraper-$(VERSION).$(GOOS)-$(GOARCH))
+	mkdir -p $(OUTDIR)/harry-scraper-$(VERSION).$(GOOS)-$(GOARCH)/
+	go build $(GOFLAGS) -o $(OUTDIR)/harry-scraper-$(VERSION).$(GOOS)-$(GOARCH)/harry-scraper$(EXT)
+	(cd dist ; tar cfz harry-scraper-$(VERSION).$(GOOS)-$(GOARCH).tar.gz harry-scraper-$(VERSION).$(GOOS)-$(GOARCH))
 
 .PHONY: go-build-linux-amd64
 go-build-linux-amd64:

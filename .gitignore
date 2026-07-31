@@ -17,7 +17,7 @@ bin/
 minikube_tests.sh
 .env
 
-# Documentation is maintained in oracledb-performance-scraper-web.
+# Documentation is maintained in harry-performance-scraper-web.
 /docs/
 /site/
 db-sample-schemas-23.3/

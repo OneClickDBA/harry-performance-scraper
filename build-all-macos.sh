@@ -13,7 +13,7 @@ set -euo pipefail
 # - darwin-arm64 binary tarball
 
 # Example usage:
-# ./build-all-macos.sh -v 2.4.0 -t godror -cmuo
+# ./build-all-macos.sh -v 1.0.0 -t godror -cmuo
 
 USAGE="Usage: $0 [-v VERSION] [-t TARGET] [-cmuo]"
 VERSION=""
@@ -42,7 +42,6 @@ if [[ -z "$VERSION" ]] || [[ -z "$TARGET" ]]; then
 fi
 
 OL_IMAGE="oraclelinux:8"
-BASE_IMAGE="ghcr.io/oracle/oraclelinux:8-slim"
 UBUNTU_IMAGE="ubuntu:24.04"
 OL8_GLIBC_VERSION="2.28"
 GO_VERSION="1.26.3"
@@ -58,9 +57,9 @@ fi
 copy_workspace_to_container() {
   local container="$1"
 
-  docker exec "${container}" rm -rf /oracledb-performance-scraper
-  docker cp "${SCRIPT_DIR}/." "${container}:/oracledb-performance-scraper"
-  docker exec "${container}" rm -rf /oracledb-performance-scraper/.git
+  docker exec "${container}" rm -rf /harry-performance-scraper
+  docker cp "${SCRIPT_DIR}/." "${container}:/harry-performance-scraper"
+  docker exec "${container}" rm -rf /harry-performance-scraper/.git
 }
 
 linux_make_target() {
@@ -87,7 +86,7 @@ build_ol_platform() {
 build_ol() {
   local platform="$1"
   local container="build-${platform}"
-  local filename="oracledb_performance_scraper-${VERSION}.linux-${platform}.tar.gz"
+  local filename="harry-scraper-${VERSION}.linux-${platform}.tar.gz"
   local make_target
   local go_tarball="go${GO_VERSION}.linux-${platform}.tar.gz"
 
@@ -104,10 +103,10 @@ build_ol() {
                                     tar -C /usr/local -xzf ${go_tarball} && \
                                     rm ${go_tarball} && \
                                     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin && \
-                                    cd oracledb-performance-scraper && \
+                                    cd harry-performance-scraper && \
                                     make ${make_target} VERSION=\"${VERSION}\" TAGS=\"${TAGS}\" CGO_ENABLED=\"${CGO_ENABLED}\""
 
-  docker cp "${container}:/oracledb-performance-scraper/dist/${filename}" "dist/"
+  docker cp "${container}:/harry-performance-scraper/dist/${filename}" "dist/"
 
   echo "Build complete for ${OL_IMAGE}-${platform}"
   docker stop "$container"
@@ -120,13 +119,13 @@ build_ubuntu() {
   copy_workspace_to_container "${container}"
   docker exec "${container}" bash -c "apt-get update -y && \
                                       apt-get -y install podman qemu-user-static golang gcc-aarch64-linux-gnu git make && \
-                                      cd oracledb-performance-scraper && \
+                                      cd harry-performance-scraper && \
                                       make go-build-linux-amd64 VERSION=\"${VERSION}\" TAGS=\"${TAGS}\" CGO_ENABLED=\"${CGO_ENABLED}\" && \
                                       make go-build-linux-gcc-arm64 VERSION=\"${VERSION}\" TAGS=\"${TAGS}\" CGO_ENABLED=\"${CGO_ENABLED}\""
 
 
-  docker cp "${container}:/oracledb-performance-scraper/dist/oracledb_performance_scraper-${VERSION}.linux-amd64.tar.gz" "dist/"
-  docker cp "${container}:/oracledb-performance-scraper/dist/oracledb_performance_scraper-${VERSION}.linux-arm64.tar.gz" "dist/"
+  docker cp "${container}:/harry-performance-scraper/dist/harry-scraper-${VERSION}.linux-amd64.tar.gz" "dist/"
+  docker cp "${container}:/harry-performance-scraper/dist/harry-scraper-${VERSION}.linux-arm64.tar.gz" "dist/"
 
   docker stop "$container"
   docker rm "$container"
@@ -135,8 +134,8 @@ build_ubuntu() {
 rename_glibc() {
   local platform="$1"
 
-  local f1="oracledb_performance_scraper-${VERSION}.linux-${platform}.tar.gz"
-  local f2="oracledb_performance_scraper-${VERSION}.linux-${platform}-glibc-${OL8_GLIBC_VERSION}.tar.gz"
+  local f1="harry-scraper-${VERSION}.linux-${platform}.tar.gz"
+  local f2="harry-scraper-${VERSION}.linux-${platform}-glibc-${OL8_GLIBC_VERSION}.tar.gz"
 
   mv "dist/$f1" "dist/$f2" 2>/dev/null
 }

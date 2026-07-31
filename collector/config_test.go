@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dodger-one/oracledb-performance-scraper/ocivault"
+	"github.com/OneClickDBA/harry-performance-scraper/ocivault"
 )
 
 func TestConnectConfigGetConnMaxLifetime(t *testing.T) {
@@ -357,8 +357,8 @@ databases:
     url: localhost:1521/freepdb1
 metrics:
   definitions:
-    - /etc/oracledb-monitor/application-capacity-metrics.toml
-    - /etc/oracledb-monitor/application-metrics.toml
+    - /etc/harry/application-capacity-metrics.toml
+    - /etc/harry/application-metrics.toml
 `)
 
 	cfg, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
@@ -366,8 +366,8 @@ metrics:
 		t.Fatalf("expected config to load, got %v", err)
 	}
 	want := []string{
-		"/etc/oracledb-monitor/application-capacity-metrics.toml",
-		"/etc/oracledb-monitor/application-metrics.toml",
+		"/etc/harry/application-capacity-metrics.toml",
+		"/etc/harry/application-metrics.toml",
 	}
 	if strings.Join(cfg.Metrics.Definitions, ",") != strings.Join(want, ",") {
 		t.Fatalf("unexpected metric definitions: got %#v want %#v", cfg.Metrics.Definitions, want)

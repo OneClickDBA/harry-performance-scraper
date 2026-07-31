@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dodger-one/oracledb-performance-scraper/collector"
+	"github.com/OneClickDBA/harry-performance-scraper/collector"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

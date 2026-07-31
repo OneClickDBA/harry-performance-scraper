@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dodger-one/oracledb-performance-scraper/azvault"
-	"github.com/dodger-one/oracledb-performance-scraper/hashivault"
-	"github.com/dodger-one/oracledb-performance-scraper/ocivault"
+	"github.com/OneClickDBA/harry-performance-scraper/azvault"
+	"github.com/OneClickDBA/harry-performance-scraper/hashivault"
+	"github.com/OneClickDBA/harry-performance-scraper/ocivault"
 	"go.yaml.in/yaml/v2"
 )
 

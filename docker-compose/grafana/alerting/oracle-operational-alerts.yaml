@@ -85,7 +85,7 @@ groups:
             services.
         labels:
           severity: critical
-          service: oracledb-performance-scraper
+          service: harry-performance-scraper
         isPaused: false
 
       - uid: oracle_connectivity_failed
@@ -162,7 +162,7 @@ groups:
             The scraper cannot connect to the configured Oracle database.
         labels:
           severity: critical
-          service: oracledb-performance-scraper
+          service: harry-performance-scraper
         isPaused: false
 
       - uid: oracle_tablespace_pressure
@@ -240,7 +240,7 @@ groups:
             before allocating space.
         labels:
           severity: warning
-          service: oracledb-performance-scraper
+          service: harry-performance-scraper
         isPaused: false
 
       - uid: oracle_resource_pressure
@@ -321,7 +321,7 @@ groups:
             limit.
         labels:
           severity: warning
-          service: oracledb-performance-scraper
+          service: harry-performance-scraper
         isPaused: false
 
       - uid: oracle_asm_pressure
@@ -399,5 +399,5 @@ groups:
             expected growth.
         labels:
           severity: warning
-          service: oracledb-performance-scraper
+          service: harry-performance-scraper
         isPaused: false

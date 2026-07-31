@@ -1,10 +1,10 @@
 Harry - Performance Scraper for Oracle Database
 
-Copyright (c) 2026 Ciberterminal S.L.
+Copyright (c) 2026 Jorge Holgado.
 All rights reserved except as expressly granted under the license below.
 
-Harry is developed and maintained by Jorge Holgado on behalf of
-Ciberterminal S.L.
+Harry is developed by Jorge Holgado and commercially supported
+under the OneClickDBA brand.
 
 Except for upstream and third-party portions identified in
 THIRD_PARTY_LICENSES.txt, the original components and fork-specific
@@ -13,7 +13,7 @@ Permissive License, Version 1.0.
 
 Upstream and third-party portions remain subject to their respective
 copyright notices and license terms. Nothing in this license transfers
-ownership of those portions to Ciberterminal S.L.
+ownership of those portions to Jorge Holgado.
 
 The Harry name, logo, mascot, visual identity, and associated branding
 are not licensed under the software license. See TRADEMARKS.md.

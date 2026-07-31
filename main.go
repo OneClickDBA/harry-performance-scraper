@@ -25,20 +25,20 @@ import (
 	// Required for debugging
 	// _ "net/http/pprof"
 
-	"github.com/dodger-one/oracledb-performance-scraper/alertlog"
-	"github.com/dodger-one/oracledb-performance-scraper/collector"
-	"github.com/dodger-one/oracledb-performance-scraper/postgresql"
+	"github.com/OneClickDBA/harry-performance-scraper/alertlog"
+	"github.com/OneClickDBA/harry-performance-scraper/collector"
+	"github.com/OneClickDBA/harry-performance-scraper/postgresql"
 )
 
 // Version will be set at build time.
 var Version = "0.0.0.dev"
 
 func parseConfigFile(args []string, getenv func(string) string, output io.Writer) (string, error) {
-	flags := flag.NewFlagSet("oracledb_performance_scraper", flag.ContinueOnError)
+	flags := flag.NewFlagSet("harry-scraper", flag.ContinueOnError)
 	var flagOutput bytes.Buffer
 	flags.SetOutput(&flagOutput)
 	flags.Usage = func() {
-		fmt.Fprintf(flags.Output(), "Usage of oracledb_performance_scraper:\n")
+		fmt.Fprintf(flags.Output(), "Usage of harry-scraper:\n")
 		fmt.Fprintf(flags.Output(), "  --config.file string\n")
 		fmt.Fprintf(flags.Output(), "        File with metrics scraper configuration. (env: CONFIG_FILE)\n")
 	}
@@ -152,7 +152,7 @@ func main() {
 	}
 	defer sink.Close()
 
-	logger.Info("Starting oracledb_performance_scraper", "version", Version)
+	logger.Info("Starting harry-scraper", "version", Version)
 	logger.Info("Writing metrics to PostgreSQL",
 		"samples_table", m.Output.PostgreSQL.SamplesTable,
 		"sql_samples_table", m.Output.PostgreSQL.SQLSamplesTable,

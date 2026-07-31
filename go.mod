@@ -1,4 +1,4 @@
-module github.com/dodger-one/oracledb-performance-scraper
+module github.com/OneClickDBA/harry-performance-scraper
 
 go 1.26.3
 

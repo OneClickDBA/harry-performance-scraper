@@ -7,9 +7,9 @@ services:
       - 127.0.0.1:5432:5432
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-oracledb_monitoring}
-      - POSTGRES_USER=${POSTGRES_USER:-oracledb_monitoring}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-oracledb_monitoring}
+      - POSTGRES_DB=${POSTGRES_DB:-harry_monitoring}
+      - POSTGRES_USER=${POSTGRES_USER:-harry_monitoring}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-harry_monitoring}
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
@@ -30,9 +30,9 @@ services:
       - 3000:3000
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-oracledb_monitoring}
-      - POSTGRES_USER=${POSTGRES_USER:-oracledb_monitoring}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-oracledb_monitoring}
+      - POSTGRES_DB=${POSTGRES_DB:-harry_monitoring}
+      - POSTGRES_USER=${POSTGRES_USER:-harry_monitoring}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-harry_monitoring}
     volumes:
       - ./grafana/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/alerting:/etc/grafana/provisioning/alerting
@@ -79,22 +79,22 @@ services:
       retries: 5
       start_period: 30s
 
-  dbscraper:
+  harry-scraper:
     build:
       context: ..
       dockerfile: Dockerfile
       target: scraper-godror
       cache_from:
-        - ${BUILD_DEPS_IMAGE:-oracledb-performance-scraper-build-deps:local}
+        - ${BUILD_DEPS_IMAGE:-harry-performance-scraper-build-deps:local}
       args:
         GOOS: ${GOOS:-linux}
         GOARCH: ${GOARCH:-amd64}
         TAGS: ${TAGS:-godror}
         CGO_ENABLED: ${CGO_ENABLED:-1}
         GO_VERSION: ${GO_VERSION:-1.26.3}
-        VERSION: ${VERSION:-1.0.0}
-    image: oracledb-performance-scraper:local
-    container_name: dbscraper
+        VERSION: ${VERSION:-0.0.0-dev}
+    image: harry-performance-scraper:local
+    container_name: harry-scraper
     command:
       - --config.file=/scraper/${COMPOSE_CONFIG_FILE:-config.yaml}
     ports:
@@ -106,9 +106,9 @@ services:
       - ADB_PASSWORD=${ADB_PASSWORD}
       - ADB_TNS_ALIAS=${ADB_TNS_ALIAS}
       - DB_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB:-oracledb_monitoring}
-      - POSTGRES_USER=${POSTGRES_USER:-oracledb_monitoring}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-oracledb_monitoring}
+      - POSTGRES_DB=${POSTGRES_DB:-harry_monitoring}
+      - POSTGRES_USER=${POSTGRES_USER:-harry_monitoring}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-harry_monitoring}
       #   - DB_USERNAME=pdbadmin
       #   - DB_PASSWORD=${DB_PASSWORD}
       #   - DB_CONNECT_STRING=free26ai:1521/freepdb1

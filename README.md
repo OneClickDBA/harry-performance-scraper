@@ -1,7 +1,7 @@
 # Harry - Performance Scraper for Oracle Database
 
 <p align="center">
-  <img width="256" src="https://oneclickdba.github.io/oracledb-performance-scraper-web/img/harry/harry.png" alt="Harry - Performance Scraper for Oracle Database">
+  <img width="256" src="https://oneclickdba.github.io/harry-performance-scraper-web/img/harry/harry.png" alt="Harry - Performance Scraper for Oracle Database">
 </p>
 
 Harry is a PostgreSQL-backed Oracle Database performance and operational
@@ -9,8 +9,10 @@ monitoring scraper. It collects SQL, session, blocking, database activity,
 capacity, resource, and collector-health data, then stores it in PostgreSQL for
 Grafana dashboards, alerting, and historical analysis.
 
+Project homepage: [oneclickdba.com/harry](https://oneclickdba.com/harry/).
+
 The project is developed at
-[OneClickDBA/oracledb-performance-scraper](https://github.com/OneClickDBA/oracledb-performance-scraper)
+[OneClickDBA/harry-performance-scraper](https://github.com/OneClickDBA/harry-performance-scraper)
 and originated as a heavily modified fork of Oracle's application observability
 codebase. Harry is not a Prometheus exporter: it writes structured samples
 directly to PostgreSQL and exposes only a small health endpoint.
@@ -35,17 +37,17 @@ directly to PostgreSQL and exposes only a small health endpoint.
 ## Getting Started
 
 The complete documentation is published at the
-[Harry documentation site](https://oneclickdba.github.io/oracledb-performance-scraper-web/).
+[Harry documentation site](https://oneclickdba.github.io/harry-performance-scraper-web/).
 Start with:
 
-- [Installation and basic configuration](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/getting-started/basics)
-- [Configuration reference](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/configuration/config-file)
-- [Collection and storage model](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/getting-started/collection-model)
-- [Grafana dashboards](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/getting-started/grafana-dashboards)
-- [Builds and releases](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/releases/builds)
+- [Installation and basic configuration](https://oneclickdba.github.io/harry-performance-scraper-web/docs/getting-started/basics)
+- [Configuration reference](https://oneclickdba.github.io/harry-performance-scraper-web/docs/configuration/config-file)
+- [Collection and storage model](https://oneclickdba.github.io/harry-performance-scraper-web/docs/getting-started/collection-model)
+- [Grafana dashboards](https://oneclickdba.github.io/harry-performance-scraper-web/docs/getting-started/grafana-dashboards)
+- [Builds and releases](https://oneclickdba.github.io/harry-performance-scraper-web/docs/releases/builds)
 
 The Docusaurus source is maintained separately in
-[OneClickDBA/oracledb-performance-scraper-web](https://github.com/OneClickDBA/oracledb-performance-scraper-web).
+[OneClickDBA/harry-performance-scraper-web](https://github.com/OneClickDBA/harry-performance-scraper-web).
 PostgreSQL schema and Oracle-to-PostgreSQL data-flow diagrams remain in
 [`doc/`](doc/) because they are maintained alongside the implementation.
 
@@ -55,13 +57,13 @@ The default build uses the `godror` driver and requires Oracle Instant Client
 at runtime:
 
 ```bash
-go build -o oracledb_performance_scraper ./
+go build -o harry-scraper ./
 ```
 
 For a no-CGO build using the `go-ora` driver:
 
 ```bash
-go build -tags goora -o oracledb_performance_scraper ./
+go build -tags goora -o harry-scraper ./
 ```
 
 ## Production Considerations
@@ -73,13 +75,15 @@ environment files, an Oracle wallet, or a supported vault integration.
 PostgreSQL-backed Grafana alerts cannot report a complete failure of Grafana,
 PostgreSQL, the scraper, or the notification path. Production deployments need
 an independent external availability check for the monitoring stack. See
-[Grafana Alerting](https://oneclickdba.github.io/oracledb-performance-scraper-web/docs/configuration/grafana-alerting)
+[Grafana Alerting](https://oneclickdba.github.io/harry-performance-scraper-web/docs/configuration/grafana-alerting)
 for provisioning and operational requirements.
 
 ## Project Information
 
-Harry is developed and maintained by Jorge Holgado
-<jholgado@ciberterminal.net>.
+Harry is developed by Jorge Holgado and commercially supported
+under the OneClickDBA brand.
+
+Contact: <dodger@oneclickdba.com>.
 
 - Report security vulnerabilities according to [SECURITY.md](SECURITY.md).
 - Project license: [LICENSE.txt](LICENSE.txt).
@@ -94,7 +98,7 @@ distributed under the MIT License, and
 distributed under the Universal Permissive License, Version 1.0.
 
 Original modifications and components developed specifically for Harry are
-Copyright (c) 2026 Ciberterminal S.L. and are distributed under the terms in
+Copyright (c) 2026 Jorge Holgado and are distributed under the terms in
 [LICENSE.txt](LICENSE.txt). The software licenses do not grant permission to use
 the Harry name, logo, or visual identity.
 

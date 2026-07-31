@@ -14,7 +14,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/dodger-one/oracledb-performance-scraper/collector"
+	"github.com/OneClickDBA/harry-performance-scraper/collector"
 )
 
 func TestNullStringValue(t *testing.T) {

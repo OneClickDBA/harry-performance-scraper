@@ -57,7 +57,7 @@
       },
       "id": 1,
       "options": {
-        "alertInstanceLabelFilter": "{service=\"oracledb-performance-scraper\"}",
+        "alertInstanceLabelFilter": "{service=\"harry-performance-scraper\"}",
         "alertName": "",
         "dashboardAlerts": false,
         "datasource": "",
@@ -696,7 +696,7 @@
       },
       "id": 6,
       "options": {
-        "alertInstanceLabelFilter": "{service=\"oracledb-performance-scraper\"}",
+        "alertInstanceLabelFilter": "{service=\"harry-performance-scraper\"}",
         "alertName": "",
         "dashboardAlerts": false,
         "datasource": "",

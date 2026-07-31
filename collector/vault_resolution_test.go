@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dodger-one/oracledb-performance-scraper/ocivault"
+	"github.com/OneClickDBA/harry-performance-scraper/ocivault"
 )
 
 func TestWarmupConnectionPoolWithOCIVaultLookupErrorUsesBackoff(t *testing.T) {

@@ -4,6 +4,9 @@ Thank you for your interest in contributing to Harry - Performance Scraper for
 Oracle Database. Contributions may include bug reports, feature proposals,
 documentation improvements, testing, and code.
 
+Harry is developed by Jorge Holgado and commercially supported
+under the OneClickDBA brand.
+
 ## Opening issues
 
 For bugs or enhancement requests, please open a GitHub issue unless the problem
@@ -22,10 +25,9 @@ Before any code or other copyrightable contribution can be accepted, the
 contributor must complete the project's applicable Contributor License
 Agreement (CLA).
 
-The CLA preserves a clear chain of ownership and gives Ciberterminal S.L. the
-rights necessary to maintain, distribute, sublicense, relicense, and transfer
-the project while allowing contributors to retain ownership of their
-contributions.
+The CLA preserves a clear chain of ownership and gives Jorge Holgado the rights
+necessary to maintain, distribute, sublicense, relicense, and transfer the
+project while allowing contributors to retain ownership of their contributions.
 
 By submitting a contribution, you represent that:
 
@@ -38,7 +40,7 @@ By submitting a contribution, you represent that:
 
 A pull request may be opened before the CLA is completed, but it will not be
 merged until the applicable individual or corporate CLA has been accepted by
-Ciberterminal S.L.
+Jorge Holgado.
 
 Instructions for completing the CLA will be provided in the pull request. The
 CLA itself is a legal document separate from this contribution guide.
@@ -110,4 +112,4 @@ before investing substantial time in it.
 
 [COC]: https://www.contributor-covenant.org/version/2/1/code_of_conduct/
 [DCO]: https://developercertificate.org/
-[DOCS]: https://github.com/dodger-one/oracledb-performance-scraper-web
+[DOCS]: https://github.com/OneClickDBA/harry-performance-scraper-web

@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dodger-one/oracledb-performance-scraper/collector"
+	"github.com/OneClickDBA/harry-performance-scraper/collector"
 )
 
 const (

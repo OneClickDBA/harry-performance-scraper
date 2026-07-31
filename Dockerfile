@@ -1,10 +1,12 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE:-ghcr.io/oracle/oraclelinux:8-slim} AS build-deps
 
-ARG GOOS
+ARG TARGETOS
+ARG GOOS=${TARGETOS}
 ENV GOOS=${GOOS:-linux}
 
-ARG GOARCH
+ARG TARGETARCH
+ARG GOARCH=${TARGETARCH}
 ENV GOARCH=${GOARCH:-amd64}
 
 ARG TAGS
@@ -30,16 +32,18 @@ RUN microdnf update -y && \
 
 ENV PATH=$PATH:/usr/local/go/bin
 
-WORKDIR /go/src/oracledb_performance_scraper
+WORKDIR /go/src/harry-scraper
 COPY go.mod go.sum ./
 RUN go mod download
 
 FROM build-deps AS build
 
-ARG GOOS
+ARG TARGETOS
+ARG GOOS=${TARGETOS}
 ENV GOOS=${GOOS:-linux}
 
-ARG GOARCH
+ARG TARGETARCH
+ARG GOARCH=${TARGETARCH}
 ENV GOARCH=${GOARCH:-amd64}
 
 ARG TAGS
@@ -51,38 +55,36 @@ ENV CGO_ENABLED=${CGO_ENABLED:-1}
 COPY . .
 
 ARG VERSION
-ENV VERSION=${VERSION:-1.0.0}
+ENV VERSION=${VERSION:-0.0.0-dev}
 
-RUN CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build --tags=${TAGS} -v -ldflags "-X main.Version=${VERSION} -s -w" -o /tmp/oracledb_performance_scraper
+RUN CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build --tags=${TAGS} -v -ldflags "-X main.Version=${VERSION} -s -w" -o /tmp/harry-scraper
 
 FROM ${BASE_IMAGE:-ghcr.io/oracle/oraclelinux:8-slim} AS scraper-godror
 
-LABEL org.opencontainers.image.title="Harry"
-LABEL org.opencontainers.image.description="Harry — OracleDB Performance Scraper"
-LABEL org.opencontainers.image.authors="Jorge Holgado <jholgado@ciberterminal.net>"
-LABEL org.opencontainers.image.vendor="Ciberterminal S.L."
-LABEL org.opencontainers.image.licenses="UPL-1.0 AND MIT"
-LABEL org.opencontainers.image.source="https://github.com/OneClickDBA/oracledb-performance-scraper"
-LABEL org.opencontainers.image.documentation="https://oneclickdba.github.io/oracledb-performance-scraper-web/"
-LABEL org.opencontainers.image.url="https://oneclickdba.com/harry/"
-
-
 ARG VERSION
-ENV VERSION=${VERSION:-1.0.0}
+
+LABEL org.opencontainers.image.title="Harry"
+LABEL org.opencontainers.image.description="Harry — Performance Scraper for Oracle Database"
+LABEL org.opencontainers.image.authors="Jorge Holgado <dodger@oneclickdba.com>"
+LABEL org.opencontainers.image.vendor="Jorge Holgado"
+LABEL org.opencontainers.image.licenses="UPL-1.0 AND MIT"
+LABEL org.opencontainers.image.source="https://github.com/OneClickDBA/harry-performance-scraper"
+LABEL org.opencontainers.image.documentation="https://oneclickdba.github.io/harry-performance-scraper-web/"
+LABEL org.opencontainers.image.url="https://oneclickdba.com/harry/"
+LABEL org.opencontainers.image.version="${VERSION:-0.0.0-dev}"
+
+ENV VERSION=${VERSION:-0.0.0-dev}
 ENV DEBIAN_FRONTEND=noninteractive
 
-ARG GOARCH
-ENV GOARCH=${GOARCH:-amd64}
+ARG ORACLE_INSTANTCLIENT_RELEASE=26ai
 
 RUN microdnf update -y && \
-    microdnf install -y oracle-instantclient-release-23ai-el8 && \
+    oracle_linux_major="$(. /etc/os-release; printf '%s' "${VERSION_ID%%.*}")" && \
+    microdnf install -y "oracle-instantclient-release-${ORACLE_INSTANTCLIENT_RELEASE}-el${oracle_linux_major}" && \
     microdnf install -y oracle-instantclient-basic glibc && \
     microdnf clean all
 
-ENV LD_LIBRARY_PATH=/usr/lib/oracle/23/client64/lib
-ENV PATH=$PATH:/usr/lib/oracle/23/client64/bin
-
-COPY --from=build /tmp/oracledb_performance_scraper /oracledb_performance_scraper
+COPY --from=build /tmp/harry-scraper /harry-scraper
 
 # create the mount point for alert log exports (default location)
 RUN mkdir /log && chown 1000:1000 /log
@@ -92,11 +94,25 @@ EXPOSE 9161
 
 USER 1000
 
-ENTRYPOINT ["/oracledb_performance_scraper"]
+ENTRYPOINT ["/harry-scraper"]
 
 FROM ${BASE_IMAGE:-ghcr.io/oracle/oraclelinux:8-slim} AS scraper-goora
 
-COPY --from=build /tmp/oracledb_performance_scraper /oracledb_performance_scraper
+ARG VERSION
+
+LABEL org.opencontainers.image.title="Harry"
+LABEL org.opencontainers.image.description="Harry — Performance Scraper for Oracle Database"
+LABEL org.opencontainers.image.authors="Jorge Holgado <dodger@oneclickdba.com>"
+LABEL org.opencontainers.image.vendor="Jorge Holgado"
+LABEL org.opencontainers.image.licenses="UPL-1.0 AND MIT"
+LABEL org.opencontainers.image.source="https://github.com/OneClickDBA/harry-performance-scraper"
+LABEL org.opencontainers.image.documentation="https://oneclickdba.github.io/harry-performance-scraper-web/"
+LABEL org.opencontainers.image.url="https://oneclickdba.com/harry/"
+LABEL org.opencontainers.image.version="${VERSION:-0.0.0-dev}"
+
+ENV VERSION=${VERSION:-0.0.0-dev}
+
+COPY --from=build /tmp/harry-scraper /harry-scraper
 
 # create the mount point for alert log exports (default location)
 RUN mkdir /log && chown 1000:1000 /log
@@ -106,4 +122,4 @@ EXPOSE 9161
 
 USER 1000
 
-ENTRYPOINT ["/oracledb_performance_scraper"]
+ENTRYPOINT ["/harry-scraper"]
