@@ -122,5 +122,35 @@ services:
         condition: service_healthy
       second26ai:
         condition: service_healthy
+
+  harry-scraper-secondary:
+    image: harry-performance-scraper:local
+    container_name: harry-scraper-secondary
+    command:
+      - --config.file=/scraper/${COMPOSE_CONFIG_FILE:-config.yaml}
+    ports:
+      - 9162:9161
+    environment:
+      # Both Harry instances use the same PostgreSQL database and HA scope.
+      - TNS_ADMIN=${TNS_ADMIN}
+      - ADB_USERNAME=${ADB_USERNAME}
+      - ADB_PASSWORD=${ADB_PASSWORD}
+      - ADB_TNS_ALIAS=${ADB_TNS_ALIAS}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-harry_monitoring}
+      - POSTGRES_USER=${POSTGRES_USER:-harry_monitoring}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-harry_monitoring}
+    volumes:
+      - ./scraper:/scraper
+      - ./wallet:/scraper/wallet
+    depends_on:
+      postgres:
+        condition: service_healthy
+      free26ai:
+        condition: service_healthy
+      second26ai:
+        condition: service_healthy
+      harry-scraper:
+        condition: service_started
 volumes:
   postgres_data:

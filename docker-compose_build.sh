@@ -38,13 +38,17 @@ echo "## build dependency image"
 echo "## build"
 "${DOCKER_COMPOSE[@]}" build harry-scraper
 echo "## UP"
-"${DOCKER_COMPOSE[@]}" up -d postgres free26ai second26ai harry-scraper grafana
+"${DOCKER_COMPOSE[@]}" up -d postgres free26ai second26ai harry-scraper harry-scraper-secondary grafana
 echo "## ps"
 "${DOCKER_COMPOSE[@]}" ps
 echo "## healthz"
 curl -fsS http://localhost:9161/healthz
+curl -fsS http://localhost:9162/healthz
+echo "## readyz (exactly one instance should return HTTP 200)"
+curl -sS -o /dev/null -w 'harry-scraper: %{http_code}\n' http://localhost:9161/readyz
+curl -sS -o /dev/null -w 'harry-scraper-secondary: %{http_code}\n' http://localhost:9162/readyz
 echo "## logs"
-"${DOCKER_COMPOSE[@]}" logs -f harry-scraper
+"${DOCKER_COMPOSE[@]}" logs -f harry-scraper harry-scraper-secondary
 echo "## Postgresql table info"
 "${DOCKER_COMPOSE[@]}" exec postgres psql -U "${POSTGRES_USER:-harry_monitoring}" -d "${POSTGRES_DB:-harry_monitoring}" -c "select count(*) from oracle_metric_samples;"
 "${DOCKER_COMPOSE[@]}" exec postgres psql -U "${POSTGRES_USER:-harry_monitoring}" -d "${POSTGRES_DB:-harry_monitoring}" -c "select count(*) from oracle_sql_samples;"

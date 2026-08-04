@@ -43,6 +43,12 @@ performance:
     topN: 20
     queryTimeout: 10s
 
+highAvailability:
+  enabled: true
+  scope: default
+  retryInterval: 5s
+  validationInterval: 2s
+
 output:
   postgresql:
     url: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable

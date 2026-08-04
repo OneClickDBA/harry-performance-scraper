@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 
 	"github.com/OneClickDBA/harry-performance-scraper/alertlog"
 	"github.com/OneClickDBA/harry-performance-scraper/collector"
+	"github.com/OneClickDBA/harry-performance-scraper/ha"
 	"github.com/OneClickDBA/harry-performance-scraper/postgresql"
 )
 
@@ -96,6 +98,18 @@ func landingPageHandler(healthPath string) http.HandlerFunc {
 	}
 }
 
+func readinessHandler(ready *atomic.Bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		if !ready.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("standby\n"))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ready\n"))
+	}
+}
+
 func listenAddress(addresses *[]string) string {
 	if addresses == nil || len(*addresses) == 0 || strings.TrimSpace((*addresses)[0]) == "" {
 		return ":9161"
@@ -104,13 +118,17 @@ func listenAddress(addresses *[]string) string {
 }
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	configFile, err := parseConfigFile(os.Args[1:], os.Getenv, os.Stderr)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			return
+			return 0
 		}
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(2)
+		return 2
 	}
 
 	bootstrapLogger, _ := newLogger("info", "logfmt", os.Stderr)
@@ -118,13 +136,13 @@ func main() {
 	m, err := collector.LoadMetricsConfiguration(bootstrapLogger, config)
 	if err != nil {
 		bootstrapLogger.Error("unable to load metrics configuration file", "error", err)
-		os.Exit(1)
+		return 1
 	}
 
 	logger, err := newLogger(m.Logging.Level, m.Logging.Format, os.Stderr)
 	if err != nil {
 		bootstrapLogger.Error("invalid logging configuration", "error", err)
-		os.Exit(1)
+		return 1
 	}
 
 	freeOSMemInterval, enableFree := os.LookupEnv("FREE_INTERVAL")
@@ -144,21 +162,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	scraper := collector.NewScraper(logger, m)
-	sink, err := postgresql.New(ctx, logger, m.Output.PostgreSQL)
-	if err != nil {
-		logger.Error("unable to initialize PostgreSQL output", "error", err)
-		os.Exit(1)
-	}
-	defer sink.Close()
-
 	logger.Info("Starting harry-scraper", "version", Version)
-	logger.Info("Writing metrics to PostgreSQL",
-		"samples_table", m.Output.PostgreSQL.SamplesTable,
-		"sql_samples_table", m.Output.PostgreSQL.SQLSamplesTable,
-		"session_samples_table", m.Output.PostgreSQL.SessionSamplesTable,
-		"blocking_sessions_table", m.Output.PostgreSQL.BlockingSessionsTable,
-		"database_activity_table", m.Output.PostgreSQL.DatabaseActivityTable)
+	logger.Info("High availability configuration",
+		"enabled", m.HighAvailability.GetEnabled(),
+		"scope", m.HighAvailability.GetScope(),
+		"retry_interval", m.HighAvailability.GetRetryInterval(),
+		"validation_interval", m.HighAvailability.GetValidationInterval())
 	logger.Info("SQL execution plan collection configuration",
 		"enabled", m.Performance.SQLPlans.GetEnabled(),
 		"interval", m.Performance.SQLPlans.GetInterval(),
@@ -176,12 +185,115 @@ func main() {
 		logger.Warn("Oracle ASH collection is enabled; the operator is responsible for verifying Oracle Diagnostics Pack licensing")
 	}
 
+	var ready atomic.Bool
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
+	mux.HandleFunc("/readyz", readinessHandler(&ready))
 	mux.HandleFunc("/", landingPageHandler("/healthz"))
+
+	server := &http.Server{
+		Addr:              listenAddress(m.Web.ListenAddresses),
+		ReadHeaderTimeout: m.Web.GetReadHeaderTimeout(),
+		ReadTimeout:       m.Web.GetReadTimeout(),
+		IdleTimeout:       m.Web.GetIdleTimeout(),
+		Handler:           mux,
+	}
+	serverErr := make(chan error, 1)
+	go func() {
+		logger.Info("Starting health server", "address", server.Addr)
+		serverErr <- server.ListenAndServe()
+	}()
+	shutdownServer := func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logger.Error("HTTP server shutdown error", "error", err)
+		}
+	}
+
+	var elector *ha.Elector
+	if m.HighAvailability.GetEnabled() {
+		elector, err = ha.New(logger, m.Output.PostgreSQL.URL, m.HighAvailability.GetScope(),
+			m.HighAvailability.GetRetryInterval(), m.HighAvailability.GetValidationInterval())
+		if err != nil {
+			logger.Error("unable to initialize PostgreSQL HA election", "error", err)
+			shutdownServer()
+			return 1
+		}
+		defer func() {
+			closeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			if err := elector.Close(closeCtx); err != nil {
+				logger.Warn("Unable to close PostgreSQL HA leadership connection", "error", err)
+			}
+		}()
+		acquireErr := make(chan error, 1)
+		go func() { acquireErr <- elector.Acquire(ctx) }()
+		select {
+		case err := <-acquireErr:
+			if err != nil {
+				if errors.Is(err, context.Canceled) && ctx.Err() != nil {
+					logger.Info("Shutting down while waiting for PostgreSQL HA leadership")
+					shutdownServer()
+					return 0
+				}
+				logger.Error("PostgreSQL HA election failed", "error", err)
+				shutdownServer()
+				return 1
+			}
+		case err := <-serverErr:
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logger.Error("Listening error", "error", err)
+			}
+			return 1
+		case <-ctx.Done():
+			logger.Info("Shutting down while waiting for PostgreSQL HA leadership")
+			shutdownServer()
+			return 0
+		}
+	} else {
+		logger.Warn("PostgreSQL HA leadership is disabled; this instance will scrape immediately")
+	}
+
+	workCtx, cancelWork := context.WithCancel(ctx)
+	defer cancelWork()
+	var leadershipErr <-chan error
+	if elector != nil {
+		monitorErr := make(chan error, 1)
+		leadershipErr = monitorErr
+		go func() { monitorErr <- elector.Monitor(workCtx) }()
+	}
+	scraper := collector.NewScraper(logger, m)
+	sink, err := postgresql.New(workCtx, logger, m.Output.PostgreSQL)
+	if err != nil {
+		logger.Error("unable to initialize PostgreSQL output", "error", err)
+		shutdownServer()
+		return 1
+	}
+	defer sink.Close()
+	select {
+	case err := <-leadershipErr:
+		cancelWork()
+		if errors.Is(err, context.Canceled) && ctx.Err() != nil {
+			logger.Info("Shutting down during startup")
+			shutdownServer()
+			return 0
+		}
+		logger.Error("PostgreSQL HA leadership lost during startup", "error", err)
+		shutdownServer()
+		return 1
+	default:
+	}
+
+	logger.Info("Writing metrics to PostgreSQL",
+		"samples_table", m.Output.PostgreSQL.SamplesTable,
+		"sql_samples_table", m.Output.PostgreSQL.SQLSamplesTable,
+		"session_samples_table", m.Output.PostgreSQL.SessionSamplesTable,
+		"blocking_sessions_table", m.Output.PostgreSQL.BlockingSessionsTable,
+		"database_activity_table", m.Output.PostgreSQL.DatabaseActivityTable)
 
 	// start a ticker to cause rebirth
 	if enableRestart {
@@ -242,46 +354,49 @@ func main() {
 
 		go func() {
 			for {
-				<-logTicker.C
-				logger.Debug("updating alert log")
-				for _, db := range scraper.GetDBs() {
-					alertlog.UpdateLog(m.LogDestination(), m.LogPerDatabaseFiles(), logger, db)
+				select {
+				case <-logTicker.C:
+					logger.Debug("updating alert log")
+					for _, db := range scraper.GetDBs() {
+						alertlog.UpdateLog(m.LogDestination(), m.LogPerDatabaseFiles(), logger, db)
+					}
+				case <-workCtx.Done():
+					return
 				}
-
 			}
 		}()
 	}
 
-	server := &http.Server{
-		Addr:              listenAddress(m.Web.ListenAddresses),
-		ReadHeaderTimeout: m.Web.GetReadHeaderTimeout(),
-		ReadTimeout:       m.Web.GetReadTimeout(),
-		IdleTimeout:       m.Web.GetIdleTimeout(),
-		Handler:           mux,
-	}
-	serverErr := make(chan error, 1)
-	go func() {
-		logger.Info("Starting health server", "address", server.Addr)
-		serverErr <- server.ListenAndServe()
-	}()
-
 	go scraper.InitializeDatabases()
-	go scraper.RunScheduledScrapes(ctx, sink)
-	go scraper.RunActivitySampling(ctx, sink)
+	go scraper.RunScheduledScrapes(workCtx, sink)
+	go scraper.RunActivitySampling(workCtx, sink)
+	ready.Store(true)
 
 	select {
 	case <-ctx.Done():
+		ready.Store(false)
+		cancelWork()
 		logger.Info("Shutting down")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			logger.Error("HTTP server shutdown error", "error", err)
+		shutdownServer()
+		return 0
+	case err := <-leadershipErr:
+		ready.Store(false)
+		cancelWork()
+		if errors.Is(err, context.Canceled) && ctx.Err() != nil {
+			logger.Info("Shutting down")
+			shutdownServer()
+			return 0
 		}
+		logger.Error("PostgreSQL HA leadership lost; shutting down", "error", err)
+		shutdownServer()
+		return 1
 	case err := <-serverErr:
-		if err == http.ErrServerClosed {
-			return
+		ready.Store(false)
+		cancelWork()
+		if errors.Is(err, http.ErrServerClosed) {
+			return 0
 		}
 		logger.Error("Listening error", "error", err)
-		os.Exit(1)
+		return 1
 	}
 }

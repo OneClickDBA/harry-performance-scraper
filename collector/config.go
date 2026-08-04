@@ -29,14 +29,50 @@ var (
 )
 
 type MetricsConfiguration struct {
-	ListenAddress string                    `yaml:"listenAddress"`
-	Databases     map[string]DatabaseConfig `yaml:"databases"`
-	Metrics       MetricsConfig             `yaml:"metrics"`
-	Operational   OperationalConfig         `yaml:"operational"`
-	Performance   PerformanceConfig         `yaml:"performance"`
-	Output        OutputConfig              `yaml:"output"`
-	Logging       LoggingConfig             `yaml:"log"`
-	Web           WebConfig                 `yaml:"web"`
+	ListenAddress    string                    `yaml:"listenAddress"`
+	Databases        map[string]DatabaseConfig `yaml:"databases"`
+	Metrics          MetricsConfig             `yaml:"metrics"`
+	Operational      OperationalConfig         `yaml:"operational"`
+	Performance      PerformanceConfig         `yaml:"performance"`
+	HighAvailability HighAvailabilityConfig    `yaml:"highAvailability"`
+	Output           OutputConfig              `yaml:"output"`
+	Logging          LoggingConfig             `yaml:"log"`
+	Web              WebConfig                 `yaml:"web"`
+}
+
+type HighAvailabilityConfig struct {
+	Enabled            *bool          `yaml:"enabled"`
+	Scope              string         `yaml:"scope"`
+	RetryInterval      *time.Duration `yaml:"retryInterval"`
+	ValidationInterval *time.Duration `yaml:"validationInterval"`
+}
+
+func (c HighAvailabilityConfig) GetEnabled() bool {
+	if c.Enabled == nil {
+		return true
+	}
+	return *c.Enabled
+}
+
+func (c HighAvailabilityConfig) GetScope() string {
+	if c.Scope == "" {
+		return "default"
+	}
+	return c.Scope
+}
+
+func (c HighAvailabilityConfig) GetRetryInterval() time.Duration {
+	if c.RetryInterval == nil {
+		return 5 * time.Second
+	}
+	return *c.RetryInterval
+}
+
+func (c HighAvailabilityConfig) GetValidationInterval() time.Duration {
+	if c.ValidationInterval == nil {
+		return 2 * time.Second
+	}
+	return *c.ValidationInterval
 }
 
 type WebConfig struct {
@@ -552,6 +588,9 @@ func (m *MetricsConfiguration) mergeOutputConfig() {
 
 func (m *MetricsConfiguration) validate(logger *slog.Logger) error {
 	m.checkDuplicatedDatabases(logger)
+	if err := m.validateHighAvailabilityConfig(); err != nil {
+		return err
+	}
 	if err := m.validateOCIVaultAuth(); err != nil {
 		return err
 	}
@@ -563,6 +602,30 @@ func (m *MetricsConfiguration) validate(logger *slog.Logger) error {
 	}
 	if err := m.validatePerformanceConfig(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (m *MetricsConfiguration) validateHighAvailabilityConfig() error {
+	if !m.HighAvailability.GetEnabled() {
+		return nil
+	}
+	scope := m.HighAvailability.GetScope()
+	if len(scope) > 63 {
+		return fmt.Errorf("highAvailability.scope must not exceed 63 characters")
+	}
+	for i, r := range scope {
+		alphaNumeric := r >= 'a' && r <= 'z' || r >= '0' && r <= '9'
+		valid := alphaNumeric || i > 0 && (r == '.' || r == '_' || r == '-')
+		if !valid {
+			return fmt.Errorf("highAvailability.scope must match [a-z0-9][a-z0-9._-]{0,62}")
+		}
+	}
+	if m.HighAvailability.GetRetryInterval() <= 0 {
+		return fmt.Errorf("highAvailability.retryInterval must be greater than zero")
+	}
+	if m.HighAvailability.GetValidationInterval() <= 0 {
+		return fmt.Errorf("highAvailability.validationInterval must be greater than zero")
 	}
 	return nil
 }

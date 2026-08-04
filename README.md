@@ -15,7 +15,7 @@ The project is developed at
 [OneClickDBA/harry-performance-scraper](https://github.com/OneClickDBA/harry-performance-scraper)
 and originated as a heavily modified fork of Oracle's application observability
 codebase. Harry is not a Prometheus exporter: it writes structured samples
-directly to PostgreSQL and exposes only a small health endpoint.
+directly to PostgreSQL and exposes only small health and readiness endpoints.
 
 > **Oracle Diagnostics Pack**
 >
@@ -30,6 +30,7 @@ directly to PostgreSQL and exposes only a small health endpoint.
 - Bounded SQL text and execution-plan collection from `GV$SQL` and
   `GV$SQL_PLAN`.
 - PostgreSQL range-partitioned storage with automatic retention.
+- PostgreSQL-backed active/standby operation using advisory-lock leader election.
 - Grafana dashboards and PostgreSQL-backed operational alerts.
 - Optional user-defined additional metrics from TOML or YAML definitions.
 - Docker Compose testing and production-style Linux service deployment.
@@ -71,6 +72,13 @@ go build -tags goora -o harry-scraper ./
 Use a dedicated Oracle monitoring user with only the grants required for the
 enabled collectors. Keep production credentials outside the YAML file, using
 environment files, an Oracle wallet, or a supported vault integration.
+
+High availability is enabled by default. Harry instances using the same
+PostgreSQL cluster and HA scope elect one active scraper; standbys do not open
+Oracle connections or write samples. PostgreSQL HA must independently enforce
+a single writable primary with quorum and fencing. See
+[High availability](https://oneclickdba.github.io/harry-performance-scraper-web/docs/configuration/high-availability)
+for connection-string, scope, readiness, and Patroni requirements.
 
 PostgreSQL-backed Grafana alerts cannot report a complete failure of Grafana,
 PostgreSQL, the scraper, or the notification path. Production deployments need

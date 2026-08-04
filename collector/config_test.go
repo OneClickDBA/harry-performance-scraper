@@ -236,6 +236,97 @@ databases:
 	if got := cfg.Operational.GetQueryTimeout(); got != 10*time.Second {
 		t.Fatalf("expected default operational query timeout of 10s, got %s", got)
 	}
+	if !cfg.HighAvailability.GetEnabled() {
+		t.Fatal("expected high availability to be enabled by default")
+	}
+	if got := cfg.HighAvailability.GetScope(); got != "default" {
+		t.Fatalf("expected default HA scope, got %q", got)
+	}
+	if got := cfg.HighAvailability.GetRetryInterval(); got != 5*time.Second {
+		t.Fatalf("expected default HA retry interval of 5s, got %s", got)
+	}
+	if got := cfg.HighAvailability.GetValidationInterval(); got != 2*time.Second {
+		t.Fatalf("expected default HA validation interval of 2s, got %s", got)
+	}
+}
+
+func TestLoadMetricsConfigurationAcceptsHighAvailabilitySettings(t *testing.T) {
+	configPath := writeScraperConfig(t, `
+databases:
+  default:
+    username: scott
+    password: tiger
+    url: localhost:1521/freepdb1
+highAvailability:
+  enabled: true
+  scope: production-1
+  retryInterval: 10s
+  validationInterval: 3s
+`)
+
+	cfg, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
+	if err != nil {
+		t.Fatalf("expected config to load, got %v", err)
+	}
+	if got := cfg.HighAvailability.GetScope(); got != "production-1" {
+		t.Fatalf("HA scope = %q, want production-1", got)
+	}
+	if got := cfg.HighAvailability.GetRetryInterval(); got != 10*time.Second {
+		t.Fatalf("HA retry interval = %s, want 10s", got)
+	}
+	if got := cfg.HighAvailability.GetValidationInterval(); got != 3*time.Second {
+		t.Fatalf("HA validation interval = %s, want 3s", got)
+	}
+}
+
+func TestLoadMetricsConfigurationRejectsInvalidHighAvailabilitySettings(t *testing.T) {
+	tests := []struct {
+		name    string
+		haYAML  string
+		wantErr string
+	}{
+		{name: "uppercase scope", haYAML: "  scope: Production\n", wantErr: "highAvailability.scope"},
+		{name: "leading separator", haYAML: "  scope: -production\n", wantErr: "highAvailability.scope"},
+		{name: "zero retry", haYAML: "  retryInterval: 0s\n", wantErr: "highAvailability.retryInterval"},
+		{name: "zero validation", haYAML: "  validationInterval: 0s\n", wantErr: "highAvailability.validationInterval"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configPath := writeScraperConfig(t, `
+databases:
+  default:
+    username: scott
+    password: tiger
+    url: localhost:1521/freepdb1
+highAvailability:
+`+tt.haYAML)
+			_, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestLoadMetricsConfigurationAllowsDisabledHighAvailability(t *testing.T) {
+	configPath := writeScraperConfig(t, `
+databases:
+  default:
+    username: scott
+    password: tiger
+    url: localhost:1521/freepdb1
+highAvailability:
+  enabled: false
+  scope: Invalid Scope Is Ignored
+  retryInterval: 0s
+`)
+	cfg, err := LoadMetricsConfiguration(testLogger(), &Config{ConfigFile: configPath})
+	if err != nil {
+		t.Fatalf("disabled HA settings should not be validated, got %v", err)
+	}
+	if cfg.HighAvailability.GetEnabled() {
+		t.Fatal("expected high availability to be disabled")
+	}
 }
 
 func TestLoadMetricsConfigurationAcceptsOperationalSettings(t *testing.T) {

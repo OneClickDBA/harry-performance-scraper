@@ -72,9 +72,20 @@ performance:
     topN: 20
     queryTimeout: 10s
 
+highAvailability:
+  ## PostgreSQL advisory-lock leader election is enabled by default. Instances
+  ## using the same PostgreSQL cluster and scope form one election group.
+  enabled: true
+  scope: default
+  retryInterval: 5s
+  validationInterval: 2s
+
 output:
   postgresql:
-    ## PostgreSQL connection URL. Environment variables will be expanded.
+    ## PostgreSQL connection URL. Environment variables will be expanded. A
+    ## keyword/value URL may list Patroni members, for example:
+    ## host=pg-a,pg-b,pg-c dbname=harry_monitoring user=harry_monitoring
+    ## password=secret target_session_attrs=read-write connect_timeout=3
     url: ${POSTGRES_URL}
     ## Destination table names. Schemas may be included, for example monitoring.oracle_metric_samples.
     samplesTable: oracle_metric_samples

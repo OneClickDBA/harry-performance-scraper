@@ -78,6 +78,17 @@ spec:
               cpu: "500m"
           ports:
             - containerPort: 9161
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9161
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 9161
+            periodSeconds: 5
       restartPolicy: Always
       volumes:
         - name: tns-admin

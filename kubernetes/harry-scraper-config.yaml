@@ -67,6 +67,12 @@ performance:
     topN: 20
     queryTimeout: 10s
 
+highAvailability:
+  enabled: true
+  scope: default
+  retryInterval: 5s
+  validationInterval: 2s
+
 output:
   postgresql:
     url: ${POSTGRES_URL}

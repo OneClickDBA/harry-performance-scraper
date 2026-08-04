@@ -5,7 +5,10 @@ package main
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -23,6 +26,24 @@ func TestLandingPageHTMLEscapesHealthPath(t *testing.T) {
 	}
 	if !strings.Contains(body, "href='/healthz&#39; onclick=&#39;alert(1)'") {
 		t.Fatalf("expected escaped health path in href, got %q", body)
+	}
+}
+
+func TestReadinessHandlerReflectsLeadership(t *testing.T) {
+	var ready atomic.Bool
+	handler := readinessHandler(&ready)
+
+	standby := httptest.NewRecorder()
+	handler(standby, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if standby.Code != http.StatusServiceUnavailable || standby.Body.String() != "standby\n" {
+		t.Fatalf("standby response = %d %q", standby.Code, standby.Body.String())
+	}
+
+	ready.Store(true)
+	active := httptest.NewRecorder()
+	handler(active, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if active.Code != http.StatusOK || active.Body.String() != "ready\n" {
+		t.Fatalf("active response = %d %q", active.Code, active.Body.String())
 	}
 }
 
