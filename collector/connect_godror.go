@@ -6,7 +6,9 @@
 package collector
 
 import (
+	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,6 +17,51 @@ import (
 	"github.com/godror/godror"
 	"github.com/godror/godror/dsn"
 )
+
+const minimumGodrorConnectionInterval = 100 * time.Millisecond
+
+var godrorConnectionCreationGate = newOracleConnectionGate(minimumGodrorConnectionInterval)
+
+type oracleConnectionGate struct {
+	semaphore       chan struct{}
+	minimumInterval time.Duration
+	lastCompleted   time.Time
+}
+
+type gatedConnector struct {
+	driver.Connector
+	gate *oracleConnectionGate
+}
+
+func newOracleConnectionGate(minimumInterval time.Duration) *oracleConnectionGate {
+	return &oracleConnectionGate{
+		semaphore:       make(chan struct{}, 1),
+		minimumInterval: minimumInterval,
+	}
+}
+
+func (c gatedConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	select {
+	case c.gate.semaphore <- struct{}{}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	defer func() { <-c.gate.semaphore }()
+
+	if wait := c.gate.minimumInterval - time.Since(c.gate.lastCompleted); wait > 0 {
+		timer := time.NewTimer(wait)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
+	conn, err := c.Connector.Connect(ctx)
+	c.gate.lastCompleted = time.Now()
+	return conn, err
+}
 
 func connect(logger *slog.Logger, dbname string, dbconfig DatabaseConfig) (*sql.DB, error) {
 	logger.Debug("Launching connection to "+maskDsn(dbconfig.URL), "database", dbname)
@@ -82,7 +129,13 @@ func connect(logger *slog.Logger, dbname string, dbconfig DatabaseConfig) (*sql.
 
 	// note that this just configures the connection, it does not actually connect until later
 	// when we call db.Ping()
-	db := sql.OpenDB(godror.NewConnector(P))
+	// database/sql may create connections concurrently across every configured
+	// Oracle pool when their lifetimes expire together. Gate only physical OCI
+	// connection creation; established connections and queries remain concurrent.
+	db := sql.OpenDB(gatedConnector{
+		Connector: godror.NewConnector(P),
+		gate:      godrorConnectionCreationGate,
+	})
 	return db, nil
 }
 

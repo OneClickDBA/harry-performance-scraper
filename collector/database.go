@@ -60,9 +60,9 @@ func (d *Database) initCache(metrics map[string]*Metric) {
 	d.MetricsCache = NewMetricsCache(metrics)
 }
 
-// WarmupConnectionPool serially acquires connections to "warm up" the connection pool.
-// This is a workaround for a perceived bug in ODPI_C where rapid acquisition of connections
-// results in a SIGABRT.
+// WarmupConnectionPool serially acquires connections to warm the pool. The
+// godror connector also gates physical OCI connection creation process-wide so
+// runtime pool recycling cannot create connections concurrently across pools.
 func (d *Database) WarmupConnectionPool(logger *slog.Logger, backoff time.Duration) error {
 	defer d.startupReady.Store(true)
 
