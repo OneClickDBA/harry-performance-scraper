@@ -1,0 +1,545 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Top Consumers",
+      "tooltip": "Open the top SQL drilldown",
+      "type": "link",
+      "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_preview"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 560
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_id"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Open in Top Consumers",
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_id=${__value.raw}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 145
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  left((select t.sql_fulltext from oracle_sql_texts t where t.source_database = deltas.source_database and t.sql_id = deltas.sql_id), 240) as sql_preview\nfrom deltas\nwhere elapsed_micro_delta > 0\norder by elapsed_micro_delta desc\nlimit 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top SQL by Elapsed Time Delta",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_preview"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 560
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_id"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Open in Top Consumers",
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_id=${__value.raw}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 145
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  left((select t.sql_fulltext from oracle_sql_texts t where t.source_database = deltas.source_database and t.sql_id = deltas.sql_id), 240) as sql_preview\nfrom deltas\nwhere cpu_micro_delta > 0\norder by cpu_micro_delta desc\nlimit 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top SQL by CPU Time Delta",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_preview"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 560
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_id"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Open in Top Consumers",
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_id=${__value.raw}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 145
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "id": 3,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(cpu_time_micro, 0)) - min(coalesce(cpu_time_micro, 0)) as cpu_micro_delta,\n    max(coalesce(user_io_wait_micro, 0)) - min(coalesce(user_io_wait_micro, 0)) as user_io_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  round(elapsed_micro_delta / 1000000.0, 3) as elapsed_seconds_delta,\n  round(cpu_micro_delta / 1000000.0, 3) as cpu_seconds_delta,\n  round(user_io_micro_delta / 1000000.0, 3) as user_io_seconds_delta,\n  executions_delta,\n  buffer_gets_delta,\n  disk_reads_delta,\n  parsing_schema_name,\n  module,\n  left((select t.sql_fulltext from oracle_sql_texts t where t.source_database = deltas.source_database and t.sql_id = deltas.sql_id), 240) as sql_preview\nfrom deltas\nwhere user_io_micro_delta > 0\norder by user_io_micro_delta desc\nlimit 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top SQL by User I/O Wait Delta",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_preview"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 560
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_id"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Open in Top Consumers",
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_id=${__value.raw}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 145
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with deltas as (\n  select\n    source_database,\n    inst_id,\n    sql_id,\n    child_number,\n    plan_hash_value,\n    max(coalesce(elapsed_time_micro, 0)) - min(coalesce(elapsed_time_micro, 0)) as elapsed_micro_delta,\n    max(coalesce(executions, 0)) - min(coalesce(executions, 0)) as executions_delta,\n    max(coalesce(buffer_gets, 0)) - min(coalesce(buffer_gets, 0)) as buffer_gets_delta,\n    max(coalesce(disk_reads, 0)) - min(coalesce(disk_reads, 0)) as disk_reads_delta,\n    max(coalesce(rows_processed, 0)) - min(coalesce(rows_processed, 0)) as rows_processed_delta,\n    max(parsing_schema_name) as parsing_schema_name,\n    max(module) as module\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database, inst_id, sql_id, child_number, plan_hash_value\n)\nselect\n  inst_id,\n  sql_id,\n  child_number,\n  plan_hash_value,\n  executions_delta,\n  rows_processed_delta,\n  round((elapsed_micro_delta / 1000000.0) / nullif(executions_delta, 0), 6) as elapsed_seconds_per_exec,\n  round(buffer_gets_delta::numeric / nullif(rows_processed_delta, 0), 3) as buffer_gets_per_row,\n  round(disk_reads_delta::numeric / nullif(executions_delta, 0), 3) as disk_reads_per_exec,\n  parsing_schema_name,\n  module,\n  left((select t.sql_fulltext from oracle_sql_texts t where t.source_database = deltas.source_database and t.sql_id = deltas.sql_id), 240) as sql_preview\nfrom deltas\nwhere elapsed_micro_delta > 0\norder by coalesce((elapsed_micro_delta / 1000000.0) / nullif(executions_delta, 0), 0) desc\nlimit 50;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "SQL Efficiency Outliers",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "oracle",
+    "postgresql",
+    "sql",
+    "performance"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "PostgreSQL"
+        },
+        "definition": "select distinct source_database from oracle_sql_samples order by 1;",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Source Database",
+        "multi": false,
+        "name": "source_database",
+        "options": [],
+        "query": "select distinct source_database from oracle_sql_samples order by 1;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Oracle SQL Performance",
+  "uid": "oracle-sql-performance",
+  "version": 5,
+  "weekStart": ""
+}

@@ -1,0 +1,3 @@
+# Protect workflow changes and the ownership file itself.
+.github/workflows/* @dodger-one
+.github/CODEOWNERS @dodger-one

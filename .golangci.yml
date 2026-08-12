@@ -1,0 +1,22 @@
+version: "2"
+
+run:
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - dupl
+    - exhaustive
+    - gochecknoinits
+    - govet
+    - importas
+    - predeclared
+    - unconvert
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -1,0 +1,333 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  validate:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version and main ancestry
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release tag: ${TAG}" >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
+
+          tag_object="$(git rev-parse "${TAG}^{tag}")"
+          verified="$(
+            gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}" \
+              --jq '.verification.verified'
+          )"
+          if [[ "${verified}" != "true" ]]; then
+            echo "Release tag ${TAG} does not have a GitHub-verified signature" >&2
+            exit 1
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test godror build
+        run: go test ./...
+
+      - name: Test go-ora build
+        run: CGO_ENABLED=0 go test -tags goora ./...
+
+  build-goora:
+    name: Build go-ora ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            extension: ""
+            format: tar
+          - goos: linux
+            goarch: arm64
+            extension: ""
+            format: tar
+          - goos: windows
+            goarch: amd64
+            extension: .exe
+            format: zip
+          - goos: darwin
+            goarch: amd64
+            extension: ""
+            format: tar
+          - goos: darwin
+            goarch: arm64
+            extension: ""
+            format: tar
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build release archive
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          EXTENSION: ${{ matrix.extension }}
+          FORMAT: ${{ matrix.format }}
+        run: |
+          set -euo pipefail
+          name="harry-scraper-${VERSION}-${GOOS}-${GOARCH}-goora"
+          package_dir="dist/${name}"
+          mkdir -p "${package_dir}"
+
+          CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" \
+            go build -tags goora \
+              -ldflags "-X main.Version=${VERSION} -s -w" \
+              -o "${package_dir}/harry-scraper${EXTENSION}" ./
+
+          cp README.md LICENSE.txt THIRD_PARTY_LICENSES.txt TRADEMARKS.md \
+            "${package_dir}/"
+
+          if [[ "${FORMAT}" == "zip" ]]; then
+            (
+              cd dist
+              zip -qr "${name}.zip" "${name}"
+            )
+          else
+            tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+          fi
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-goora-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  build-godror:
+    name: Build godror EL${{ matrix.el }} ${{ matrix.arch }}
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        el: [8, 9]
+        arch: [amd64, arm64]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build release archive
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          EL: ${{ matrix.el }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          rootfs="build/rootfs"
+          name="harry-scraper-${VERSION}-linux-${ARCH}-godror-el${EL}"
+          package_dir="dist/${name}"
+
+          docker buildx build \
+            --platform "linux/${ARCH}" \
+            --target build \
+            --build-arg "BASE_IMAGE=ghcr.io/oracle/oraclelinux:${EL}-slim" \
+            --build-arg "VERSION=${VERSION}" \
+            --build-arg "TAGS=godror" \
+            --build-arg "CGO_ENABLED=1" \
+            --output "type=local,dest=${rootfs}" \
+            .
+
+          mkdir -p "${package_dir}"
+          cp "${rootfs}/tmp/harry-scraper" "${package_dir}/"
+          cp README.md LICENSE.txt THIRD_PARTY_LICENSES.txt TRADEMARKS.md \
+            "${package_dir}/"
+          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-godror-el${{ matrix.el }}-${{ matrix.arch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-container:
+    name: Publish ${{ matrix.driver }} EL${{ matrix.el }} image
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - driver: godror
+            el: 8
+            cgo: 1
+            target: scraper-godror
+            default: true
+          - driver: godror
+            el: 9
+            cgo: 1
+            target: scraper-godror
+            default: false
+          - driver: goora
+            el: 8
+            cgo: 0
+            target: scraper-goora
+            default: false
+          - driver: goora
+            el: 9
+            cgo: 0
+            target: scraper-goora
+            default: false
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare image tags
+        id: tags
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          DRIVER: ${{ matrix.driver }}
+          EL: ${{ matrix.el }}
+          DEFAULT_IMAGE: ${{ matrix.default }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          major="${VERSION%%.*}"
+          minor="${VERSION%.*}"
+          {
+            echo "tags<<EOF"
+            echo "${image}:v${VERSION}-${DRIVER}-el${EL}"
+            echo "${image}:${VERSION}-${DRIVER}-el${EL}"
+            if [[ "${DEFAULT_IMAGE}" == "true" ]]; then
+              echo "${image}:v${VERSION}"
+              echo "${image}:${VERSION}"
+              echo "${image}:${minor}"
+              echo "${image}:${major}"
+              echo "${image}:latest"
+            fi
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=ghcr.io/oracle/oraclelinux:${{ matrix.el }}-slim
+            VERSION=${{ needs.validate.outputs.version }}
+            TAGS=${{ matrix.driver }}
+            CGO_ENABLED=${{ matrix.cgo }}
+          cache-from: type=gha,scope=${{ matrix.driver }}-el${{ matrix.el }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.driver }}-el${{ matrix.el }}
+
+  release:
+    name: Publish GitHub Release
+    needs:
+      - validate
+      - build-goora
+      - build-godror
+      - publish-container
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Download release archives
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          (
+            cd dist
+            sha256sum ./* > SHA256SUMS
+          )
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release create "${TAG}" dist/* \
+            --verify-tag \
+            --title "${TAG}" \
+            --generate-notes

@@ -1,0 +1,169 @@
+// Copyright (c) 2025, Oracle and/or its affiliates.
+// Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
+
+//go:build !goora
+
+package collector
+
+import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
+	"errors"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/godror/godror"
+	"github.com/godror/godror/dsn"
+)
+
+const minimumGodrorConnectionInterval = 100 * time.Millisecond
+
+var godrorConnectionCreationGate = newOracleConnectionGate(minimumGodrorConnectionInterval)
+
+type oracleConnectionGate struct {
+	semaphore       chan struct{}
+	minimumInterval time.Duration
+	lastCompleted   time.Time
+}
+
+type gatedConnector struct {
+	driver.Connector
+	gate *oracleConnectionGate
+}
+
+func newOracleConnectionGate(minimumInterval time.Duration) *oracleConnectionGate {
+	return &oracleConnectionGate{
+		semaphore:       make(chan struct{}, 1),
+		minimumInterval: minimumInterval,
+	}
+}
+
+func (c gatedConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	select {
+	case c.gate.semaphore <- struct{}{}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	defer func() { <-c.gate.semaphore }()
+
+	if wait := c.gate.minimumInterval - time.Since(c.gate.lastCompleted); wait > 0 {
+		timer := time.NewTimer(wait)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
+	conn, err := c.Connector.Connect(ctx)
+	c.gate.lastCompleted = time.Now()
+	return conn, err
+}
+
+func connect(logger *slog.Logger, dbname string, dbconfig DatabaseConfig) (*sql.DB, error) {
+	logger.Debug("Launching connection to "+maskDsn(dbconfig.URL), "database", dbname)
+
+	var P godror.ConnectionParams
+	password, err := dbconfig.GetPassword()
+	if err != nil {
+		return nil, err
+	}
+	username, err := dbconfig.GetUsername()
+	if err != nil {
+		return nil, err
+	}
+	// If password is not specified, externalAuth will be true, and we'll ignore user input
+	dbconfig.ExternalAuth = password == ""
+	logger.Debug(fmt.Sprintf("external authentication set to %t", dbconfig.ExternalAuth), "database", dbname)
+	msg := "Using Username/Password Authentication."
+	if dbconfig.ExternalAuth {
+		msg = "Database Password not specified; will attempt to use external authentication (ignoring user input)."
+		dbconfig.Username = ""
+	}
+	logger.Info(msg, "database", dbname)
+	externalAuth := sql.NullBool{
+		Bool:  dbconfig.ExternalAuth,
+		Valid: true,
+	}
+	P.Username, P.Password, P.ConnectString, P.ExternalAuth = username, godror.NewPassword(password), dbconfig.URL, externalAuth
+
+	if dbconfig.GetPoolIncrement() > 0 {
+		logger.Debug(fmt.Sprintf("set pool increment to %d", dbconfig.PoolIncrement), "database", dbname)
+		P.PoolParams.SessionIncrement = dbconfig.GetPoolIncrement()
+	}
+	if dbconfig.GetPoolMaxConnections() > 0 {
+		logger.Debug(fmt.Sprintf("set pool max connections to %d", dbconfig.PoolMaxConnections), "database", dbname)
+		P.PoolParams.MaxSessions = dbconfig.GetPoolMaxConnections()
+	}
+	if dbconfig.GetPoolMinConnections() > 0 {
+		logger.Debug(fmt.Sprintf("set pool min connections to %d", dbconfig.PoolMinConnections), "database", dbname)
+		P.PoolParams.MinSessions = dbconfig.GetPoolMinConnections()
+	}
+
+	P.PoolParams.WaitTimeout = time.Second * 5
+
+	// if TNS_ADMIN env var is set, set ConfigDir to that location
+	P.ConfigDir = dbconfig.TNSAdmin
+
+	switch dbconfig.Role {
+	case "SYSDBA":
+		P.AdminRole = dsn.SysDBA
+	case "SYSOPER":
+		P.AdminRole = dsn.SysOPER
+	case "SYSBACKUP":
+		P.AdminRole = dsn.SysBACKUP
+	case "SYSDG":
+		P.AdminRole = dsn.SysDG
+	case "SYSKM":
+		P.AdminRole = dsn.SysKM
+	case "SYSRAC":
+		P.AdminRole = dsn.SysRAC
+	case "SYSASM":
+		P.AdminRole = dsn.SysASM
+	default:
+		P.AdminRole = dsn.NoRole
+	}
+
+	// note that this just configures the connection, it does not actually connect until later
+	// when we call db.Ping()
+	// database/sql may create connections concurrently across every configured
+	// Oracle pool when their lifetimes expire together. Gate only physical OCI
+	// connection creation; established connections and queries remain concurrent.
+	db := sql.OpenDB(gatedConnector{
+		Connector: godror.NewConnector(P),
+		gate:      godrorConnectionCreationGate,
+	})
+	return db, nil
+}
+
+func isInvalidCredentialsError(err error) bool {
+	err = errors.Unwrap(err)
+	if err == nil {
+		return false
+	}
+	oraErr, ok := err.(*godror.OraErr)
+	if !ok {
+		return false
+	}
+	return oraErr.Code() == ora01017code || oraErr.Code() == ora28000code
+}
+
+func isTemporaryConnectionError(err error) bool {
+	err = errors.Unwrap(err)
+	if err == nil {
+		return false
+	}
+	oraErr, ok := err.(*godror.OraErr)
+	if !ok {
+		return false
+	}
+	switch oraErr.Code() {
+	case ora01033code, ora03113code, ora03114code, ora12537code:
+		return true
+	default:
+		return false
+	}
+}

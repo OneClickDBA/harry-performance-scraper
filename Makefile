@@ -1,0 +1,148 @@
+ARCH           ?= $(shell uname -m)
+OS_TYPE        ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
+ARCH_TYPE      ?= $(subst x86_64,amd64,$(patsubst i%86,386,$(ARCH)))
+GOOS           ?= $(shell go env GOOS)
+GOARCH         ?= $(shell go env GOARCH)
+TAGS           ?= godror
+PLATFORM       ?= amd64
+DOCKER_TARGET  ?= scraper-godror
+CGO_ENABLED    ?= 1
+VERSION        ?= 0.0.0-dev
+LDFLAGS        := -X main.Version=$(VERSION)
+GOFLAGS        := -ldflags "$(LDFLAGS) -s -w" --tags $(TAGS)
+BUILD_ARGS      = --build-arg VERSION=$(VERSION)
+OUTDIR          = ./dist
+COMPOSE_CONFIG_FILE ?= config.yaml
+GO_LICENSES     ?= go-licenses
+
+IMAGE_NAME     ?= harry-performance-scraper
+IMAGE_ID       ?= $(IMAGE_NAME):$(VERSION)
+IMAGE_ID_LATEST?= $(IMAGE_NAME):latest
+
+ORACLE_LINUX_BASE_IMAGE ?= ghcr.io/oracle/oraclelinux:8-slim
+
+ifeq ($(GOOS), windows)
+EXT?=.exe
+else
+EXT?=
+endif
+
+export LD_LIBRARY_PATH
+
+version:
+	@echo "$(VERSION)"
+
+.PHONY: go-build
+go-build:
+	@echo "Build $(OS_TYPE)"
+	mkdir -p $(OUTDIR)/harry-scraper-$(VERSION).$(GOOS)-$(GOARCH)/
+	go build $(GOFLAGS) -o $(OUTDIR)/harry-scraper-$(VERSION).$(GOOS)-$(GOARCH)/harry-scraper$(EXT)
+	(cd dist ; tar cfz harry-scraper-$(VERSION).$(GOOS)-$(GOARCH).tar.gz harry-scraper-$(VERSION).$(GOOS)-$(GOARCH))
+
+.PHONY: go-build-linux-amd64
+go-build-linux-amd64:
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=amd64 $(MAKE) go-build -j2
+
+.PHONY: go-build-linux-arm64
+go-build-linux-arm64:
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=arm64 $(MAKE) go-build -j2
+
+.PHONY: go-build-linux-gcc-arm64
+go-build-linux-gcc-arm64:
+	CGO_ENABLED=$(CGO_ENABLED) CC=aarch64-linux-gnu-gcc GOOS=linux GOARCH=arm64 $(MAKE) go-build -j2
+
+.PHONY: go-build-darwin-amd64
+go-build-darwin-amd64:
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=darwin GOARCH=amd64 $(MAKE) go-build -j2
+
+.PHONY: go-build-darwin-arm64
+go-build-darwin-arm64:
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=darwin GOARCH=arm64 $(MAKE) go-build -j2
+
+.PHONY: go-build-windows-amd64
+go-build-windows-amd64:
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=windows GOARCH=amd64 $(MAKE) go-build -j2
+
+.PHONY: go-build-windows-x86
+go-build-windows-x86:
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=windows GOARCH=386 $(MAKE) go-build -j2
+
+dist: go-build-linux-gcc-arm64 go-build-linux-amd64
+
+go-lint:
+	@echo "Linting codebase"
+	docker run --rm -v $(shell pwd):/app -v ~/.cache/golangci-lint/v1.50.1:/root/.cache -w /app golangci/golangci-lint:v1.50.1 golangci-lint run -v
+
+.PHONY: govulncheck
+govulncheck:
+	@echo "Run govulncheck"
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+.PHONY: licenses licenses-check
+licenses:
+	GO_LICENSES_BIN="$(GO_LICENSES)" ./scripts/generate-third-party-licenses.sh
+
+licenses-check:
+	GO_LICENSES_BIN="$(GO_LICENSES)" ./scripts/generate-third-party-licenses.sh --check
+
+local-build: go-build
+	@true
+
+build: docker
+	@true
+
+deps:
+	go get
+
+go-test:
+	@echo "Run tests"
+	GOOS=$(OS_TYPE) GOARCH=$(ARCH_TYPE) go test --tags goora -coverprofile="test-coverage.out" $$(go list ./... | grep -v /vendor/)
+
+clean:
+	rm -rf ./dist glibc-*.apk oracle-*.rpm
+
+push-images:
+	@make --no-print-directory push-oraclelinux-image
+
+docker-compose-up:
+	(cd docker-compose ; COMPOSE_CONFIG_FILE=$(COMPOSE_CONFIG_FILE) docker compose up -d)
+
+docker-compose-down:
+	(cd docker-compose ; docker compose down)
+
+docker: docker-amd
+
+docker-arm:
+	@$(MAKE) PLATFORM=arm64 docker-platform
+
+docker-amd:
+	@$(MAKE) PLATFORM=amd64 docker-platform
+
+docker-platform:
+	@echo "Building Docker image for $(PLATFORM)..."
+	docker build --no-cache --target=$(DOCKER_TARGET) \
+		--platform linux/$(PLATFORM) \
+		--progress=plain $(BUILD_ARGS) \
+		-t "$(IMAGE_ID)-$(PLATFORM)" \
+		--build-arg BASE_IMAGE=$(ORACLE_LINUX_BASE_IMAGE) \
+		--build-arg GOARCH=$(PLATFORM) \
+		--build-arg CGO_ENABLED=$(CGO_ENABLED) \
+		--build-arg TAGS=$(TAGS) .
+
+push-oraclelinux-image:
+	docker push $(IMAGE_ID)
+
+# build multiarch (linux-amd64, linux-arm64) images with podman
+podman-build:
+	podman manifest rm $(IMAGE_ID) || true
+	podman manifest create $(IMAGE_ID)
+	podman build --platform linux/amd64 --manifest $(IMAGE_ID) --build-arg BASE_IMAGE=$(ORACLE_LINUX_BASE_IMAGE) --build-arg GOARCH=amd64 --build-arg GOOS=linux --build-arg VERSION=$(VERSION) .
+	podman build --platform linux/arm64 --manifest $(IMAGE_ID) --build-arg BASE_IMAGE=$(ORACLE_LINUX_BASE_IMAGE) --build-arg GOARCH=arm64 --build-arg GOOS=linux --build-arg VERSION=$(VERSION) .
+
+podman-push:
+	podman manifest push $(IMAGE_ID)
+
+podman-release: podman-build podman-push
+
+.PHONY: version build deps go-test clean docker-compose-up docker-compose-down docker docker-arm docker-platform docker-amd \
+        podman-build podman-push podman-release govulncheck licenses licenses-check

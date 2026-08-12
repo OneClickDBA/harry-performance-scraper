@@ -1,0 +1,105 @@
+## Copyright (c) 2021, 2026, Oracle and/or its affiliates.
+## Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harry-scraper
+  namespace: scraper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: harry-scraper
+  template:
+    metadata:
+      labels:
+        app: harry-scraper
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: harry-scraper
+          image: harry-performance-scraper:local
+          imagePullPolicy: IfNotPresent
+          command: ["/harry-scraper"]
+          args: ["--config.file=/config/harry-scraper-config.yaml"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          env:
+            - name: TNS_ADMIN
+              value: "/oracle/tns_admin"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: username
+                  optional: false
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: password
+                  optional: false
+            # Update the connect string for your database.
+            - name: DB_CONNECT_STRING
+              value: "DEVDB_TP?TNS_ADMIN=$(TNS_ADMIN)"
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-secret
+                  key: url
+                  optional: false
+          volumeMounts:
+            - name: scraper-config
+              mountPath: /config
+              readOnly: true
+            - name: tns-admin
+              mountPath: /oracle/tns_admin
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            # Uncomment to mount an additional metric definition file.
+            # - name: config-volume
+            #   mountPath: /oracle/scraper/txeventq-metrics.toml
+            #   subPath: txeventq-metrics.toml
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "250m"
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          ports:
+            - containerPort: 9161
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9161
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 9161
+            periodSeconds: 5
+      restartPolicy: Always
+      volumes:
+        - name: tns-admin
+          configMap:
+            name: db-metrics-tns-admin
+        - name: scraper-config
+          configMap:
+            name: harry-scraper-config
+        - name: tmp
+          emptyDir: {}
+        # Uncomment to provide an additional metric definition file.
+        # - name: config-volume
+        #   configMap:
+        #     name: db-metrics-txeventq-scraper-config
