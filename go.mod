@@ -8,7 +8,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/godror/godror v0.50.0
 	github.com/hashicorp/vault/api v1.23.0
-	github.com/jackc/pgx/v5 v5.9.2
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/oracle/oci-go-sdk/v65 v65.123.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	go.yaml.in/yaml/v2 v2.4.4
