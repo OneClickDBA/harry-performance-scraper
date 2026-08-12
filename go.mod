@@ -9,7 +9,7 @@ require (
 	github.com/godror/godror v0.50.0
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/jackc/pgx/v5 v5.9.2
-	github.com/oracle/oci-go-sdk/v65 v65.113.0
+	github.com/oracle/oci-go-sdk/v65 v65.123.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	go.yaml.in/yaml/v2 v2.4.4
 )
@@ -44,14 +44,14 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
-	github.com/sony/gobreaker v1.0.0 // indirect
+	github.com/sony/gobreaker/v2 v2.4.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
-	golang.org/x/net v0.53.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
