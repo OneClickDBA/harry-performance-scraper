@@ -218,6 +218,7 @@ digraph oracle_to_postgresql_tables {
     pg_oracle_wait_class_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_wait_class_samples"];
     pg_oracle_system_metric_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_system_metric_samples"];
     pg_oracle_scrape_status [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_scrape_status"];
+    pg_oracle_latest_scrape_status [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_latest_scrape_status"];
   }
 
   oracle_metric_sources -> pg_oracle_metric_samples [label="additional metric definitions"];
@@ -236,4 +237,5 @@ digraph oracle_to_postgresql_tables {
   oracle_operational_counter_sources -> pg_oracle_wait_class_samples [label="wait time plus deltas"];
   oracle_operational_counter_sources -> pg_oracle_system_metric_samples [label="selected bounded metrics"];
   scraper_status_sources -> pg_oracle_scrape_status [label="all collector outcomes"];
+  scraper_status_sources -> pg_oracle_latest_scrape_status [label="latest outcome per collector"];
 }

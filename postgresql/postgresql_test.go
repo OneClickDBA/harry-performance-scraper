@@ -15,15 +15,16 @@ import (
 func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
 	sqlSamples := pgx.Identifier{"monitoring", "oracle_sql_samples"}
 	sink := &Sink{
-		databaseStatusTable: siblingIdentifier(sqlSamples, "oracle_database_status_samples"),
-		instanceTable:       siblingIdentifier(sqlSamples, "oracle_instance_samples"),
-		resourceLimitTable:  siblingIdentifier(sqlSamples, "oracle_resource_limit_samples"),
-		tablespaceTable:     siblingIdentifier(sqlSamples, "oracle_tablespace_samples"),
-		asmDiskgroupTable:   siblingIdentifier(sqlSamples, "oracle_asm_diskgroup_samples"),
-		systemCounterTable:  siblingIdentifier(sqlSamples, "oracle_system_counter_samples"),
-		waitClassTable:      siblingIdentifier(sqlSamples, "oracle_wait_class_samples"),
-		systemMetricTable:   siblingIdentifier(sqlSamples, "oracle_system_metric_samples"),
-		scrapeStatusTable:   siblingIdentifier(sqlSamples, "oracle_scrape_status"),
+		databaseStatusTable:     siblingIdentifier(sqlSamples, "oracle_database_status_samples"),
+		instanceTable:           siblingIdentifier(sqlSamples, "oracle_instance_samples"),
+		resourceLimitTable:      siblingIdentifier(sqlSamples, "oracle_resource_limit_samples"),
+		tablespaceTable:         siblingIdentifier(sqlSamples, "oracle_tablespace_samples"),
+		asmDiskgroupTable:       siblingIdentifier(sqlSamples, "oracle_asm_diskgroup_samples"),
+		systemCounterTable:      siblingIdentifier(sqlSamples, "oracle_system_counter_samples"),
+		waitClassTable:          siblingIdentifier(sqlSamples, "oracle_wait_class_samples"),
+		systemMetricTable:       siblingIdentifier(sqlSamples, "oracle_system_metric_samples"),
+		scrapeStatusTable:       siblingIdentifier(sqlSamples, "oracle_scrape_status"),
+		latestScrapeStatusTable: siblingIdentifier(sqlSamples, "oracle_latest_scrape_status"),
 	}
 	ddl := sink.operationalSchemaDDL()
 	if strings.Contains(ddl, "%!") {
@@ -44,6 +45,16 @@ func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
 		if !strings.Contains(ddl, pgx.Identifier{"monitoring", table}.Sanitize()) {
 			t.Fatalf("operational DDL does not contain schema-qualified %s", table)
 		}
+	}
+	latestTable := pgx.Identifier{"monitoring", "oracle_latest_scrape_status"}.Sanitize()
+	if !strings.Contains(ddl, "create table if not exists "+latestTable) {
+		t.Fatalf("operational DDL does not create latest scrape status as a table")
+	}
+	if strings.Contains(ddl, "create or replace view "+latestTable) {
+		t.Fatalf("operational DDL still creates latest scrape status as a view")
+	}
+	if !strings.Contains(ddl, "primary key (source_database, collector)") {
+		t.Fatalf("latest scrape status table does not define its expected primary key")
 	}
 }
 
@@ -89,11 +100,11 @@ func TestPartitionDay(t *testing.T) {
 	}
 }
 
-func TestSQLTextRetentionCutoffUsesStartOfCutoffDay(t *testing.T) {
+func TestRetentionDayCutoffUsesStartOfCutoffDay(t *testing.T) {
 	cutoff := time.Date(2026, 7, 17, 14, 35, 12, 0, time.FixedZone("CEST", 2*60*60))
 	want := time.Date(2026, 7, 17, 0, 0, 0, 0, time.UTC)
-	if got := sqlTextRetentionCutoff(cutoff); !got.Equal(want) {
-		t.Fatalf("sqlTextRetentionCutoff() = %s, want %s", got, want)
+	if got := retentionDayCutoff(cutoff); !got.Equal(want) {
+		t.Fatalf("retentionDayCutoff() = %s, want %s", got, want)
 	}
 }
 

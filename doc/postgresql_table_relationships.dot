@@ -86,6 +86,10 @@ digraph postgresql_table_relationships {
     label="oracle_scrape_status\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\lcollector\lsuccess\lduration_seconds\lsample_count\lerror_message\l\lIndexes\lsource_database, collector, collected_at desc\l"
   ];
 
+  oracle_latest_scrape_status [
+    label="oracle_latest_scrape_status\l\lCurrent state (non-partitioned)\lcollected_at\lsource_database PK\lcollector PK\lsuccess\lduration_seconds\lsample_count\lerror_message\l"
+  ];
+
   // Logical relationships used by dashboards and analysis queries.
   oracle_session_samples -> oracle_sql_samples [
     label="logical: source_database, sql_id, sql_child_number",
@@ -193,5 +197,10 @@ digraph postgresql_table_relationships {
     label="logical: source_database",
     style=dashed,
     color="#666666"
+  ];
+
+  oracle_scrape_status -> oracle_latest_scrape_status [
+    label="latest row upsert: source_database, collector",
+    color="#2f6f44"
   ];
 }

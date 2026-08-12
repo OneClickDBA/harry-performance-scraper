@@ -88,7 +88,7 @@
         "type": "postgres",
         "uid": "PostgreSQL"
       },
-      "description": "Latest result from every scraper collector across every configured Oracle database.",
+      "description": "Current result from every scraper collector across every configured Oracle database, read from transactionally maintained status state.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -236,7 +236,7 @@
         "type": "postgres",
         "uid": "PostgreSQL"
       },
-      "description": "Collectors whose latest result failed or is more than three minutes old.",
+      "description": "Collectors whose transactionally maintained current result failed or is more than three minutes old.",
       "fieldConfig": {
         "defaults": {
           "custom": {

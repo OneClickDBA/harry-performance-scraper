@@ -19,27 +19,28 @@ import (
 )
 
 type Sink struct {
-	pool                  *pgxpool.Pool
-	logger                *slog.Logger
-	retention             time.Duration
-	samplesTable          pgx.Identifier
-	sqlSamplesTable       pgx.Identifier
-	sqlTextsTable         pgx.Identifier
-	sqlPlansTable         pgx.Identifier
-	sessionSamplesTable   pgx.Identifier
-	blockingSessionsTable pgx.Identifier
-	databaseActivityTable pgx.Identifier
-	databaseStatusTable   pgx.Identifier
-	instanceTable         pgx.Identifier
-	resourceLimitTable    pgx.Identifier
-	tablespaceTable       pgx.Identifier
-	asmDiskgroupTable     pgx.Identifier
-	systemCounterTable    pgx.Identifier
-	waitClassTable        pgx.Identifier
-	systemMetricTable     pgx.Identifier
-	scrapeStatusTable     pgx.Identifier
-	retentionMu           sync.Mutex
-	lastRetentionCleanup  time.Time
+	pool                    *pgxpool.Pool
+	logger                  *slog.Logger
+	retention               time.Duration
+	samplesTable            pgx.Identifier
+	sqlSamplesTable         pgx.Identifier
+	sqlTextsTable           pgx.Identifier
+	sqlPlansTable           pgx.Identifier
+	sessionSamplesTable     pgx.Identifier
+	blockingSessionsTable   pgx.Identifier
+	databaseActivityTable   pgx.Identifier
+	databaseStatusTable     pgx.Identifier
+	instanceTable           pgx.Identifier
+	resourceLimitTable      pgx.Identifier
+	tablespaceTable         pgx.Identifier
+	asmDiskgroupTable       pgx.Identifier
+	systemCounterTable      pgx.Identifier
+	waitClassTable          pgx.Identifier
+	systemMetricTable       pgx.Identifier
+	scrapeStatusTable       pgx.Identifier
+	latestScrapeStatusTable pgx.Identifier
+	retentionMu             sync.Mutex
+	lastRetentionCleanup    time.Time
 }
 
 func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfig) (*Sink, error) {
@@ -62,25 +63,26 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 
 	sqlSamplesTable := identifier(cfg.SQLSamplesTable, "oracle_sql_samples")
 	s := &Sink{
-		pool:                  pool,
-		logger:                logger,
-		retention:             cfg.GetRetention(),
-		samplesTable:          identifier(cfg.SamplesTable, "oracle_metric_samples"),
-		sqlSamplesTable:       sqlSamplesTable,
-		sqlTextsTable:         siblingIdentifier(sqlSamplesTable, "oracle_sql_texts"),
-		sqlPlansTable:         siblingIdentifier(sqlSamplesTable, "oracle_sql_plans"),
-		sessionSamplesTable:   identifier(cfg.SessionSamplesTable, "oracle_session_samples"),
-		blockingSessionsTable: identifier(cfg.BlockingSessionsTable, "oracle_blocking_session_samples"),
-		databaseActivityTable: identifier(cfg.DatabaseActivityTable, "oracle_database_activity_samples"),
-		databaseStatusTable:   siblingIdentifier(sqlSamplesTable, "oracle_database_status_samples"),
-		instanceTable:         siblingIdentifier(sqlSamplesTable, "oracle_instance_samples"),
-		resourceLimitTable:    siblingIdentifier(sqlSamplesTable, "oracle_resource_limit_samples"),
-		tablespaceTable:       siblingIdentifier(sqlSamplesTable, "oracle_tablespace_samples"),
-		asmDiskgroupTable:     siblingIdentifier(sqlSamplesTable, "oracle_asm_diskgroup_samples"),
-		systemCounterTable:    siblingIdentifier(sqlSamplesTable, "oracle_system_counter_samples"),
-		waitClassTable:        siblingIdentifier(sqlSamplesTable, "oracle_wait_class_samples"),
-		systemMetricTable:     siblingIdentifier(sqlSamplesTable, "oracle_system_metric_samples"),
-		scrapeStatusTable:     siblingIdentifier(sqlSamplesTable, "oracle_scrape_status"),
+		pool:                    pool,
+		logger:                  logger,
+		retention:               cfg.GetRetention(),
+		samplesTable:            identifier(cfg.SamplesTable, "oracle_metric_samples"),
+		sqlSamplesTable:         sqlSamplesTable,
+		sqlTextsTable:           siblingIdentifier(sqlSamplesTable, "oracle_sql_texts"),
+		sqlPlansTable:           siblingIdentifier(sqlSamplesTable, "oracle_sql_plans"),
+		sessionSamplesTable:     identifier(cfg.SessionSamplesTable, "oracle_session_samples"),
+		blockingSessionsTable:   identifier(cfg.BlockingSessionsTable, "oracle_blocking_session_samples"),
+		databaseActivityTable:   identifier(cfg.DatabaseActivityTable, "oracle_database_activity_samples"),
+		databaseStatusTable:     siblingIdentifier(sqlSamplesTable, "oracle_database_status_samples"),
+		instanceTable:           siblingIdentifier(sqlSamplesTable, "oracle_instance_samples"),
+		resourceLimitTable:      siblingIdentifier(sqlSamplesTable, "oracle_resource_limit_samples"),
+		tablespaceTable:         siblingIdentifier(sqlSamplesTable, "oracle_tablespace_samples"),
+		asmDiskgroupTable:       siblingIdentifier(sqlSamplesTable, "oracle_asm_diskgroup_samples"),
+		systemCounterTable:      siblingIdentifier(sqlSamplesTable, "oracle_system_counter_samples"),
+		waitClassTable:          siblingIdentifier(sqlSamplesTable, "oracle_wait_class_samples"),
+		systemMetricTable:       siblingIdentifier(sqlSamplesTable, "oracle_system_metric_samples"),
+		scrapeStatusTable:       siblingIdentifier(sqlSamplesTable, "oracle_scrape_status"),
+		latestScrapeStatusTable: siblingIdentifier(sqlSamplesTable, "oracle_latest_scrape_status"),
 	}
 
 	if err := pool.Ping(ctx); err != nil {
@@ -323,9 +325,127 @@ create index if not exists oracle_database_activity_samples_source_idx on %s (so
 }
 
 func (s *Sink) migrateOperationalSchema(ctx context.Context) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin PostgreSQL operational schema migration: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	backfillLatest, selectGrants, err := s.prepareLatestScrapeStatusTable(ctx, tx)
+	if err != nil {
+		return err
+	}
 	ddl := s.operationalSchemaDDL()
-	if _, err := s.pool.Exec(ctx, ddl); err != nil {
+	if _, err := tx.Exec(ctx, ddl); err != nil {
 		return fmt.Errorf("migrate PostgreSQL operational schema: %w", err)
+	}
+	if err := s.restoreLatestScrapeStatusGrants(ctx, tx, selectGrants); err != nil {
+		return err
+	}
+	if backfillLatest {
+		if err := s.backfillLatestScrapeStatus(ctx, tx); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit PostgreSQL operational schema migration: %w", err)
+	}
+	return nil
+}
+
+type relationGrant struct {
+	grantee     string
+	grantOption bool
+}
+
+func (s *Sink) prepareLatestScrapeStatusTable(ctx context.Context, tx pgx.Tx) (bool, []relationGrant, error) {
+	var relationKind string
+	err := tx.QueryRow(ctx, `
+select c.relkind::text
+from pg_catalog.pg_class c
+where c.oid = to_regclass($1)`, s.latestScrapeStatusTable.Sanitize()).Scan(&relationKind)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return true, nil, nil
+	}
+	if err != nil {
+		return false, nil, fmt.Errorf("inspect legacy latest scrape status relation: %w", err)
+	}
+	if relationKind == "r" || relationKind == "p" {
+		return false, nil, nil
+	}
+	if relationKind != "v" {
+		return false, nil, fmt.Errorf("cannot migrate %s: expected a view or table, found PostgreSQL relkind %q",
+			s.latestScrapeStatusTable.Sanitize(), relationKind)
+	}
+	rows, err := tx.Query(ctx, `
+select
+	case when acl.grantee = 0 then 'PUBLIC' else pg_get_userbyid(acl.grantee) end,
+	acl.is_grantable
+from pg_catalog.pg_class c
+cross join lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) acl
+where c.oid = to_regclass($1)
+	and acl.privilege_type = 'SELECT'`, s.latestScrapeStatusTable.Sanitize())
+	if err != nil {
+		return false, nil, fmt.Errorf("read legacy latest scrape status grants: %w", err)
+	}
+	var grants []relationGrant
+	for rows.Next() {
+		var grant relationGrant
+		if err := rows.Scan(&grant.grantee, &grant.grantOption); err != nil {
+			rows.Close()
+			return false, nil, fmt.Errorf("scan legacy latest scrape status grant: %w", err)
+		}
+		grants = append(grants, grant)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return false, nil, fmt.Errorf("read legacy latest scrape status grants: %w", err)
+	}
+	rows.Close()
+	if _, err := tx.Exec(ctx, fmt.Sprintf("drop view %s", s.latestScrapeStatusTable.Sanitize())); err != nil {
+		return false, nil, fmt.Errorf("drop legacy latest scrape status view: %w", err)
+	}
+	return true, grants, nil
+}
+
+func (s *Sink) restoreLatestScrapeStatusGrants(ctx context.Context, tx pgx.Tx, grants []relationGrant) error {
+	for _, grant := range grants {
+		grantee := pgx.Identifier{grant.grantee}.Sanitize()
+		if grant.grantee == "PUBLIC" {
+			grantee = "PUBLIC"
+		}
+		query := fmt.Sprintf("grant select on %s to %s", s.latestScrapeStatusTable.Sanitize(), grantee)
+		if grant.grantOption {
+			query += " with grant option"
+		}
+		if _, err := tx.Exec(ctx, query); err != nil {
+			return fmt.Errorf("restore latest scrape status SELECT grant for %s: %w", grant.grantee, err)
+		}
+	}
+	return nil
+}
+
+func (s *Sink) backfillLatestScrapeStatus(ctx context.Context, tx pgx.Tx) error {
+	query := fmt.Sprintf(`
+insert into %s (
+	collected_at, source_database, collector, success, duration_seconds, sample_count, error_message
+)
+select distinct on (source_database, collector)
+	collected_at, source_database, collector, success, duration_seconds, sample_count, error_message
+from %s
+order by source_database, collector, collected_at desc
+on conflict (source_database, collector) do update set
+	collected_at = excluded.collected_at,
+	success = excluded.success,
+	duration_seconds = excluded.duration_seconds,
+	sample_count = excluded.sample_count,
+	error_message = excluded.error_message
+where excluded.collected_at >= %s.collected_at`,
+		s.latestScrapeStatusTable.Sanitize(),
+		s.scrapeStatusTable.Sanitize(),
+		s.latestScrapeStatusTable.Sanitize())
+	if _, err := tx.Exec(ctx, query); err != nil {
+		return fmt.Errorf("backfill latest scrape status table: %w", err)
 	}
 	return nil
 }
@@ -340,6 +460,7 @@ func (s *Sink) operationalSchemaDDL() string {
 	waitClasses := s.waitClassTable.Sanitize()
 	systemMetrics := s.systemMetricTable.Sanitize()
 	scrapeStatus := s.scrapeStatusTable.Sanitize()
+	latestScrapeStatus := s.latestScrapeStatusTable.Sanitize()
 
 	return fmt.Sprintf(`
 create table if not exists %s (
@@ -466,11 +587,16 @@ create table if not exists %s (
 create index if not exists oracle_scrape_status_database_collector_time_idx
 	on %s (source_database, collector, collected_at desc);
 
-create or replace view %s as
-select distinct on (source_database, collector)
-	collected_at, source_database, collector, success, duration_seconds, sample_count, error_message
-from %s
-order by source_database, collector, collected_at desc;
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	collector text not null,
+	success boolean not null,
+	duration_seconds double precision not null,
+	sample_count bigint not null,
+	error_message text,
+	primary key (source_database, collector)
+);
 
 create or replace view %s as
 select distinct on (source_database, tablespace_name)
@@ -518,7 +644,7 @@ from %s;
 		waitClasses, waitClasses,
 		systemMetrics, systemMetrics,
 		scrapeStatus, scrapeStatus,
-		siblingIdentifier(s.scrapeStatusTable, "oracle_latest_scrape_status").Sanitize(), scrapeStatus,
+		latestScrapeStatus,
 		siblingIdentifier(s.tablespaceTable, "oracle_latest_tablespace_samples").Sanitize(), tablespaces,
 		siblingIdentifier(s.resourceLimitTable, "oracle_latest_resource_limit_samples").Sanitize(), resourceLimits,
 		siblingIdentifier(s.asmDiskgroupTable, "oracle_latest_asm_diskgroup_samples").Sanitize(), asmDiskgroups,
@@ -1247,10 +1373,46 @@ func (s *Sink) writeScrapeStatuses(ctx context.Context, tx pgx.Tx, statuses []co
 			status.DurationSeconds, status.SampleCount, status.ErrorMessage,
 		})
 	}
-	return copyRows(ctx, tx, s.scrapeStatusTable, []string{
+	if err := copyRows(ctx, tx, s.scrapeStatusTable, []string{
 		"collected_at", "source_database", "collector", "success", "duration_seconds",
 		"sample_count", "error_message",
-	}, rows, "scrape status samples")
+	}, rows, "scrape status samples"); err != nil {
+		return err
+	}
+	if len(statuses) == 0 {
+		return nil
+	}
+
+	query := fmt.Sprintf(`
+insert into %s (
+	collected_at, source_database, collector, success, duration_seconds, sample_count, error_message
+)
+values ($1, $2, $3, $4, $5, $6, $7)
+on conflict (source_database, collector) do update set
+	collected_at = excluded.collected_at,
+	success = excluded.success,
+	duration_seconds = excluded.duration_seconds,
+	sample_count = excluded.sample_count,
+	error_message = excluded.error_message
+where excluded.collected_at >= %s.collected_at`,
+		s.latestScrapeStatusTable.Sanitize(), s.latestScrapeStatusTable.Sanitize())
+	batch := &pgx.Batch{}
+	for _, status := range statuses {
+		batch.Queue(query,
+			status.CollectedAt, status.Database, status.Collector, status.Success,
+			status.DurationSeconds, status.SampleCount, status.ErrorMessage)
+	}
+	results := tx.SendBatch(ctx, batch)
+	for range statuses {
+		if _, err := results.Exec(); err != nil {
+			_ = results.Close()
+			return fmt.Errorf("upsert latest scrape status: %w", err)
+		}
+	}
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("close latest scrape status batch: %w", err)
+	}
+	return nil
 }
 
 func (s *Sink) ensureWritePartitions(ctx context.Context, tx pgx.Tx, batch collector.SampleBatch) error {
@@ -1389,18 +1551,27 @@ func (s *Sink) cleanupRetention(ctx context.Context) {
 		s.logger.Warn("Unable to clean PostgreSQL sample partitions", "error", err, "retention", s.retention.String())
 		return
 	}
-	deletedSQLTexts, err := s.deleteExpiredSQLTexts(ctx, sqlTextRetentionCutoff(cutoff))
+	retentionCutoff := retentionDayCutoff(cutoff)
+	deletedLatestStatuses, err := s.deleteExpiredLatestScrapeStatuses(ctx, retentionCutoff)
+	if err != nil {
+		s.logger.Warn("Unable to clean PostgreSQL latest scrape statuses", "error", err, "retention", s.retention.String())
+		return
+	}
+	deletedSQLTexts, err := s.deleteExpiredSQLTexts(ctx, retentionCutoff)
 	if err != nil {
 		s.logger.Warn("Unable to clean PostgreSQL SQL texts", "error", err, "retention", s.retention.String())
 		return
 	}
-	deletedSQLPlans, err := s.deleteExpiredSQLPlans(ctx, sqlTextRetentionCutoff(cutoff))
+	deletedSQLPlans, err := s.deleteExpiredSQLPlans(ctx, retentionCutoff)
 	if err != nil {
 		s.logger.Warn("Unable to clean PostgreSQL SQL plans", "error", err, "retention", s.retention.String())
 		return
 	}
 	if dropped > 0 {
 		s.logger.Info("Cleaned PostgreSQL sample partitions", "partitions_dropped", dropped, "retention", s.retention.String())
+	}
+	if deletedLatestStatuses > 0 {
+		s.logger.Info("Cleaned PostgreSQL latest scrape statuses", "statuses_deleted", deletedLatestStatuses, "retention", s.retention.String())
 	}
 	if deletedSQLTexts > 0 {
 		s.logger.Info("Cleaned PostgreSQL SQL texts", "sql_texts_deleted", deletedSQLTexts, "retention", s.retention.String())
@@ -1410,8 +1581,17 @@ func (s *Sink) cleanupRetention(ctx context.Context) {
 	}
 }
 
-func sqlTextRetentionCutoff(partitionCutoff time.Time) time.Time {
+func retentionDayCutoff(partitionCutoff time.Time) time.Time {
 	return dayStartUTC(partitionCutoff)
+}
+
+func (s *Sink) deleteExpiredLatestScrapeStatuses(ctx context.Context, cutoff time.Time) (int64, error) {
+	query := fmt.Sprintf("delete from %s where collected_at < $1", s.latestScrapeStatusTable.Sanitize())
+	result, err := s.pool.Exec(ctx, query, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("delete latest scrape statuses older than %s: %w", cutoff.Format(time.RFC3339), err)
+	}
+	return result.RowsAffected(), nil
 }
 
 func (s *Sink) deleteExpiredSQLTexts(ctx context.Context, cutoff time.Time) (int64, error) {
