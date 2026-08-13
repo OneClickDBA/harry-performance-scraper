@@ -59,6 +59,10 @@ ENV VERSION=${VERSION:-0.0.0-dev}
 
 RUN CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build --tags=${TAGS} -v -ldflags "-X main.Version=${VERSION} -s -w" -o /tmp/harry-scraper
 
+FROM scratch AS release-binary
+
+COPY --from=build /tmp/harry-scraper /harry-scraper
+
 FROM ${BASE_IMAGE:-ghcr.io/oracle/oraclelinux:8-slim} AS scraper-godror
 
 ARG VERSION
