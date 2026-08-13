@@ -345,10 +345,17 @@ groups:
               rawSql: |
                 select
                   now() as "time",
-                  source_database,
+                  string_agg(source_database, ', ' order by source_database) as source_database,
                   diskgroup_name,
                   used_percent::double precision as value
                 from oracle_latest_asm_diskgroup_samples
+                group by
+                  diskgroup_name,
+                  inst_id,
+                  total_bytes,
+                  free_bytes,
+                  usable_bytes,
+                  used_percent
               refId: A
           - refId: B
             datasourceUid: __expr__
