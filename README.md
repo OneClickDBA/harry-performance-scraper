@@ -113,4 +113,3 @@ the Harry name, logo, or visual identity.
 Oracle and Oracle Database are trademarks or registered trademarks of Oracle
 and/or its affiliates. Harry is an independent project and is not affiliated
 with, endorsed by, or sponsored by Oracle.
-
