@@ -408,3 +408,334 @@ groups:
           severity: warning
           service: harry-performance-scraper
         isPaused: false
+
+  - orgId: 1
+    name: Harry repository ingestion alerts
+    folder: Harry - Performance Scraper for Oracle Database
+    interval: 5m
+    rules:
+      - uid: harry_repository_ingest_stale
+        title: Harry repository ingestion accounting is stale
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 1800
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: postgres
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 300000
+              maxDataPoints: 300
+              rawQuery: true
+              rawSql: |
+                with configured_databases as (
+                  select source_database
+                  from oracle_latest_scrape_status
+                  where collector = 'scheduled'
+                ), latest_ingest as (
+                  select source_database, max(last_flushed_at) as last_flushed_at
+                  from harry_repository_daily_ingest
+                  group by source_database
+                )
+                select
+                  now() as "time",
+                  configured.source_database,
+                  coalesce(
+                    extract(epoch from (now() - ingest.last_flushed_at)),
+                    1000000000
+                  )::double precision as value
+                from configured_databases configured
+                left join latest_ingest ingest using (source_database)
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 300000
+              maxDataPoints: 300
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [900]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "$B > 900"
+              intervalMs: 300000
+              maxDataPoints: 300
+              refId: C
+              type: math
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: harry-postgresql-repository-health
+          __panelId__: "25"
+          summary: >-
+            Harry repository accounting is stale for
+            {{ $labels.source_database }}
+          description: >-
+            No ingestion accounting flush has completed for more than fifteen
+            minutes. Verify Harry leadership, PostgreSQL writes, and scraper
+            logs. Accounting normally flushes every five minutes.
+        labels:
+          severity: critical
+          service: harry-performance-scraper
+        isPaused: false
+
+      - uid: harry_sql_ingest_drop
+        title: Harry SQL sample ingestion dropped sharply
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 864000
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: postgres
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 300000
+              maxDataPoints: 300
+              rawQuery: true
+              rawSql: |
+                with configured_databases as (
+                  select source_database
+                  from oracle_latest_scrape_status
+                  where collector = 'scheduled'
+                ), comparison as (
+                  select
+                    source_database,
+                    max(sql_sample_rows) filter (
+                      where sample_day::date =
+                        (now() at time zone 'UTC')::date - 1
+                    ) as yesterday_rows,
+                    avg(sql_sample_rows) filter (
+                      where sample_day::date between
+                        (now() at time zone 'UTC')::date - 8
+                        and (now() at time zone 'UTC')::date - 2
+                    ) as baseline_rows,
+                    count(*) filter (
+                      where sample_day::date between
+                        (now() at time zone 'UTC')::date - 8
+                        and (now() at time zone 'UTC')::date - 2
+                    ) as baseline_days
+                  from harry_repository_daily_ingest
+                  where sample_day >=
+                    date_trunc('day', now() at time zone 'UTC') - interval '8 days'
+                  group by source_database
+                )
+                select
+                  now() as "time",
+                  configured.source_database,
+                  case
+                    when comparison.baseline_days >= 4
+                     and comparison.baseline_rows >= 1000
+                     and coalesce(comparison.yesterday_rows, 0) <
+                       comparison.baseline_rows * 0.2
+                    then 1.0 else 0.0
+                  end as value
+                from configured_databases configured
+                left join comparison using (source_database)
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 300000
+              maxDataPoints: 300
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "$B > 0"
+              intervalMs: 300000
+              maxDataPoints: 300
+              refId: C
+              type: math
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          __dashboardUid__: harry-postgresql-repository-health
+          __panelId__: "26"
+          summary: >-
+            Harry SQL ingestion dropped for
+            {{ $labels.source_database }}
+          description: >-
+            The previous complete UTC day recorded less than 20% of the prior
+            seven-day SQL sample average. The baseline requires at least four
+            days and 1,000 average rows. Review workload schedules, privileges,
+            collector errors, and database connectivity.
+        labels:
+          severity: warning
+          service: harry-performance-scraper
+        isPaused: false
+
+      - uid: harry_repository_ingest_surge
+        title: Harry repository ingestion increased sharply
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 864000
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: postgres
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 300000
+              maxDataPoints: 300
+              rawQuery: true
+              rawSql: |
+                with configured_databases as (
+                  select source_database
+                  from oracle_latest_scrape_status
+                  where collector = 'scheduled'
+                ), daily as (
+                  select
+                    sample_day::date as sample_day,
+                    source_database,
+                    additional_metric_rows + sql_sample_rows + sql_text_writes +
+                    sql_plan_operation_writes + session_sample_rows +
+                    blocking_session_sample_rows + database_activity_sample_rows +
+                    database_status_sample_rows + instance_sample_rows +
+                    resource_limit_sample_rows + tablespace_sample_rows +
+                    asm_diskgroup_sample_rows + system_counter_sample_rows +
+                    wait_class_sample_rows + system_metric_sample_rows +
+                    scrape_status_rows as total_rows
+                  from harry_repository_daily_ingest
+                  where sample_day >=
+                    date_trunc('day', now() at time zone 'UTC') - interval '8 days'
+                ), comparison as (
+                  select
+                    source_database,
+                    max(total_rows) filter (
+                      where sample_day = (now() at time zone 'UTC')::date - 1
+                    ) as yesterday_rows,
+                    avg(total_rows) filter (
+                      where sample_day between
+                        (now() at time zone 'UTC')::date - 8
+                        and (now() at time zone 'UTC')::date - 2
+                    ) as baseline_rows,
+                    count(*) filter (
+                      where sample_day between
+                        (now() at time zone 'UTC')::date - 8
+                        and (now() at time zone 'UTC')::date - 2
+                    ) as baseline_days
+                  from daily
+                  group by source_database
+                )
+                select
+                  now() as "time",
+                  configured.source_database,
+                  case
+                    when comparison.baseline_days >= 4
+                     and comparison.baseline_rows >= 10000
+                     and comparison.yesterday_rows > comparison.baseline_rows * 3
+                    then 1.0 else 0.0
+                  end as value
+                from configured_databases configured
+                left join comparison using (source_database)
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 300000
+              maxDataPoints: 300
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "$B > 0"
+              intervalMs: 300000
+              maxDataPoints: 300
+              refId: C
+              type: math
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          __dashboardUid__: harry-postgresql-repository-health
+          __panelId__: "26"
+          summary: >-
+            Harry repository ingestion surged for
+            {{ $labels.source_database }}
+          description: >-
+            The previous complete UTC day recorded more than three times the
+            prior seven-day average. The baseline requires at least four days
+            and 10,000 average rows. Review workload changes, collector
+            configuration, and projected PostgreSQL growth.
+        labels:
+          severity: warning
+          service: harry-performance-scraper
+        isPaused: false

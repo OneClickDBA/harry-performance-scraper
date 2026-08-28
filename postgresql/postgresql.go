@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -39,9 +40,17 @@ type Sink struct {
 	systemMetricTable       pgx.Identifier
 	scrapeStatusTable       pgx.Identifier
 	latestScrapeStatusTable pgx.Identifier
+	repositoryIngestTable   pgx.Identifier
 	retentionMu             sync.Mutex
 	lastRetentionCleanup    time.Time
+	ingestMu                sync.Mutex
+	ingestFlushMu           sync.Mutex
+	pendingIngest           map[repositoryIngestKey]repositoryIngestCounts
+	lastIngestFlushAttempt  time.Time
+	ingestFlushInterval     time.Duration
 }
+
+const repositoryIngestFlushInterval = 5 * time.Minute
 
 func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfig) (*Sink, error) {
 	if strings.TrimSpace(cfg.URL) == "" {
@@ -83,6 +92,9 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 		systemMetricTable:       siblingIdentifier(sqlSamplesTable, "oracle_system_metric_samples"),
 		scrapeStatusTable:       siblingIdentifier(sqlSamplesTable, "oracle_scrape_status"),
 		latestScrapeStatusTable: siblingIdentifier(sqlSamplesTable, "oracle_latest_scrape_status"),
+		repositoryIngestTable:   siblingIdentifier(sqlSamplesTable, "harry_repository_daily_ingest"),
+		pendingIngest:           make(map[repositoryIngestKey]repositoryIngestCounts),
+		ingestFlushInterval:     repositoryIngestFlushInterval,
 	}
 
 	if err := pool.Ping(ctx); err != nil {
@@ -321,7 +333,49 @@ create index if not exists oracle_database_activity_samples_source_idx on %s (so
 	if _, err := s.pool.Exec(ctx, ddl); err != nil {
 		return fmt.Errorf("migrate postgresql schema: %w", err)
 	}
+	if err := s.migrateRepositoryIngestSchema(ctx); err != nil {
+		return err
+	}
 	return s.migrateOperationalSchema(ctx)
+}
+
+func (s *Sink) migrateRepositoryIngestSchema(ctx context.Context) error {
+	if _, err := s.pool.Exec(ctx, s.repositoryIngestSchemaDDL()); err != nil {
+		return fmt.Errorf("migrate PostgreSQL repository ingest schema: %w", err)
+	}
+	return nil
+}
+
+func (s *Sink) repositoryIngestSchemaDDL() string {
+	return fmt.Sprintf(`
+create table if not exists %s (
+	sample_day timestamptz not null,
+	source_database text not null,
+	additional_metric_rows bigint not null default 0,
+	sql_sample_rows bigint not null default 0,
+	sql_text_writes bigint not null default 0,
+	sql_plan_operation_writes bigint not null default 0,
+	session_sample_rows bigint not null default 0,
+	blocking_session_sample_rows bigint not null default 0,
+	database_activity_sample_rows bigint not null default 0,
+	database_status_sample_rows bigint not null default 0,
+	instance_sample_rows bigint not null default 0,
+	resource_limit_sample_rows bigint not null default 0,
+	tablespace_sample_rows bigint not null default 0,
+	asm_diskgroup_sample_rows bigint not null default 0,
+	system_counter_sample_rows bigint not null default 0,
+	wait_class_sample_rows bigint not null default 0,
+	system_metric_sample_rows bigint not null default 0,
+	scrape_status_rows bigint not null default 0,
+	first_sample_at timestamptz,
+	last_sample_at timestamptz,
+	last_sql_sample_at timestamptz,
+	last_session_sample_at timestamptz,
+	last_database_activity_sample_at timestamptz,
+	last_flushed_at timestamptz not null,
+	primary key (sample_day, source_database)
+) partition by range (sample_day);
+`, s.repositoryIngestTable.Sanitize())
 }
 
 func (s *Sink) migrateOperationalSchema(ctx context.Context) error {
@@ -723,6 +777,10 @@ func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, su
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit postgresql transaction: %w", err)
 	}
+	s.recordRepositoryIngest(batch)
+	if err := s.flushRepositoryIngest(ctx, false); err != nil {
+		s.logger.Warn("Unable to flush PostgreSQL repository ingestion accounting", "error", err)
+	}
 	logWrite := s.logger.Info
 	if batch.Count() == 0 {
 		logWrite = s.logger.Debug
@@ -741,6 +799,321 @@ func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, su
 		"duration", summary.DurationSeconds)
 	s.cleanupRetention(ctx)
 	return nil
+}
+
+type repositoryIngestKey struct {
+	day      time.Time
+	database string
+}
+
+type repositoryIngestCounts struct {
+	additionalMetricRows         int64
+	sqlSampleRows                int64
+	sqlTextWrites                int64
+	sqlPlanOperationWrites       int64
+	sessionSampleRows            int64
+	blockingSessionSampleRows    int64
+	databaseActivitySampleRows   int64
+	databaseStatusSampleRows     int64
+	instanceSampleRows           int64
+	resourceLimitSampleRows      int64
+	tablespaceSampleRows         int64
+	asmDiskgroupSampleRows       int64
+	systemCounterSampleRows      int64
+	waitClassSampleRows          int64
+	systemMetricSampleRows       int64
+	scrapeStatusRows             int64
+	firstSampleAt                time.Time
+	lastSampleAt                 time.Time
+	lastSQLSampleAt              time.Time
+	lastSessionSampleAt          time.Time
+	lastDatabaseActivitySampleAt time.Time
+}
+
+func (c *repositoryIngestCounts) observe(sampleTime time.Time) {
+	if sampleTime.IsZero() {
+		return
+	}
+	if c.firstSampleAt.IsZero() || sampleTime.Before(c.firstSampleAt) {
+		c.firstSampleAt = sampleTime
+	}
+	if c.lastSampleAt.IsZero() || sampleTime.After(c.lastSampleAt) {
+		c.lastSampleAt = sampleTime
+	}
+}
+
+func (c *repositoryIngestCounts) add(other repositoryIngestCounts) {
+	c.additionalMetricRows += other.additionalMetricRows
+	c.sqlSampleRows += other.sqlSampleRows
+	c.sqlTextWrites += other.sqlTextWrites
+	c.sqlPlanOperationWrites += other.sqlPlanOperationWrites
+	c.sessionSampleRows += other.sessionSampleRows
+	c.blockingSessionSampleRows += other.blockingSessionSampleRows
+	c.databaseActivitySampleRows += other.databaseActivitySampleRows
+	c.databaseStatusSampleRows += other.databaseStatusSampleRows
+	c.instanceSampleRows += other.instanceSampleRows
+	c.resourceLimitSampleRows += other.resourceLimitSampleRows
+	c.tablespaceSampleRows += other.tablespaceSampleRows
+	c.asmDiskgroupSampleRows += other.asmDiskgroupSampleRows
+	c.systemCounterSampleRows += other.systemCounterSampleRows
+	c.waitClassSampleRows += other.waitClassSampleRows
+	c.systemMetricSampleRows += other.systemMetricSampleRows
+	c.scrapeStatusRows += other.scrapeStatusRows
+	if c.firstSampleAt.IsZero() || (!other.firstSampleAt.IsZero() && other.firstSampleAt.Before(c.firstSampleAt)) {
+		c.firstSampleAt = other.firstSampleAt
+	}
+	if other.lastSampleAt.After(c.lastSampleAt) {
+		c.lastSampleAt = other.lastSampleAt
+	}
+	if other.lastSQLSampleAt.After(c.lastSQLSampleAt) {
+		c.lastSQLSampleAt = other.lastSQLSampleAt
+	}
+	if other.lastSessionSampleAt.After(c.lastSessionSampleAt) {
+		c.lastSessionSampleAt = other.lastSessionSampleAt
+	}
+	if other.lastDatabaseActivitySampleAt.After(c.lastDatabaseActivitySampleAt) {
+		c.lastDatabaseActivitySampleAt = other.lastDatabaseActivitySampleAt
+	}
+}
+
+func addRepositoryIngestValues[T any](
+	counts map[repositoryIngestKey]repositoryIngestCounts,
+	values []T,
+	identity func(T) (time.Time, string),
+	increment func(*repositoryIngestCounts, time.Time),
+) {
+	for _, value := range values {
+		sampleTime, database := identity(value)
+		if sampleTime.IsZero() || database == "" {
+			continue
+		}
+		key := repositoryIngestKey{day: dayStartUTC(sampleTime), database: database}
+		entry := counts[key]
+		entry.observe(sampleTime)
+		increment(&entry, sampleTime)
+		counts[key] = entry
+	}
+}
+
+func collectRepositoryIngest(batch collector.SampleBatch) map[repositoryIngestKey]repositoryIngestCounts {
+	counts := make(map[repositoryIngestKey]repositoryIngestCounts)
+	addRepositoryIngestValues(counts, batch.AdditionalMetrics,
+		func(v collector.MetricSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.additionalMetricRows++ })
+	addRepositoryIngestValues(counts, batch.Performance.SQL,
+		func(v collector.SQLSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, at time.Time) {
+			c.sqlSampleRows++
+			if at.After(c.lastSQLSampleAt) {
+				c.lastSQLSampleAt = at
+			}
+		})
+	addRepositoryIngestValues(counts, batch.Performance.SQLTexts,
+		func(v collector.SQLTextSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.sqlTextWrites++ })
+	addRepositoryIngestValues(counts, batch.Performance.SQLPlans,
+		func(v collector.SQLPlanOperation) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.sqlPlanOperationWrites++ })
+	addRepositoryIngestValues(counts, batch.Performance.Sessions,
+		func(v collector.SessionSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, at time.Time) {
+			c.sessionSampleRows++
+			if at.After(c.lastSessionSampleAt) {
+				c.lastSessionSampleAt = at
+			}
+		})
+	addRepositoryIngestValues(counts, batch.Performance.BlockingSessions,
+		func(v collector.BlockingSessionSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.blockingSessionSampleRows++ })
+	addRepositoryIngestValues(counts, batch.Performance.DatabaseActivity,
+		func(v collector.DatabaseActivitySample) (time.Time, string) { return v.SampleTime, v.Database },
+		func(c *repositoryIngestCounts, at time.Time) {
+			c.databaseActivitySampleRows++
+			if at.After(c.lastDatabaseActivitySampleAt) {
+				c.lastDatabaseActivitySampleAt = at
+			}
+		})
+	addRepositoryIngestValues(counts, batch.Operational.DatabaseStatus,
+		func(v collector.DatabaseStatusSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.databaseStatusSampleRows++ })
+	addRepositoryIngestValues(counts, batch.Operational.Instances,
+		func(v collector.InstanceSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.instanceSampleRows++ })
+	addRepositoryIngestValues(counts, batch.Operational.ResourceLimits,
+		func(v collector.ResourceLimitSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.resourceLimitSampleRows++ })
+	addRepositoryIngestValues(counts, batch.Operational.Tablespaces,
+		func(v collector.TablespaceSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.tablespaceSampleRows++ })
+	addRepositoryIngestValues(counts, batch.Operational.ASMDiskgroups,
+		func(v collector.ASMDiskgroupSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.asmDiskgroupSampleRows++ })
+	addRepositoryIngestValues(counts, batch.Operational.SystemCounters,
+		func(v collector.SystemCounterSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.systemCounterSampleRows++ })
+	addRepositoryIngestValues(counts, batch.Operational.WaitClasses,
+		func(v collector.WaitClassSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.waitClassSampleRows++ })
+	addRepositoryIngestValues(counts, batch.Operational.SystemMetrics,
+		func(v collector.SystemMetricSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.systemMetricSampleRows++ })
+	addRepositoryIngestValues(counts, batch.ScrapeStatuses,
+		func(v collector.ScrapeStatusSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.scrapeStatusRows++ })
+	return counts
+}
+
+func (s *Sink) recordRepositoryIngest(batch collector.SampleBatch) {
+	counts := collectRepositoryIngest(batch)
+	if len(counts) == 0 {
+		return
+	}
+	s.ingestMu.Lock()
+	defer s.ingestMu.Unlock()
+	for key, value := range counts {
+		pending := s.pendingIngest[key]
+		pending.add(value)
+		s.pendingIngest[key] = pending
+	}
+}
+
+func (s *Sink) flushRepositoryIngest(ctx context.Context, force bool) error {
+	s.ingestFlushMu.Lock()
+	defer s.ingestFlushMu.Unlock()
+
+	now := time.Now().UTC()
+	s.ingestMu.Lock()
+	interval := s.ingestFlushInterval
+	if interval <= 0 {
+		interval = repositoryIngestFlushInterval
+	}
+	if !force && !s.lastIngestFlushAttempt.IsZero() && now.Sub(s.lastIngestFlushAttempt) < interval {
+		s.ingestMu.Unlock()
+		return nil
+	}
+	s.lastIngestFlushAttempt = now
+	pending := s.pendingIngest
+	s.pendingIngest = make(map[repositoryIngestKey]repositoryIngestCounts)
+	s.ingestMu.Unlock()
+	if len(pending) == 0 {
+		return nil
+	}
+
+	if err := s.writeRepositoryIngest(ctx, pending, now); err != nil {
+		s.ingestMu.Lock()
+		for key, value := range pending {
+			current := s.pendingIngest[key]
+			current.add(value)
+			s.pendingIngest[key] = current
+		}
+		s.ingestMu.Unlock()
+		return err
+	}
+	return nil
+}
+
+func (s *Sink) writeRepositoryIngest(
+	ctx context.Context,
+	counts map[repositoryIngestKey]repositoryIngestCounts,
+	flushedAt time.Time,
+) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin repository ingestion transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	days := make([]time.Time, 0, len(counts))
+	keys := make([]repositoryIngestKey, 0, len(counts))
+	for key := range counts {
+		days = append(days, key.day)
+		keys = append(keys, key)
+	}
+	if err := ensureRepositoryIngestPartitions(ctx, tx, s.repositoryIngestTable, days); err != nil {
+		return fmt.Errorf("ensure repository ingestion partitions: %w", err)
+	}
+	slices.SortFunc(keys, func(a, b repositoryIngestKey) int {
+		if cmp := a.day.Compare(b.day); cmp != 0 {
+			return cmp
+		}
+		return strings.Compare(a.database, b.database)
+	})
+
+	table := s.repositoryIngestTable.Sanitize()
+	query := fmt.Sprintf(`
+insert into %s (
+	sample_day, source_database, additional_metric_rows, sql_sample_rows,
+	sql_text_writes, sql_plan_operation_writes, session_sample_rows,
+	blocking_session_sample_rows, database_activity_sample_rows,
+	database_status_sample_rows, instance_sample_rows, resource_limit_sample_rows,
+	tablespace_sample_rows, asm_diskgroup_sample_rows, system_counter_sample_rows,
+	wait_class_sample_rows, system_metric_sample_rows, scrape_status_rows,
+	first_sample_at, last_sample_at, last_sql_sample_at, last_session_sample_at,
+	last_database_activity_sample_at, last_flushed_at
+)
+values (
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+	$13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
+)
+on conflict (sample_day, source_database) do update set
+	additional_metric_rows = %s.additional_metric_rows + excluded.additional_metric_rows,
+	sql_sample_rows = %s.sql_sample_rows + excluded.sql_sample_rows,
+	sql_text_writes = %s.sql_text_writes + excluded.sql_text_writes,
+	sql_plan_operation_writes = %s.sql_plan_operation_writes + excluded.sql_plan_operation_writes,
+	session_sample_rows = %s.session_sample_rows + excluded.session_sample_rows,
+	blocking_session_sample_rows = %s.blocking_session_sample_rows + excluded.blocking_session_sample_rows,
+	database_activity_sample_rows = %s.database_activity_sample_rows + excluded.database_activity_sample_rows,
+	database_status_sample_rows = %s.database_status_sample_rows + excluded.database_status_sample_rows,
+	instance_sample_rows = %s.instance_sample_rows + excluded.instance_sample_rows,
+	resource_limit_sample_rows = %s.resource_limit_sample_rows + excluded.resource_limit_sample_rows,
+	tablespace_sample_rows = %s.tablespace_sample_rows + excluded.tablespace_sample_rows,
+	asm_diskgroup_sample_rows = %s.asm_diskgroup_sample_rows + excluded.asm_diskgroup_sample_rows,
+	system_counter_sample_rows = %s.system_counter_sample_rows + excluded.system_counter_sample_rows,
+	wait_class_sample_rows = %s.wait_class_sample_rows + excluded.wait_class_sample_rows,
+	system_metric_sample_rows = %s.system_metric_sample_rows + excluded.system_metric_sample_rows,
+	scrape_status_rows = %s.scrape_status_rows + excluded.scrape_status_rows,
+	first_sample_at = least(%s.first_sample_at, excluded.first_sample_at),
+	last_sample_at = greatest(%s.last_sample_at, excluded.last_sample_at),
+	last_sql_sample_at = greatest(%s.last_sql_sample_at, excluded.last_sql_sample_at),
+	last_session_sample_at = greatest(%s.last_session_sample_at, excluded.last_session_sample_at),
+	last_database_activity_sample_at = greatest(%s.last_database_activity_sample_at, excluded.last_database_activity_sample_at),
+	last_flushed_at = greatest(%s.last_flushed_at, excluded.last_flushed_at)`,
+		table, table, table, table, table, table, table, table, table, table, table, table,
+		table, table, table, table, table, table, table, table, table, table, table)
+	batch := &pgx.Batch{}
+	for _, key := range keys {
+		value := counts[key]
+		batch.Queue(query,
+			key.day, key.database, value.additionalMetricRows, value.sqlSampleRows,
+			value.sqlTextWrites, value.sqlPlanOperationWrites, value.sessionSampleRows,
+			value.blockingSessionSampleRows, value.databaseActivitySampleRows,
+			value.databaseStatusSampleRows, value.instanceSampleRows, value.resourceLimitSampleRows,
+			value.tablespaceSampleRows, value.asmDiskgroupSampleRows, value.systemCounterSampleRows,
+			value.waitClassSampleRows, value.systemMetricSampleRows, value.scrapeStatusRows,
+			nullableTime(value.firstSampleAt), nullableTime(value.lastSampleAt), nullableTime(value.lastSQLSampleAt),
+			nullableTime(value.lastSessionSampleAt), nullableTime(value.lastDatabaseActivitySampleAt), flushedAt)
+	}
+	results := tx.SendBatch(ctx, batch)
+	for range keys {
+		if _, err := results.Exec(); err != nil {
+			_ = results.Close()
+			return fmt.Errorf("upsert repository ingestion accounting: %w", err)
+		}
+	}
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("close repository ingestion batch: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit repository ingestion transaction: %w", err)
+	}
+	return nil
+}
+
+func nullableTime(value time.Time) any {
+	if value.IsZero() {
+		return nil
+	}
+	return value
 }
 
 type sqlTextKey struct {
@@ -1516,6 +1889,32 @@ func ensureDailyPartitions(ctx context.Context, tx pgx.Tx, parent pgx.Identifier
 	return nil
 }
 
+func ensureRepositoryIngestPartitions(
+	ctx context.Context,
+	tx pgx.Tx,
+	parent pgx.Identifier,
+	times []time.Time,
+) error {
+	days := map[time.Time]struct{}{}
+	for _, value := range times {
+		if !value.IsZero() {
+			days[dayStartUTC(value)] = struct{}{}
+		}
+	}
+	for day := range days {
+		nextDay := day.AddDate(0, 0, 1)
+		partition := partitionIdentifier(parent, day)
+		ddl := fmt.Sprintf(
+			"create table if not exists %s partition of %s for values from (%s) to (%s) with (fillfactor = 70)",
+			partition.Sanitize(), parent.Sanitize(), quoteTimestamp(day), quoteTimestamp(nextDay),
+		)
+		if _, err := tx.Exec(ctx, ddl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func dayStartUTC(value time.Time) time.Time {
 	year, month, day := value.UTC().Date()
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
@@ -1640,6 +2039,7 @@ func (s *Sink) partitionedTables() []pgx.Identifier {
 		s.waitClassTable,
 		s.systemMetricTable,
 		s.scrapeStatusTable,
+		s.repositoryIngestTable,
 	}
 }
 
@@ -1701,6 +2101,11 @@ func partitionDay(parent pgx.Identifier, partition string) (time.Time, bool) {
 }
 
 func (s *Sink) Close() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := s.flushRepositoryIngest(ctx, true); err != nil {
+		s.logger.Warn("Unable to flush PostgreSQL repository ingestion accounting during shutdown", "error", err)
+	}
 	s.pool.Close()
 }
 
