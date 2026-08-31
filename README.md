@@ -1,7 +1,7 @@
 # Harry - Performance Scraper for Oracle Database
 
 <p align="center">
-  <img width="256" src="https://oneclickdba.github.io/harry-performance-scraper-web/img/harry/harry.png" alt="Harry - Performance Scraper for Oracle Database">
+  <img width="256" src="https://harryperformance.com/img/harry/harry.png" alt="Harry - Performance Scraper for Oracle Database">
 </p>
 
 Harry is a PostgreSQL-backed Oracle Database performance and operational
@@ -9,7 +9,9 @@ monitoring scraper. It collects SQL, session, blocking, database activity,
 capacity, resource, and collector-health data, then stores it in PostgreSQL for
 Grafana dashboards, alerting, and historical analysis.
 
-Project homepage: [oneclickdba.com/harry](https://oneclickdba.com/harry/).
+Project website: [harryperformance.com](https://harryperformance.com/).
+
+Live demo: [demo.harryperformance.com](https://demo.harryperformance.com/).
 
 The project is developed at
 [OneClickDBA/harry-performance-scraper](https://github.com/OneClickDBA/harry-performance-scraper)
@@ -38,14 +40,15 @@ directly to PostgreSQL and exposes only small health and readiness endpoints.
 ## Getting Started
 
 The complete documentation is published at the
-[Harry documentation site](https://oneclickdba.github.io/harry-performance-scraper-web/).
+[Harry documentation site](https://harryperformance.com/).
 Start with:
 
-- [Installation and basic configuration](https://oneclickdba.github.io/harry-performance-scraper-web/docs/getting-started/basics)
-- [Configuration reference](https://oneclickdba.github.io/harry-performance-scraper-web/docs/configuration/config-file)
-- [Collection and storage model](https://oneclickdba.github.io/harry-performance-scraper-web/docs/getting-started/collection-model)
-- [Grafana dashboards](https://oneclickdba.github.io/harry-performance-scraper-web/docs/getting-started/grafana-dashboards)
-- [Builds and releases](https://oneclickdba.github.io/harry-performance-scraper-web/docs/releases/builds)
+- [Live demo](https://harryperformance.com/docs/getting-started/live-demo/)
+- [Installation and basic configuration](https://harryperformance.com/docs/getting-started/basics/)
+- [Configuration reference](https://harryperformance.com/docs/configuration/config-file/)
+- [Collection and storage model](https://harryperformance.com/docs/getting-started/collection-model/)
+- [Grafana dashboards](https://harryperformance.com/docs/getting-started/grafana-dashboards/)
+- [Builds and releases](https://harryperformance.com/docs/releases/builds/)
 
 The Docusaurus source is maintained separately in
 [OneClickDBA/harry-performance-scraper-web](https://github.com/OneClickDBA/harry-performance-scraper-web).
@@ -77,13 +80,13 @@ High availability is enabled by default. Harry instances using the same
 PostgreSQL cluster and HA scope elect one active scraper; standbys do not open
 Oracle connections or write samples. PostgreSQL HA must independently enforce
 a single writable primary with quorum and fencing. See
-[High availability](https://oneclickdba.github.io/harry-performance-scraper-web/docs/configuration/high-availability)
+[High availability](https://harryperformance.com/docs/configuration/high-availability/)
 for connection-string, scope, readiness, and Patroni requirements.
 
 PostgreSQL-backed Grafana alerts cannot report a complete failure of Grafana,
 PostgreSQL, the scraper, or the notification path. Production deployments need
 an independent external availability check for the monitoring stack. See
-[Grafana Alerting](https://oneclickdba.github.io/harry-performance-scraper-web/docs/configuration/grafana-alerting)
+[Grafana Alerting](https://harryperformance.com/docs/configuration/grafana-alerting/)
 for provisioning and operational requirements.
 
 ## Project Information

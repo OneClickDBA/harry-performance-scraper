@@ -134,7 +134,24 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -529,6 +546,22 @@
                 "value": "color-background"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
           }
         ]
       },
@@ -611,6 +644,22 @@
               {
                 "id": "custom.displayMode",
                 "value": "color-background"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
               }
             ]
           }
@@ -751,14 +800,14 @@
           "type": "postgres",
           "uid": "PostgreSQL"
         },
-        "definition": "select distinct source_database from oracle_latest_scrape_status order by 1;",
+        "definition": "select source_database from oracle_latest_scrape_status where collector = 'scheduled' order by source_database;",
         "hide": 0,
         "includeAll": false,
         "label": "Source Database",
         "multi": false,
         "name": "source_database",
         "options": [],
-        "query": "select distinct source_database from oracle_latest_scrape_status order by 1;",
+        "query": "select source_database from oracle_latest_scrape_status where collector = 'scheduled' order by source_database;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

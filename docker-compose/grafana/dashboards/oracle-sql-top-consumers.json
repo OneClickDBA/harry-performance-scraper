@@ -68,6 +68,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "SQL ID"
+              },
+              {
                 "id": "custom.width",
                 "value": 130
               },
@@ -90,6 +94,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "SQL preview"
+              },
+              {
                 "id": "custom.width",
                 "value": 420
               }
@@ -102,8 +110,284 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "SQL text"
+              },
+              {
                 "id": "custom.width",
-                "value": 170
+                "value": 145
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "collected_plans"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plans"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "orange",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-text"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(elapsed_rank|cpu_rank|user_io_rank|executions_rank)$/"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 72
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "elapsed_rank"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Elapsed #"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cpu_rank"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CPU #"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user_io_rank"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "I/O #"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "executions_rank"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Exec #"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "primary_pressure"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Pressure"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(elapsed_seconds|cpu_seconds|user_io_seconds|application_seconds|concurrency_seconds|cluster_seconds)$/"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "elapsed_seconds"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Elapsed s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cpu_seconds"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CPU s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user_io_seconds"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "User I/O s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "application_seconds"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "App s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "concurrency_seconds"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Concur. s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cluster_seconds"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Cluster s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "executions_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Executions"
+              },
+              {
+                "id": "custom.width",
+                "value": 92
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "elapsed_seconds_per_exec"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "s / exec"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "buffer_gets_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Buffer gets"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "disk_reads_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Disk reads"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
               }
             ]
           }
@@ -138,7 +422,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with ordered as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(elapsed_time_micro, 0) as elapsed_time_micro,\n    coalesce(cpu_time_micro, 0) as cpu_time_micro,\n    coalesce(user_io_wait_micro, 0) as user_io_wait_micro,\n    coalesce(application_wait_micro, 0) as application_wait_micro,\n    coalesce(concurrency_wait_micro, 0) as concurrency_wait_micro,\n    coalesce(cluster_wait_micro, 0) as cluster_wait_micro,\n    coalesce(executions, 0) as executions,\n    coalesce(buffer_gets, 0) as buffer_gets,\n    coalesce(disk_reads, 0) as disk_reads,\n    lag(coalesce(elapsed_time_micro, 0)) over w as prev_elapsed,\n    lag(coalesce(cpu_time_micro, 0)) over w as prev_cpu,\n    lag(coalesce(user_io_wait_micro, 0)) over w as prev_user_io,\n    lag(coalesce(application_wait_micro, 0)) over w as prev_application,\n    lag(coalesce(concurrency_wait_micro, 0)) over w as prev_concurrency,\n    lag(coalesce(cluster_wait_micro, 0)) over w as prev_cluster,\n    lag(coalesce(executions, 0)) over w as prev_executions,\n    lag(coalesce(buffer_gets, 0)) over w as prev_buffer_gets,\n    lag(coalesce(disk_reads, 0)) over w as prev_disk_reads\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), deltas as (\n  select sql_id,\n    case when prev_elapsed is null then 0 when elapsed_time_micro >= prev_elapsed then elapsed_time_micro - prev_elapsed else elapsed_time_micro end as elapsed_delta,\n    case when prev_cpu is null then 0 when cpu_time_micro >= prev_cpu then cpu_time_micro - prev_cpu else cpu_time_micro end as cpu_delta,\n    case when prev_user_io is null then 0 when user_io_wait_micro >= prev_user_io then user_io_wait_micro - prev_user_io else user_io_wait_micro end as user_io_delta,\n    case when prev_application is null then 0 when application_wait_micro >= prev_application then application_wait_micro - prev_application else application_wait_micro end as application_delta,\n    case when prev_concurrency is null then 0 when concurrency_wait_micro >= prev_concurrency then concurrency_wait_micro - prev_concurrency else concurrency_wait_micro end as concurrency_delta,\n    case when prev_cluster is null then 0 when cluster_wait_micro >= prev_cluster then cluster_wait_micro - prev_cluster else cluster_wait_micro end as cluster_delta,\n    case when prev_executions is null then 0 when executions >= prev_executions then executions - prev_executions else executions end as executions_delta,\n    case when prev_buffer_gets is null then 0 when buffer_gets >= prev_buffer_gets then buffer_gets - prev_buffer_gets else buffer_gets end as buffer_gets_delta,\n    case when prev_disk_reads is null then 0 when disk_reads >= prev_disk_reads then disk_reads - prev_disk_reads else disk_reads end as disk_reads_delta\n  from ordered\n), consumers as (\n  select sql_id,\n    sum(elapsed_delta) as elapsed_micro,\n    sum(cpu_delta) as cpu_micro,\n    sum(user_io_delta) as user_io_micro,\n    sum(application_delta) as application_micro,\n    sum(concurrency_delta) as concurrency_micro,\n    sum(cluster_delta) as cluster_micro,\n    sum(executions_delta) as executions_delta,\n    sum(buffer_gets_delta) as buffer_gets_delta,\n    sum(disk_reads_delta) as disk_reads_delta\n  from deltas\n  group by sql_id\n), ranked as (\n  select *,\n    rank() over (order by elapsed_micro desc) as elapsed_rank,\n    rank() over (order by cpu_micro desc) as cpu_rank,\n    rank() over (order by user_io_micro desc) as user_io_rank,\n    rank() over (order by executions_delta desc) as executions_rank\n  from consumers\n  where elapsed_micro > 0\n)\nselect r.sql_id, elapsed_rank, cpu_rank, user_io_rank, executions_rank,\n  case\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) <= 0 then 'Other'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = cpu_micro then 'CPU'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = user_io_micro then 'User I/O'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = application_micro then 'Application'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = concurrency_micro then 'Concurrency'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = cluster_micro then 'Cluster'\n    else 'Other'\n  end as primary_pressure,\n  round(elapsed_micro / 1000000.0, 3) as elapsed_seconds,\n  round(cpu_micro / 1000000.0, 3) as cpu_seconds,\n  round(user_io_micro / 1000000.0, 3) as user_io_seconds,\n  round(application_micro / 1000000.0, 3) as application_seconds,\n  round(concurrency_micro / 1000000.0, 3) as concurrency_seconds,\n  round(cluster_micro / 1000000.0, 3) as cluster_seconds,\n  executions_delta,\n  round((elapsed_micro / 1000000.0) / nullif(executions_delta, 0), 6) as elapsed_seconds_per_exec,\n  buffer_gets_delta, disk_reads_delta,\n  case when t.sql_id is null then 'Not collected or aged out' else 'Available' end as sql_text_status,\n  coalesce(p.plan_count, 0) as collected_plans,\n  left(t.sql_fulltext, 240) as sql_preview\nfrom ranked r\nleft join oracle_sql_texts t\n  on t.source_database = ${source_database:sqlstring} and t.sql_id = r.sql_id\nleft join lateral (\n  select count(distinct (inst_id, child_number, plan_hash_value)) as plan_count\n  from oracle_sql_plans p\n  where p.source_database = ${source_database:sqlstring} and p.sql_id = r.sql_id\n) p on true\norder by elapsed_rank\nlimit 20;",
+          "rawSql": "with ordered as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    coalesce(elapsed_time_micro, 0) as elapsed_time_micro,\n    coalesce(cpu_time_micro, 0) as cpu_time_micro,\n    coalesce(user_io_wait_micro, 0) as user_io_wait_micro,\n    coalesce(application_wait_micro, 0) as application_wait_micro,\n    coalesce(concurrency_wait_micro, 0) as concurrency_wait_micro,\n    coalesce(cluster_wait_micro, 0) as cluster_wait_micro,\n    coalesce(executions, 0) as executions,\n    coalesce(buffer_gets, 0) as buffer_gets,\n    coalesce(disk_reads, 0) as disk_reads,\n    lag(coalesce(elapsed_time_micro, 0)) over w as prev_elapsed,\n    lag(coalesce(cpu_time_micro, 0)) over w as prev_cpu,\n    lag(coalesce(user_io_wait_micro, 0)) over w as prev_user_io,\n    lag(coalesce(application_wait_micro, 0)) over w as prev_application,\n    lag(coalesce(concurrency_wait_micro, 0)) over w as prev_concurrency,\n    lag(coalesce(cluster_wait_micro, 0)) over w as prev_cluster,\n    lag(coalesce(executions, 0)) over w as prev_executions,\n    lag(coalesce(buffer_gets, 0)) over w as prev_buffer_gets,\n    lag(coalesce(disk_reads, 0)) over w as prev_disk_reads\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  window w as (\n    partition by source_database, inst_id, sql_id, coalesce(plan_hash_value, 0)\n    order by collected_at\n  )\n), deltas as (\n  select sql_id,\n    case when prev_elapsed is null then 0 when elapsed_time_micro >= prev_elapsed then elapsed_time_micro - prev_elapsed else elapsed_time_micro end as elapsed_delta,\n    case when prev_cpu is null then 0 when cpu_time_micro >= prev_cpu then cpu_time_micro - prev_cpu else cpu_time_micro end as cpu_delta,\n    case when prev_user_io is null then 0 when user_io_wait_micro >= prev_user_io then user_io_wait_micro - prev_user_io else user_io_wait_micro end as user_io_delta,\n    case when prev_application is null then 0 when application_wait_micro >= prev_application then application_wait_micro - prev_application else application_wait_micro end as application_delta,\n    case when prev_concurrency is null then 0 when concurrency_wait_micro >= prev_concurrency then concurrency_wait_micro - prev_concurrency else concurrency_wait_micro end as concurrency_delta,\n    case when prev_cluster is null then 0 when cluster_wait_micro >= prev_cluster then cluster_wait_micro - prev_cluster else cluster_wait_micro end as cluster_delta,\n    case when prev_executions is null then 0 when executions >= prev_executions then executions - prev_executions else executions end as executions_delta,\n    case when prev_buffer_gets is null then 0 when buffer_gets >= prev_buffer_gets then buffer_gets - prev_buffer_gets else buffer_gets end as buffer_gets_delta,\n    case when prev_disk_reads is null then 0 when disk_reads >= prev_disk_reads then disk_reads - prev_disk_reads else disk_reads end as disk_reads_delta\n  from ordered\n), consumers as (\n  select sql_id,\n    sum(elapsed_delta) as elapsed_micro,\n    sum(cpu_delta) as cpu_micro,\n    sum(user_io_delta) as user_io_micro,\n    sum(application_delta) as application_micro,\n    sum(concurrency_delta) as concurrency_micro,\n    sum(cluster_delta) as cluster_micro,\n    sum(executions_delta) as executions_delta,\n    sum(buffer_gets_delta) as buffer_gets_delta,\n    sum(disk_reads_delta) as disk_reads_delta\n  from deltas\n  group by sql_id\n), ranked as (\n  select *,\n    rank() over (order by elapsed_micro desc) as elapsed_rank,\n    rank() over (order by cpu_micro desc) as cpu_rank,\n    rank() over (order by user_io_micro desc) as user_io_rank,\n    rank() over (order by executions_delta desc) as executions_rank\n  from consumers\n  where elapsed_micro > 0\n)\nselect r.sql_id, elapsed_rank, cpu_rank, user_io_rank, executions_rank,\n  coalesce(p.plan_count, 0) as collected_plans,\n  case when t.sql_id is null then 'Not collected or aged out' else 'Available' end as sql_text_status,\n  case\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) <= 0 then 'Other'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = cpu_micro then 'CPU'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = user_io_micro then 'User I/O'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = application_micro then 'Application'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = concurrency_micro then 'Concurrency'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = cluster_micro then 'Cluster'\n    else 'Other'\n  end as primary_pressure,\n  round(elapsed_micro / 1000000.0, 3) as elapsed_seconds,\n  round(cpu_micro / 1000000.0, 3) as cpu_seconds,\n  round(user_io_micro / 1000000.0, 3) as user_io_seconds,\n  round(application_micro / 1000000.0, 3) as application_seconds,\n  round(concurrency_micro / 1000000.0, 3) as concurrency_seconds,\n  round(cluster_micro / 1000000.0, 3) as cluster_seconds,\n  executions_delta,\n  round((elapsed_micro / 1000000.0) / nullif(executions_delta, 0), 6) as elapsed_seconds_per_exec,\n  buffer_gets_delta, disk_reads_delta,\n  left(t.sql_fulltext, 240) as sql_preview\nfrom ranked r\nleft join oracle_sql_texts t\n  on t.source_database = ${source_database:sqlstring} and t.sql_id = r.sql_id\nleft join lateral (\n  select count(distinct (inst_id, child_number, plan_hash_value)) as plan_count\n  from oracle_sql_plans p\n  where p.source_database = ${source_database:sqlstring} and p.sql_id = r.sql_id\n) p on true\norder by elapsed_rank\nlimit 20;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -667,7 +951,168 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SQL ID"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child_number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Child"
+              },
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_hash_value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plan hash"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "first_seen"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "First seen"
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_seen"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Last seen"
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "samples"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Samples"
+              },
+              {
+                "id": "custom.width",
+                "value": 75
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "executions_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Executions"
+              },
+              {
+                "id": "custom.width",
+                "value": 92
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "elapsed_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Elapsed s"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_status"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plan"
+              },
+              {
+                "id": "custom.width",
+                "value": 145
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -791,6 +1236,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Access predicates"
+              },
+              {
                 "id": "custom.width",
                 "value": 360
               }
@@ -803,6 +1252,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Filter predicates"
+              },
+              {
                 "id": "custom.width",
                 "value": 360
               }
@@ -814,10 +1267,6 @@
               "options": "plan_operation"
             },
             "properties": [
-              {
-                "id": "custom.width",
-                "value": 420
-              },
               {
                 "id": "custom.cellOptions",
                 "value": {
@@ -952,6 +1401,14 @@
               {
                 "id": "custom.displayMode",
                 "value": "color-text"
+              },
+              {
+                "id": "displayName",
+                "value": "Operation"
+              },
+              {
+                "id": "custom.width",
+                "value": 420
               }
             ]
           },
@@ -961,10 +1418,6 @@
               "options": "review_signal"
             },
             "properties": [
-              {
-                "id": "custom.width",
-                "value": 180
-              },
               {
                 "id": "custom.cellOptions",
                 "value": {
@@ -1019,6 +1472,238 @@
               {
                 "id": "custom.displayMode",
                 "value": "color-background"
+              },
+              {
+                "id": "displayName",
+                "value": "Review"
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child_number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Child"
+              },
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_hash_value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plan hash"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Step"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "parent_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Parent"
+              },
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "object"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Object"
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "object_type"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Object type"
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Cost"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "estimated_rows"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Est. rows"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "estimated_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Est. bytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "temp_space"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Temp bytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "partition_start"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Part. start"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "partition_stop"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Part. stop"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_referenced_at"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Last referenced"
+              },
+              {
+                "id": "custom.width",
+                "value": 155
               }
             ]
           }
@@ -1083,14 +1768,14 @@
           "type": "postgres",
           "uid": "PostgreSQL"
         },
-        "definition": "select distinct source_database from oracle_sql_samples order by 1;",
+        "definition": "select source_database from oracle_latest_scrape_status where collector = 'scheduled' order by source_database;",
         "hide": 0,
         "includeAll": false,
         "label": "Source Database",
         "multi": false,
         "name": "source_database",
         "options": [],
-        "query": "select distinct source_database from oracle_sql_samples order by 1;",
+        "query": "select source_database from oracle_latest_scrape_status where collector = 'scheduled' order by source_database;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
