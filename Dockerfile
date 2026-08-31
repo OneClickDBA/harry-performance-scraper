@@ -59,6 +59,10 @@ ENV VERSION=${VERSION:-0.0.0-dev}
 
 RUN CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build --tags=${TAGS} -v -ldflags "-X main.Version=${VERSION} -s -w" -o /tmp/harry-scraper
 
+FROM scratch AS release-binary
+
+COPY --from=build /tmp/harry-scraper /harry-scraper
+
 FROM ${BASE_IMAGE:-ghcr.io/oracle/oraclelinux:8-slim} AS scraper-godror
 
 ARG VERSION
@@ -69,8 +73,8 @@ LABEL org.opencontainers.image.authors="Jorge Holgado <dodger@oneclickdba.com>"
 LABEL org.opencontainers.image.vendor="Jorge Holgado"
 LABEL org.opencontainers.image.licenses="UPL-1.0 AND MIT"
 LABEL org.opencontainers.image.source="https://github.com/OneClickDBA/harry-performance-scraper"
-LABEL org.opencontainers.image.documentation="https://oneclickdba.github.io/harry-performance-scraper-web/"
-LABEL org.opencontainers.image.url="https://oneclickdba.com/harry/"
+LABEL org.opencontainers.image.documentation="https://harryperformance.com/"
+LABEL org.opencontainers.image.url="https://harryperformance.com/"
 LABEL org.opencontainers.image.version="${VERSION:-0.0.0-dev}"
 
 ENV VERSION=${VERSION:-0.0.0-dev}
@@ -106,8 +110,8 @@ LABEL org.opencontainers.image.authors="Jorge Holgado <dodger@oneclickdba.com>"
 LABEL org.opencontainers.image.vendor="Jorge Holgado"
 LABEL org.opencontainers.image.licenses="UPL-1.0 AND MIT"
 LABEL org.opencontainers.image.source="https://github.com/OneClickDBA/harry-performance-scraper"
-LABEL org.opencontainers.image.documentation="https://oneclickdba.github.io/harry-performance-scraper-web/"
-LABEL org.opencontainers.image.url="https://oneclickdba.com/harry/"
+LABEL org.opencontainers.image.documentation="https://harryperformance.com/"
+LABEL org.opencontainers.image.url="https://harryperformance.com/"
 LABEL org.opencontainers.image.version="${VERSION:-0.0.0-dev}"
 
 ENV VERSION=${VERSION:-0.0.0-dev}

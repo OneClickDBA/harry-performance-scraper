@@ -4,6 +4,10 @@
 package postgresql
 
 import (
+	"context"
+	"io"
+	"log/slog"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -55,6 +59,162 @@ func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
 	}
 	if !strings.Contains(ddl, "primary key (source_database, collector)") {
 		t.Fatalf("latest scrape status table does not define its expected primary key")
+	}
+}
+
+func TestRepositoryIngestSchemaDDL(t *testing.T) {
+	sink := &Sink{repositoryIngestTable: pgx.Identifier{"monitoring", "harry_repository_daily_ingest"}}
+	ddl := sink.repositoryIngestSchemaDDL()
+	if strings.Contains(ddl, "%!") {
+		t.Fatalf("repository ingestion DDL contains an unresolved format directive: %s", ddl)
+	}
+	for _, expected := range []string{
+		"create table if not exists \"monitoring\".\"harry_repository_daily_ingest\"",
+		"partition by range (sample_day)",
+		"primary key (sample_day, source_database)",
+		"database_activity_sample_rows bigint not null default 0",
+		"last_flushed_at timestamptz not null",
+	} {
+		if !strings.Contains(ddl, expected) {
+			t.Fatalf("repository ingestion DDL does not contain %q", expected)
+		}
+	}
+}
+
+func TestCollectRepositoryIngest(t *testing.T) {
+	first := time.Date(2026, 8, 27, 23, 59, 0, 0, time.UTC)
+	nextDay := first.Add(2 * time.Minute)
+	counts := collectRepositoryIngest(collector.SampleBatch{
+		AdditionalMetrics: []collector.MetricSample{{CollectedAt: first, Database: "DB1"}},
+		Performance: collector.PerformanceSamples{
+			SQL:              []collector.SQLSample{{CollectedAt: first, Database: "DB1"}},
+			SQLTexts:         []collector.SQLTextSample{{CollectedAt: first, Database: "DB1"}},
+			SQLPlans:         []collector.SQLPlanOperation{{CollectedAt: first, Database: "DB1"}},
+			Sessions:         []collector.SessionSample{{CollectedAt: nextDay, Database: "DB1"}},
+			BlockingSessions: []collector.BlockingSessionSample{{CollectedAt: nextDay, Database: "DB1"}},
+			DatabaseActivity: []collector.DatabaseActivitySample{{SampleTime: nextDay, Database: "DB2"}},
+		},
+		Operational: collector.OperationalSamples{
+			DatabaseStatus: []collector.DatabaseStatusSample{{CollectedAt: nextDay, Database: "DB1"}},
+			Instances:      []collector.InstanceSample{{CollectedAt: nextDay, Database: "DB1"}},
+			ResourceLimits: []collector.ResourceLimitSample{{CollectedAt: nextDay, Database: "DB1"}},
+			Tablespaces:    []collector.TablespaceSample{{CollectedAt: nextDay, Database: "DB1"}},
+			ASMDiskgroups:  []collector.ASMDiskgroupSample{{CollectedAt: nextDay, Database: "DB1"}},
+			SystemCounters: []collector.SystemCounterSample{{CollectedAt: nextDay, Database: "DB1"}},
+			WaitClasses:    []collector.WaitClassSample{{CollectedAt: nextDay, Database: "DB1"}},
+			SystemMetrics:  []collector.SystemMetricSample{{CollectedAt: nextDay, Database: "DB1"}},
+		},
+		ScrapeStatuses: []collector.ScrapeStatusSample{{CollectedAt: nextDay, Database: "DB1"}},
+	})
+
+	if len(counts) != 3 {
+		t.Fatalf("accounting groups = %d, want 3", len(counts))
+	}
+	firstEntry := counts[repositoryIngestKey{day: dayStartUTC(first), database: "DB1"}]
+	if firstEntry.additionalMetricRows != 1 || firstEntry.sqlSampleRows != 1 ||
+		firstEntry.sqlTextWrites != 1 || firstEntry.sqlPlanOperationWrites != 1 {
+		t.Fatalf("unexpected first-day counters: %+v", firstEntry)
+	}
+	if !firstEntry.lastSQLSampleAt.Equal(first) {
+		t.Fatalf("last SQL sample = %s, want %s", firstEntry.lastSQLSampleAt, first)
+	}
+
+	secondEntry := counts[repositoryIngestKey{day: dayStartUTC(nextDay), database: "DB1"}]
+	if secondEntry.sessionSampleRows != 1 || secondEntry.blockingSessionSampleRows != 1 ||
+		secondEntry.databaseStatusSampleRows != 1 || secondEntry.instanceSampleRows != 1 ||
+		secondEntry.resourceLimitSampleRows != 1 || secondEntry.tablespaceSampleRows != 1 ||
+		secondEntry.asmDiskgroupSampleRows != 1 || secondEntry.systemCounterSampleRows != 1 ||
+		secondEntry.waitClassSampleRows != 1 || secondEntry.systemMetricSampleRows != 1 ||
+		secondEntry.scrapeStatusRows != 1 {
+		t.Fatalf("unexpected second-day counters: %+v", secondEntry)
+	}
+	if !secondEntry.lastSessionSampleAt.Equal(nextDay) {
+		t.Fatalf("last session sample = %s, want %s", secondEntry.lastSessionSampleAt, nextDay)
+	}
+
+	activityEntry := counts[repositoryIngestKey{day: dayStartUTC(nextDay), database: "DB2"}]
+	if activityEntry.databaseActivitySampleRows != 1 ||
+		!activityEntry.lastDatabaseActivitySampleAt.Equal(nextDay) {
+		t.Fatalf("unexpected activity counters: %+v", activityEntry)
+	}
+}
+
+func TestRepositoryIngestCountsAddPreservesTimestamps(t *testing.T) {
+	first := time.Date(2026, 8, 27, 10, 0, 0, 0, time.UTC)
+	last := first.Add(time.Hour)
+	counts := repositoryIngestCounts{
+		sqlSampleRows:   2,
+		firstSampleAt:   last,
+		lastSampleAt:    last,
+		lastSQLSampleAt: last,
+	}
+	counts.add(repositoryIngestCounts{
+		sqlSampleRows:   3,
+		firstSampleAt:   first,
+		lastSampleAt:    first,
+		lastSQLSampleAt: first,
+	})
+	if counts.sqlSampleRows != 5 {
+		t.Fatalf("SQL rows = %d, want 5", counts.sqlSampleRows)
+	}
+	if !counts.firstSampleAt.Equal(first) || !counts.lastSampleAt.Equal(last) ||
+		!counts.lastSQLSampleAt.Equal(last) {
+		t.Fatalf("unexpected merged timestamps: %+v", counts)
+	}
+}
+
+func TestRepositoryIngestPostgreSQL(t *testing.T) {
+	url := os.Getenv("HARRY_POSTGRES_TEST_URL")
+	if url == "" {
+		t.Skip("HARRY_POSTGRES_TEST_URL is not set")
+	}
+	ctx := context.Background()
+	sink, err := New(ctx, slog.New(slog.NewTextHandler(io.Discard, nil)), collector.PostgreSQLConfig{URL: url})
+	if err != nil {
+		t.Fatalf("create PostgreSQL sink: %v", err)
+	}
+	defer sink.Close()
+
+	day := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
+	first := day.Add(time.Hour)
+	last := first.Add(time.Hour)
+	const database = "HARRY_REPOSITORY_INGEST_INTEGRATION_TEST"
+	key := repositoryIngestKey{day: day, database: database}
+	deleteQuery := "delete from " + sink.repositoryIngestTable.Sanitize() +
+		" where sample_day = $1 and source_database = $2"
+	if _, err := sink.pool.Exec(ctx, deleteQuery, day, database); err != nil {
+		t.Fatalf("reset repository accounting test row: %v", err)
+	}
+	defer func() {
+		if _, err := sink.pool.Exec(context.Background(), deleteQuery, day, database); err != nil {
+			t.Errorf("clean up repository accounting test row: %v", err)
+		}
+	}()
+	if err := sink.writeRepositoryIngest(ctx, map[repositoryIngestKey]repositoryIngestCounts{
+		key: {sqlSampleRows: 2, firstSampleAt: first, lastSampleAt: first, lastSQLSampleAt: first},
+	}, first); err != nil {
+		t.Fatalf("write first accounting batch: %v", err)
+	}
+	if err := sink.writeRepositoryIngest(ctx, map[repositoryIngestKey]repositoryIngestCounts{
+		key: {sqlSampleRows: 3, sessionSampleRows: 4, firstSampleAt: last, lastSampleAt: last, lastSessionSampleAt: last},
+	}, last); err != nil {
+		t.Fatalf("write second accounting batch: %v", err)
+	}
+
+	var sqlRows, sessionRows int64
+	var firstSampleAt, lastSampleAt time.Time
+	query := "select sql_sample_rows, session_sample_rows, first_sample_at, last_sample_at from " +
+		sink.repositoryIngestTable.Sanitize() + " where sample_day = $1 and source_database = $2"
+	if err := sink.pool.QueryRow(ctx, query, day, database).Scan(
+		&sqlRows, &sessionRows, &firstSampleAt, &lastSampleAt,
+	); err != nil {
+		t.Fatalf("read repository accounting: %v", err)
+	}
+	if sqlRows != 5 || sessionRows != 4 {
+		t.Fatalf("rows = sql:%d session:%d, want sql:5 session:4", sqlRows, sessionRows)
+	}
+	if !firstSampleAt.Equal(first) || !lastSampleAt.Equal(last) {
+		t.Fatalf("sample range = %s to %s, want %s to %s", firstSampleAt, lastSampleAt, first, last)
 	}
 }
 

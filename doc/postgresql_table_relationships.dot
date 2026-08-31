@@ -90,6 +90,10 @@ digraph postgresql_table_relationships {
     label="oracle_latest_scrape_status\l\lCurrent state (non-partitioned)\lcollected_at\lsource_database PK\lcollector PK\lsuccess\lduration_seconds\lsample_count\lerror_message\l"
   ];
 
+  harry_repository_daily_ingest [
+    label="harry_repository_daily_ingest\l\lPartitioned by RANGE (sample_day)\lsample_day PK\lsource_database PK\ladditional_metric_rows\lsql_sample_rows\lsql_text_writes\lsql_plan_operation_writes\lsession_sample_rows\lblocking_session_sample_rows\ldatabase_activity_sample_rows\ldatabase_status_sample_rows\linstance_sample_rows\lresource_limit_sample_rows\ltablespace_sample_rows\lasm_diskgroup_sample_rows\lsystem_counter_sample_rows\lwait_class_sample_rows\lsystem_metric_sample_rows\lscrape_status_rows\lfirst_sample_at\llast_sample_at\llast_sql_sample_at\llast_session_sample_at\llast_database_activity_sample_at\llast_flushed_at\l"
+  ];
+
   // Logical relationships used by dashboards and analysis queries.
   oracle_session_samples -> oracle_sql_samples [
     label="logical: source_database, sql_id, sql_child_number",
@@ -201,6 +205,18 @@ digraph postgresql_table_relationships {
 
   oracle_scrape_status -> oracle_latest_scrape_status [
     label="latest row upsert: source_database, collector",
+    color="#2f6f44"
+  ];
+
+  repository_ingest_sources [
+    shape=note,
+    fillcolor="#e4f2e4",
+    label="Successful writes to all sample,\lstatus, SQL text, and SQL plan datasets\l"
+  ];
+
+  repository_ingest_sources -> harry_repository_daily_ingest [
+    label="buffered accounting: UTC day, source_database, typed counters",
+    style=dashed,
     color="#2f6f44"
   ];
 }

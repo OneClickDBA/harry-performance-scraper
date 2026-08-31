@@ -66,8 +66,8 @@ are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
 
 Generator: github.com/google/go-licenses/v2@v2.0.1
-go.mod SHA-256: f487649ff0c7041cf9bb5cce78d4474c0f8cf4f2588189a8fc8414df2d6b36c4
-go.sum SHA-256: b21612416cc77176fe10bfcc836b1409341b907bc96290459cfc0c266caba1e7
+go.mod SHA-256: 374854cf99fad0e286140831aa610362bb953290f802f439e4cba6ed89bb3f19
+go.sum SHA-256: 385e5fc64545e99a9a3a5cbec3d763e3d20994775acf1ea026163a3b83c34e13
 
 ===============================================================================
 DEPENDENCY INVENTORY: ALL RELEASE VARIANTS
@@ -81,9 +81,9 @@ Covered builds:
 
 -------------------------------------------------------------------------------
 Dependency: github.com/Azure/azure-sdk-for-go/sdk/azcore
-Version: v1.22.0
+Version: v1.23.1
 License: MIT
-Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/azcore/v1.22.0/sdk/azcore/LICENSE.txt
+Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/azcore/v1.23.1/sdk/azcore/LICENSE.txt
 -------------------------------------------------------------------------------
 MIT License
 
@@ -110,9 +110,9 @@ SOFTWARE
 
 -------------------------------------------------------------------------------
 Dependency: github.com/Azure/azure-sdk-for-go/sdk/azidentity
-Version: v1.14.0
+Version: v1.14.1
 License: MIT
-Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/azidentity/v1.14.0/sdk/azidentity/LICENSE.txt
+Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/azidentity/v1.14.1/sdk/azidentity/LICENSE.txt
 -------------------------------------------------------------------------------
 MIT License
 
@@ -224,9 +224,9 @@ Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/security/keyvault/int
 
 -------------------------------------------------------------------------------
 Dependency: github.com/AzureAD/microsoft-authentication-library-for-go/apps
-Version: v1.7.2
+Version: v1.8.0
 License: MIT
-Source: https://github.com/AzureAD/microsoft-authentication-library-for-go/blob/v1.7.2/LICENSE
+Source: https://github.com/AzureAD/microsoft-authentication-library-for-go/blob/v1.8.0/LICENSE
 -------------------------------------------------------------------------------
     MIT License
 
@@ -783,9 +783,9 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.0
+Version: v0.51.4
 License: Apache-2.0
-Source: https://github.com/godror/godror/blob/v0.51.0/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1111,9 +1111,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.0
+Version: v0.51.4
 License: MIT
-Source: https://github.com/godror/godror/blob/v0.51.0/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1439,9 +1439,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.0
+Version: v0.51.4
 License: BSD-3-Clause
-Source: https://github.com/godror/godror/blob/v0.51.0/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1767,9 +1767,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.0
+Version: v0.51.4
 License: UPL-1.0
-Source: https://github.com/godror/godror/blob/v0.51.0/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -6451,9 +6451,9 @@ THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/oracle/oci-go-sdk/v65
-Version: v65.123.0
+Version: v65.124.0
 License: Apache-2.0
-Source: https://github.com/oracle/oci-go-sdk/blob/v65.123.0/LICENSE.txt
+Source: https://github.com/oracle/oci-go-sdk/blob/v65.124.0/LICENSE.txt
 -------------------------------------------------------------------------------
 Copyright (c) 2016, 2026, Oracle and/or its affiliates.  All rights reserved.
 This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
@@ -6561,9 +6561,9 @@ END OF TERMS AND CONDITIONS
 
 -------------------------------------------------------------------------------
 Dependency: github.com/oracle/oci-go-sdk/v65
-Version: v65.123.0
+Version: v65.124.0
 License: UPL-1.0
-Source: https://github.com/oracle/oci-go-sdk/blob/v65.123.0/LICENSE.txt
+Source: https://github.com/oracle/oci-go-sdk/blob/v65.124.0/LICENSE.txt
 -------------------------------------------------------------------------------
 Copyright (c) 2016, 2026, Oracle and/or its affiliates.  All rights reserved.
 This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
@@ -6997,9 +6997,9 @@ Source: https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/crypto
-Version: v0.52.0
+Version: v0.55.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/crypto/+/v0.52.0:LICENSE
+Source: https://cs.opensource.google/go/x/crypto/+/v0.55.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7032,9 +7032,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/net
-Version: v0.55.0
+Version: v0.58.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/net/+/v0.55.0:LICENSE
+Source: https://cs.opensource.google/go/x/net/+/v0.58.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7066,10 +7066,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 -------------------------------------------------------------------------------
-Dependency: golang.org/x/sync/semaphore
-Version: v0.20.0
+Dependency: golang.org/x/sync
+Version: v0.22.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/sync/+/v0.20.0:LICENSE
+Source: https://cs.opensource.google/go/x/sync/+/v0.22.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7102,9 +7102,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/sys/unix
-Version: v0.45.0
+Version: v0.47.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/sys/+/v0.45.0:LICENSE
+Source: https://cs.opensource.google/go/x/sys/+/v0.47.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7137,9 +7137,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/text
-Version: v0.37.0
+Version: v0.41.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/text/+/v0.37.0:LICENSE
+Source: https://cs.opensource.google/go/x/text/+/v0.41.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7271,9 +7271,9 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/sys/windows
-Version: v0.45.0
+Version: v0.47.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/sys/+/v0.45.0:LICENSE
+Source: https://cs.opensource.google/go/x/sys/+/v0.47.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 

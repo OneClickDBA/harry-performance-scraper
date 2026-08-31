@@ -68,8 +68,12 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "SQL preview"
+              },
+              {
                 "id": "custom.width",
-                "value": 560
+                "value": 420
               }
             ]
           },
@@ -90,8 +94,188 @@
                 ]
               },
               {
+                "id": "displayName",
+                "value": "SQL ID"
+              },
+              {
                 "id": "custom.width",
-                "value": 145
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child_number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Child"
+              },
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_hash_value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plan hash"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "elapsed_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Elapsed s"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cpu_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CPU s"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user_io_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "User I/O s"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "executions_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Executions"
+              },
+              {
+                "id": "custom.width",
+                "value": 92
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "buffer_gets_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Buffer gets"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "disk_reads_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Disk reads"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "parsing_schema_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Schema"
+              },
+              {
+                "id": "custom.width",
+                "value": 125
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "module"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Module"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
               }
             ]
           }
@@ -183,8 +367,12 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "SQL preview"
+              },
+              {
                 "id": "custom.width",
-                "value": 560
+                "value": 420
               }
             ]
           },
@@ -205,8 +393,188 @@
                 ]
               },
               {
+                "id": "displayName",
+                "value": "SQL ID"
+              },
+              {
                 "id": "custom.width",
-                "value": 145
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child_number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Child"
+              },
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_hash_value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plan hash"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "elapsed_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Elapsed s"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cpu_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CPU s"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user_io_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "User I/O s"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "executions_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Executions"
+              },
+              {
+                "id": "custom.width",
+                "value": 92
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "buffer_gets_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Buffer gets"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "disk_reads_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Disk reads"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "parsing_schema_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Schema"
+              },
+              {
+                "id": "custom.width",
+                "value": 125
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "module"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Module"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
               }
             ]
           }
@@ -298,8 +666,12 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "SQL preview"
+              },
+              {
                 "id": "custom.width",
-                "value": 560
+                "value": 420
               }
             ]
           },
@@ -320,8 +692,188 @@
                 ]
               },
               {
+                "id": "displayName",
+                "value": "SQL ID"
+              },
+              {
                 "id": "custom.width",
-                "value": 145
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child_number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Child"
+              },
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_hash_value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plan hash"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "elapsed_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Elapsed s"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cpu_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CPU s"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user_io_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "User I/O s"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "executions_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Executions"
+              },
+              {
+                "id": "custom.width",
+                "value": 92
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "buffer_gets_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Buffer gets"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "disk_reads_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Disk reads"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "parsing_schema_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Schema"
+              },
+              {
+                "id": "custom.width",
+                "value": 125
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "module"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Module"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
               }
             ]
           }
@@ -413,8 +965,12 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "SQL preview"
+              },
+              {
                 "id": "custom.width",
-                "value": 560
+                "value": 420
               }
             ]
           },
@@ -435,8 +991,172 @@
                 ]
               },
               {
+                "id": "displayName",
+                "value": "SQL ID"
+              },
+              {
                 "id": "custom.width",
-                "value": 145
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child_number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Child"
+              },
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_hash_value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plan hash"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "executions_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Executions"
+              },
+              {
+                "id": "custom.width",
+                "value": 92
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rows_processed_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Rows"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "elapsed_seconds_per_exec"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "s / exec"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "buffer_gets_per_row"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Gets / row"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "disk_reads_per_exec"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Reads / exec"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "parsing_schema_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Schema"
+              },
+              {
+                "id": "custom.width",
+                "value": 125
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "module"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Module"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
               }
             ]
           }
@@ -516,14 +1236,14 @@
           "type": "postgres",
           "uid": "PostgreSQL"
         },
-        "definition": "select distinct source_database from oracle_sql_samples order by 1;",
+        "definition": "select source_database from oracle_latest_scrape_status where collector = 'scheduled' order by source_database;",
         "hide": 0,
         "includeAll": false,
         "label": "Source Database",
         "multi": false,
         "name": "source_database",
         "options": [],
-        "query": "select distinct source_database from oracle_sql_samples order by 1;",
+        "query": "select source_database from oracle_latest_scrape_status where collector = 'scheduled' order by source_database;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

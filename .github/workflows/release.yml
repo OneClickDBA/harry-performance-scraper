@@ -82,7 +82,7 @@ jobs:
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
 
       - name: Set up Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -130,7 +130,7 @@ jobs:
           ref: ${{ needs.validate.outputs.tag }}
 
       - name: Set up Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -166,7 +166,7 @@ jobs:
           fi
 
       - name: Upload release archive
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-goora-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
@@ -205,28 +205,35 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          rootfs="build/rootfs"
+          binary_dir="$(mktemp -d "${RUNNER_TEMP}/harry-release-${EL}-${ARCH}.XXXXXX")"
           name="harry-scraper-${VERSION}-linux-${ARCH}-godror-el${EL}"
           package_dir="dist/${name}"
 
+          # Older signed tags predate the binary-only export stage. Add it to
+          # the build recipe without changing the tagged application source.
+          if ! grep -q '^FROM scratch AS release-binary$' Dockerfile; then
+            printf '\nFROM scratch AS release-binary\n\nCOPY --from=build /tmp/harry-scraper /harry-scraper\n' \
+              >> Dockerfile
+          fi
+
           docker buildx build \
             --platform "linux/${ARCH}" \
-            --target build \
+            --target release-binary \
             --build-arg "BASE_IMAGE=ghcr.io/oracle/oraclelinux:${EL}-slim" \
             --build-arg "VERSION=${VERSION}" \
             --build-arg "TAGS=godror" \
             --build-arg "CGO_ENABLED=1" \
-            --output "type=local,dest=${rootfs}" \
+            --output "type=local,dest=${binary_dir}" \
             .
 
           mkdir -p "${package_dir}"
-          cp "${rootfs}/tmp/harry-scraper" "${package_dir}/"
+          cp "${binary_dir}/harry-scraper" "${package_dir}/"
           cp README.md LICENSE.txt THIRD_PARTY_LICENSES.txt TRADEMARKS.md \
             "${package_dir}/"
           tar -C dist -czf "dist/${name}.tar.gz" "${name}"
 
       - name: Upload release archive
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-godror-el${{ matrix.el }}-${{ matrix.arch }}
           path: dist/*.tar.gz
