@@ -154,6 +154,13 @@ type operationalCounterSnapshot struct {
 	value       int64
 }
 
+type operationalCounterRow struct {
+	instID int64
+	conID  int64
+	name   string
+	value  int64
+}
+
 func (e *Scraper) shouldCollectOperational(database string, collectedAt time.Time) bool {
 	if e.MetricsConfiguration == nil || !e.Operational.GetEnabled() {
 		return false
@@ -188,6 +195,31 @@ func (e *Scraper) operationalDelta(key operationalCounterKey, collectedAt time.T
 	}
 	delta := value - previous.value
 	return &delta, &interval, false
+}
+
+func (e *Scraper) scrapeOperationalCounterRows(
+	ctx context.Context,
+	d *Database,
+	collectedAt time.Time,
+	query string,
+	kind string,
+	appendSample func(operationalCounterRow, *int64, *float64, bool),
+) (int, error) {
+	count := 0
+	err := queryOperationalRows(ctx, d, query, func(rows *sql.Rows) error {
+		var row operationalCounterRow
+		if err := rows.Scan(&row.instID, &row.conID, &row.name, &row.value); err != nil {
+			return err
+		}
+		key := operationalCounterKey{
+			database: d.Name, kind: kind, instID: row.instID, conID: row.conID, name: row.name,
+		}
+		delta, interval, reset := e.operationalDelta(key, collectedAt, row.value)
+		appendSample(row, delta, interval, reset)
+		count++
+		return nil
+	})
+	return count, err
 }
 
 func (e *Scraper) ScrapeOperationalSamples(d *Database, collectedAt time.Time) (OperationalSamples, []ScrapeStatusSample, error) {
@@ -370,40 +402,27 @@ func (e *Scraper) scrapeASMDiskgroups(ctx context.Context, d *Database, collecte
 }
 
 func (e *Scraper) scrapeSystemCounters(ctx context.Context, d *Database, collectedAt time.Time, out *OperationalSamples) (int, error) {
-	before := len(out.SystemCounters)
-	err := queryOperationalRows(ctx, d, systemCounterOperationalQuery, func(rows *sql.Rows) error {
-		var sample SystemCounterSample
-		if err := rows.Scan(&sample.InstID, &sample.ConID, &sample.StatName, &sample.CumulativeValue); err != nil {
-			return err
-		}
-		sample.CollectedAt, sample.Database = collectedAt, d.Name
-		key := operationalCounterKey{
-			database: d.Name, kind: "system", instID: sample.InstID, conID: sample.ConID, name: sample.StatName,
-		}
-		sample.DeltaValue, sample.IntervalSeconds, sample.CounterReset = e.operationalDelta(key, collectedAt, sample.CumulativeValue)
-		out.SystemCounters = append(out.SystemCounters, sample)
-		return nil
+	return e.scrapeOperationalCounterRows(ctx, d, collectedAt, systemCounterOperationalQuery, "system", func(
+		row operationalCounterRow, delta *int64, interval *float64, reset bool,
+	) {
+		out.SystemCounters = append(out.SystemCounters, SystemCounterSample{
+			CollectedAt: collectedAt, Database: d.Name, InstID: row.instID, ConID: row.conID,
+			StatName: row.name, CumulativeValue: row.value, DeltaValue: delta,
+			IntervalSeconds: interval, CounterReset: reset,
+		})
 	})
-	return len(out.SystemCounters) - before, err
 }
 
 func (e *Scraper) scrapeWaitClasses(ctx context.Context, d *Database, collectedAt time.Time, out *OperationalSamples) (int, error) {
-	before := len(out.WaitClasses)
-	err := queryOperationalRows(ctx, d, waitClassOperationalQuery, func(rows *sql.Rows) error {
-		var sample WaitClassSample
-		if err := rows.Scan(&sample.InstID, &sample.ConID, &sample.WaitClass, &sample.CumulativeWaitMicro); err != nil {
-			return err
-		}
-		sample.CollectedAt, sample.Database = collectedAt, d.Name
-		key := operationalCounterKey{
-			database: d.Name, kind: "wait", instID: sample.InstID, conID: sample.ConID, name: sample.WaitClass,
-		}
-		sample.DeltaWaitMicro, sample.IntervalSeconds, sample.CounterReset =
-			e.operationalDelta(key, collectedAt, sample.CumulativeWaitMicro)
-		out.WaitClasses = append(out.WaitClasses, sample)
-		return nil
+	return e.scrapeOperationalCounterRows(ctx, d, collectedAt, waitClassOperationalQuery, "wait", func(
+		row operationalCounterRow, delta *int64, interval *float64, reset bool,
+	) {
+		out.WaitClasses = append(out.WaitClasses, WaitClassSample{
+			CollectedAt: collectedAt, Database: d.Name, InstID: row.instID, ConID: row.conID,
+			WaitClass: row.name, CumulativeWaitMicro: row.value, DeltaWaitMicro: delta,
+			IntervalSeconds: interval, CounterReset: reset,
+		})
 	})
-	return len(out.WaitClasses) - before, err
 }
 
 func (e *Scraper) scrapeSystemMetrics(ctx context.Context, d *Database, collectedAt time.Time, out *OperationalSamples) (int, error) {
