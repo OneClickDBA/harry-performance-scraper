@@ -191,7 +191,7 @@
     {
       "datasource": {"type": "postgres", "uid": "PostgreSQL"},
       "description": "Latest accounting flush and dataset-specific sample timestamps. Accounting flushes every five minutes; stale values indicate PostgreSQL writes, scraper lifecycle, or collector output should be investigated.",
-      "fieldConfig": {"defaults": {"custom": {"align": "auto", "displayMode": "auto", "inspect": false}}, "overrides": [{"matcher": {"id": "byName", "options": "flush_age_seconds"}, "properties": [{"id": "unit", "value": "s"}, {"id": "decimals", "value": 0}]}, {"matcher": {"id": "byName", "options": "today_rows"}, "properties": [{"id": "unit", "value": "short"}]}]},
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "displayMode": "auto", "inspect": false}}, "overrides": [{"matcher": {"id": "byName", "options": "source_database"}, "properties": [{"id": "displayName", "value": "Database"}, {"id": "custom.width", "value": 130}]}, {"matcher": {"id": "byName", "options": "flush_age_seconds"}, "properties": [{"id": "unit", "value": "s"}, {"id": "decimals", "value": 0}]}, {"matcher": {"id": "byName", "options": "today_rows"}, "properties": [{"id": "unit", "value": "short"}]}]},
       "gridPos": {"h": 10, "w": 8, "x": 16, "y": 35},
       "id": 25,
       "options": {"footer": {"enablePagination": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true, "sortBy": [{"desc": true, "displayName": "flush_age_seconds"}]},
@@ -287,7 +287,7 @@
     {
       "datasource": {"type": "postgres", "uid": "PostgreSQL"},
       "description": "Previous complete UTC day compared with the preceding seven complete days. DROP and SURGE are operational review signals; workload schedules and weekends can legitimately change ingestion volume.",
-      "fieldConfig": {"defaults": {"custom": {"align": "auto", "displayMode": "auto", "inspect": false}}, "overrides": [{"matcher": {"id": "byName", "options": "total_change_pct"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 1}]}, {"matcher": {"id": "byName", "options": "sql_change_pct"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 1}]}, {"matcher": {"id": "byName", "options": "review_signal"}, "properties": [{"id": "mappings", "value": [{"options": {"DROP": {"color": "red", "text": "DROP"}, "NORMAL": {"color": "green", "text": "NORMAL"}, "SURGE": {"color": "yellow", "text": "SURGE"}}, "type": "value"}]}]}]},
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "displayMode": "auto", "inspect": false}}, "overrides": [{"matcher": {"id": "byName", "options": "source_database"}, "properties": [{"id": "displayName", "value": "Database"}, {"id": "custom.width", "value": 130}]}, {"matcher": {"id": "byName", "options": "total_change_pct"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 1}]}, {"matcher": {"id": "byName", "options": "sql_change_pct"}, "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 1}]}, {"matcher": {"id": "byName", "options": "review_signal"}, "properties": [{"id": "mappings", "value": [{"options": {"DROP": {"color": "red", "text": "DROP"}, "NORMAL": {"color": "green", "text": "NORMAL"}, "SURGE": {"color": "yellow", "text": "SURGE"}}, "type": "value"}]}]}]},
       "gridPos": {"h": 11, "w": 16, "x": 0, "y": 75},
       "id": 26,
       "options": {"footer": {"enablePagination": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true, "sortBy": [{"desc": false, "displayName": "review_signal"}]},

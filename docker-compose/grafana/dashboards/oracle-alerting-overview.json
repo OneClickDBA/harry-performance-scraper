@@ -152,6 +152,14 @@
                     "url": "/d/oracle-operational-overview/oracle-operational-overview?${__url_time_range}&var-source_database=${__value.raw}"
                   }
                 ]
+              },
+              {
+                "id": "displayName",
+                "value": "Database"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
               }
             ]
           },
@@ -300,6 +308,14 @@
                     "url": "/d/oracle-operational-overview/oracle-operational-overview?${__url_time_range}&var-source_database=${__value.raw}"
                   }
                 ]
+              },
+              {
+                "id": "displayName",
+                "value": "Database"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
               }
             ]
           },
@@ -468,6 +484,30 @@
                     "url": "/d/oracle-operational-overview/oracle-operational-overview?${__url_time_range}&var-source_database=${__value.raw}"
                   }
                 ]
+              },
+              {
+                "id": "displayName",
+                "value": "Database"
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
               }
             ]
           }
@@ -618,6 +658,14 @@
                     "url": "/d/oracle-operational-overview/oracle-operational-overview?${__url_time_range}&var-source_database=${__value.raw}"
                   }
                 ]
+              },
+              {
+                "id": "displayName",
+                "value": "Database"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
               }
             ]
           },
@@ -642,6 +690,22 @@
               {
                 "id": "unit",
                 "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
               }
             ]
           }

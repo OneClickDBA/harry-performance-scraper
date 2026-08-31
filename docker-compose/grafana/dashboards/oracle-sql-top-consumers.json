@@ -951,7 +951,168 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SQL ID"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child_number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Child"
+              },
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_hash_value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plan hash"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "first_seen"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "First seen"
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_seen"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Last seen"
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "samples"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Samples"
+              },
+              {
+                "id": "custom.width",
+                "value": 75
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "executions_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Executions"
+              },
+              {
+                "id": "custom.width",
+                "value": 92
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "elapsed_seconds_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Elapsed s"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_status"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plan"
+              },
+              {
+                "id": "custom.width",
+                "value": 145
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -1075,6 +1236,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Access predicates"
+              },
+              {
                 "id": "custom.width",
                 "value": 360
               }
@@ -1087,6 +1252,10 @@
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Filter predicates"
+              },
+              {
                 "id": "custom.width",
                 "value": 360
               }
@@ -1098,10 +1267,6 @@
               "options": "plan_operation"
             },
             "properties": [
-              {
-                "id": "custom.width",
-                "value": 420
-              },
               {
                 "id": "custom.cellOptions",
                 "value": {
@@ -1236,6 +1401,14 @@
               {
                 "id": "custom.displayMode",
                 "value": "color-text"
+              },
+              {
+                "id": "displayName",
+                "value": "Operation"
+              },
+              {
+                "id": "custom.width",
+                "value": 420
               }
             ]
           },
@@ -1245,10 +1418,6 @@
               "options": "review_signal"
             },
             "properties": [
-              {
-                "id": "custom.width",
-                "value": 180
-              },
               {
                 "id": "custom.cellOptions",
                 "value": {
@@ -1303,6 +1472,238 @@
               {
                 "id": "custom.displayMode",
                 "value": "color-background"
+              },
+              {
+                "id": "displayName",
+                "value": "Review"
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child_number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Child"
+              },
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "plan_hash_value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Plan hash"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Step"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "parent_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Parent"
+              },
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "object"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Object"
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "object_type"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Object type"
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Cost"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "estimated_rows"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Est. rows"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "estimated_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Est. bytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "temp_space"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Temp bytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "partition_start"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Part. start"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "partition_stop"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Part. stop"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_referenced_at"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Last referenced"
+              },
+              {
+                "id": "custom.width",
+                "value": 155
               }
             ]
           }
