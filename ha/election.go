@@ -49,6 +49,12 @@ func New(logger *slog.Logger, url, scope string, retryInterval, validationInterv
 	if err != nil {
 		return nil, fmt.Errorf("parse PostgreSQL URL for HA: %w", err)
 	}
+	if connectionConfig.RuntimeParams == nil {
+		connectionConfig.RuntimeParams = make(map[string]string)
+	}
+	if _, configured := connectionConfig.RuntimeParams["application_name"]; !configured {
+		connectionConfig.RuntimeParams["application_name"] = "harry-scraper-ha"
+	}
 	return &Elector{
 		logger:             logger,
 		connectionConfig:   connectionConfig,

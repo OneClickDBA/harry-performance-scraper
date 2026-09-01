@@ -41,3 +41,34 @@ func TestNewAcceptsMultiHostConnectionStrings(t *testing.T) {
 		}
 	}
 }
+
+func TestNewSetsDefaultApplicationNameWithoutOverridingConfiguration(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	tests := []struct {
+		name             string
+		connectionString string
+		want             string
+	}{
+		{
+			name:             "default",
+			connectionString: "postgresql://harry_monitoring:secret@localhost/harry_monitoring",
+			want:             "harry-scraper-ha",
+		},
+		{
+			name:             "configured",
+			connectionString: "postgresql://harry_monitoring:secret@localhost/harry_monitoring?application_name=custom-ha",
+			want:             "custom-ha",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			elector, err := New(logger, tt.connectionString, "default", 5*time.Second, 2*time.Second)
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			if got := elector.connectionConfig.RuntimeParams["application_name"]; got != tt.want {
+				t.Fatalf("application_name = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

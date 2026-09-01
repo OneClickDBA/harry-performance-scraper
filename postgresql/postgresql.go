@@ -64,7 +64,16 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 	poolConfig.MaxConns = cfg.GetMaxConns()
 	poolConfig.MinConns = cfg.GetMinConns()
 	poolConfig.MaxConnLifetime = cfg.GetConnMaxLifetime()
+	if poolConfig.ConnConfig.RuntimeParams == nil {
+		poolConfig.ConnConfig.RuntimeParams = make(map[string]string)
+	}
+	if _, configured := poolConfig.ConnConfig.RuntimeParams["application_name"]; !configured {
+		poolConfig.ConnConfig.RuntimeParams["application_name"] = "harry-scraper"
+	}
 
+	logger.Info("Initializing PostgreSQL repository",
+		"auto_migrate", cfg.GetAutoMigrate(),
+		"retention", cfg.GetRetention())
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create postgresql pool: %w", err)
@@ -97,17 +106,28 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 		ingestFlushInterval:     repositoryIngestFlushInterval,
 	}
 
+	pingStarted := time.Now()
+	logger.Info("Connecting to PostgreSQL repository")
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("ping postgresql: %w", err)
 	}
+	logger.Info("Connected to PostgreSQL repository", "duration", time.Since(pingStarted))
 	if cfg.GetAutoMigrate() {
+		migrationStarted := time.Now()
+		logger.Info("Starting PostgreSQL schema migration")
 		if err := s.Migrate(ctx); err != nil {
 			pool.Close()
 			return nil, err
 		}
+		logger.Info("Completed PostgreSQL schema migration", "duration", time.Since(migrationStarted))
+	} else {
+		logger.Info("PostgreSQL automatic schema migration is disabled")
 	}
+	cleanupStarted := time.Now()
+	logger.Info("Starting PostgreSQL retention cleanup", "retention", s.retention)
 	s.cleanupRetention(ctx)
+	logger.Info("Finished PostgreSQL retention cleanup", "duration", time.Since(cleanupStarted))
 	return s, nil
 }
 
@@ -330,9 +350,12 @@ create index if not exists oracle_database_activity_samples_source_idx on %s (so
 		databaseActivity, databaseActivity, databaseActivity, databaseActivity, databaseActivity,
 		databaseActivity, databaseActivity, databaseActivity, databaseActivity)
 
+	coreStarted := time.Now()
+	s.logger.Info("Applying PostgreSQL core schema DDL")
 	if _, err := s.pool.Exec(ctx, ddl); err != nil {
 		return fmt.Errorf("migrate postgresql schema: %w", err)
 	}
+	s.logger.Info("Applied PostgreSQL core schema DDL", "duration", time.Since(coreStarted))
 	if err := s.migrateRepositoryIngestSchema(ctx); err != nil {
 		return err
 	}
@@ -340,9 +363,12 @@ create index if not exists oracle_database_activity_samples_source_idx on %s (so
 }
 
 func (s *Sink) migrateRepositoryIngestSchema(ctx context.Context) error {
+	started := time.Now()
+	s.logger.Info("Applying PostgreSQL repository ingest schema DDL")
 	if _, err := s.pool.Exec(ctx, s.repositoryIngestSchemaDDL()); err != nil {
 		return fmt.Errorf("migrate PostgreSQL repository ingest schema: %w", err)
 	}
+	s.logger.Info("Applied PostgreSQL repository ingest schema DDL", "duration", time.Since(started))
 	return nil
 }
 
@@ -379,6 +405,8 @@ create table if not exists %s (
 }
 
 func (s *Sink) migrateOperationalSchema(ctx context.Context) error {
+	started := time.Now()
+	s.logger.Info("Starting PostgreSQL operational schema migration")
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin PostgreSQL operational schema migration: %w", err)
@@ -390,9 +418,12 @@ func (s *Sink) migrateOperationalSchema(ctx context.Context) error {
 		return err
 	}
 	ddl := s.operationalSchemaDDL()
+	ddlStarted := time.Now()
+	s.logger.Info("Applying PostgreSQL operational schema DDL")
 	if _, err := tx.Exec(ctx, ddl); err != nil {
 		return fmt.Errorf("migrate PostgreSQL operational schema: %w", err)
 	}
+	s.logger.Info("Applied PostgreSQL operational schema DDL", "duration", time.Since(ddlStarted))
 	if err := s.restoreLatestScrapeStatusGrants(ctx, tx, selectGrants); err != nil {
 		return err
 	}
@@ -404,6 +435,7 @@ func (s *Sink) migrateOperationalSchema(ctx context.Context) error {
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit PostgreSQL operational schema migration: %w", err)
 	}
+	s.logger.Info("Completed PostgreSQL operational schema migration", "duration", time.Since(started))
 	return nil
 }
 
@@ -419,18 +451,24 @@ select c.relkind::text
 from pg_catalog.pg_class c
 where c.oid = to_regclass($1)`, s.latestScrapeStatusTable.Sanitize()).Scan(&relationKind)
 	if errors.Is(err, pgx.ErrNoRows) {
+		s.logger.Info("PostgreSQL latest scrape status relation does not exist; creating table",
+			"relation", s.latestScrapeStatusTable.Sanitize())
 		return true, nil, nil
 	}
 	if err != nil {
 		return false, nil, fmt.Errorf("inspect legacy latest scrape status relation: %w", err)
 	}
 	if relationKind == "r" || relationKind == "p" {
+		s.logger.Info("PostgreSQL latest scrape status relation is already a table",
+			"relation", s.latestScrapeStatusTable.Sanitize())
 		return false, nil, nil
 	}
 	if relationKind != "v" {
 		return false, nil, fmt.Errorf("cannot migrate %s: expected a view or table, found PostgreSQL relkind %q",
 			s.latestScrapeStatusTable.Sanitize(), relationKind)
 	}
+	s.logger.Info("Converting legacy PostgreSQL latest scrape status view to a table",
+		"relation", s.latestScrapeStatusTable.Sanitize())
 	rows, err := tx.Query(ctx, `
 select
 	case when acl.grantee = 0 then 'PUBLIC' else pg_get_userbyid(acl.grantee) end,
@@ -456,9 +494,13 @@ where c.oid = to_regclass($1)
 		return false, nil, fmt.Errorf("read legacy latest scrape status grants: %w", err)
 	}
 	rows.Close()
+	s.logger.Info("Dropping legacy PostgreSQL latest scrape status view",
+		"relation", s.latestScrapeStatusTable.Sanitize())
 	if _, err := tx.Exec(ctx, fmt.Sprintf("drop view %s", s.latestScrapeStatusTable.Sanitize())); err != nil {
 		return false, nil, fmt.Errorf("drop legacy latest scrape status view: %w", err)
 	}
+	s.logger.Info("Dropped legacy PostgreSQL latest scrape status view",
+		"relation", s.latestScrapeStatusTable.Sanitize())
 	return true, grants, nil
 }
 
@@ -480,6 +522,10 @@ func (s *Sink) restoreLatestScrapeStatusGrants(ctx context.Context, tx pgx.Tx, g
 }
 
 func (s *Sink) backfillLatestScrapeStatus(ctx context.Context, tx pgx.Tx) error {
+	started := time.Now()
+	s.logger.Info("Backfilling PostgreSQL latest scrape status table",
+		"source_relation", s.scrapeStatusTable.Sanitize(),
+		"target_relation", s.latestScrapeStatusTable.Sanitize())
 	query := fmt.Sprintf(`
 insert into %s (
 	collected_at, source_database, collector, success, duration_seconds, sample_count, error_message
@@ -498,9 +544,13 @@ where excluded.collected_at >= %s.collected_at`,
 		s.latestScrapeStatusTable.Sanitize(),
 		s.scrapeStatusTable.Sanitize(),
 		s.latestScrapeStatusTable.Sanitize())
-	if _, err := tx.Exec(ctx, query); err != nil {
+	result, err := tx.Exec(ctx, query)
+	if err != nil {
 		return fmt.Errorf("backfill latest scrape status table: %w", err)
 	}
+	s.logger.Info("Backfilled PostgreSQL latest scrape status table",
+		"rows", result.RowsAffected(),
+		"duration", time.Since(started))
 	return nil
 }
 
