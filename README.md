@@ -32,6 +32,7 @@ directly to PostgreSQL and exposes only small health and readiness endpoints.
 - Bounded SQL text and execution-plan collection from `GV$SQL` and
   `GV$SQL_PLAN`.
 - PostgreSQL range-partitioned storage with automatic retention.
+- Native scheduler, Oracle collection, and PostgreSQL write-pressure telemetry.
 - PostgreSQL-backed active/standby operation using advisory-lock leader election.
 - Grafana dashboards and PostgreSQL-backed operational alerts.
 - Optional user-defined additional metrics from TOML or YAML definitions.

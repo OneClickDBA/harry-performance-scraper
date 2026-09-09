@@ -19,16 +19,18 @@ import (
 func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
 	sqlSamples := pgx.Identifier{"monitoring", "oracle_sql_samples"}
 	sink := &Sink{
-		databaseStatusTable:     siblingIdentifier(sqlSamples, "oracle_database_status_samples"),
-		instanceTable:           siblingIdentifier(sqlSamples, "oracle_instance_samples"),
-		resourceLimitTable:      siblingIdentifier(sqlSamples, "oracle_resource_limit_samples"),
-		tablespaceTable:         siblingIdentifier(sqlSamples, "oracle_tablespace_samples"),
-		asmDiskgroupTable:       siblingIdentifier(sqlSamples, "oracle_asm_diskgroup_samples"),
-		systemCounterTable:      siblingIdentifier(sqlSamples, "oracle_system_counter_samples"),
-		waitClassTable:          siblingIdentifier(sqlSamples, "oracle_wait_class_samples"),
-		systemMetricTable:       siblingIdentifier(sqlSamples, "oracle_system_metric_samples"),
-		scrapeStatusTable:       siblingIdentifier(sqlSamples, "oracle_scrape_status"),
-		latestScrapeStatusTable: siblingIdentifier(sqlSamples, "oracle_latest_scrape_status"),
+		databaseStatusTable:      siblingIdentifier(sqlSamples, "oracle_database_status_samples"),
+		instanceTable:            siblingIdentifier(sqlSamples, "oracle_instance_samples"),
+		resourceLimitTable:       siblingIdentifier(sqlSamples, "oracle_resource_limit_samples"),
+		tablespaceTable:          siblingIdentifier(sqlSamples, "oracle_tablespace_samples"),
+		asmDiskgroupTable:        siblingIdentifier(sqlSamples, "oracle_asm_diskgroup_samples"),
+		systemCounterTable:       siblingIdentifier(sqlSamples, "oracle_system_counter_samples"),
+		waitClassTable:           siblingIdentifier(sqlSamples, "oracle_wait_class_samples"),
+		systemMetricTable:        siblingIdentifier(sqlSamples, "oracle_system_metric_samples"),
+		scrapeStatusTable:        siblingIdentifier(sqlSamples, "oracle_scrape_status"),
+		latestScrapeStatusTable:  siblingIdentifier(sqlSamples, "oracle_latest_scrape_status"),
+		runtimeSamplesTable:      siblingIdentifier(sqlSamples, "harry_runtime_samples"),
+		latestRuntimeStatusTable: siblingIdentifier(sqlSamples, "harry_latest_runtime_status"),
 	}
 	ddl := sink.operationalSchemaDDL()
 	if strings.Contains(ddl, "%!") {
@@ -59,6 +61,70 @@ func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
 	}
 	if !strings.Contains(ddl, "primary key (source_database, collector)") {
 		t.Fatalf("latest scrape status table does not define its expected primary key")
+	}
+}
+
+func TestRuntimeSchemaDDL(t *testing.T) {
+	sink := &Sink{
+		runtimeSamplesTable:      pgx.Identifier{"monitoring", "harry_runtime_samples"},
+		latestRuntimeStatusTable: pgx.Identifier{"monitoring", "harry_latest_runtime_status"},
+	}
+	ddl := sink.runtimeSchemaDDL()
+	if strings.Contains(ddl, "%!") {
+		t.Fatalf("runtime DDL contains an unresolved format directive: %s", ddl)
+	}
+	for _, expected := range []string{
+		"create table if not exists \"monitoring\".\"harry_runtime_samples\"",
+		"partition by range (observed_at)",
+		"create table if not exists \"monitoring\".\"harry_latest_runtime_status\"",
+		"primary key (ha_scope, scheduler)",
+		"postgresql_write_duration_seconds double precision not null",
+		"missed_intervals bigint not null",
+	} {
+		if !strings.Contains(ddl, expected) {
+			t.Fatalf("runtime DDL does not contain %q", expected)
+		}
+	}
+}
+
+func TestRuntimeQueuePreservesOrderAndIsDrained(t *testing.T) {
+	sink := &Sink{}
+	first := collector.RuntimeSample{Scheduler: "activity"}
+	second := collector.RuntimeSample{Scheduler: "scheduled"}
+	sink.queueRuntime(first, second)
+
+	got := sink.takePendingRuntime(true)
+	if len(got) != 2 || got[0].Scheduler != "activity" || got[1].Scheduler != "scheduled" {
+		t.Fatalf("unexpected runtime queue: %+v", got)
+	}
+	if remaining := sink.takePendingRuntime(true); len(remaining) != 0 {
+		t.Fatalf("runtime queue was not drained: %+v", remaining)
+	}
+}
+
+func TestRequeueRuntimePlacesFailedBatchBeforeNewSamples(t *testing.T) {
+	sink := &Sink{}
+	sink.queueRuntime(collector.RuntimeSample{Scheduler: "new"})
+	sink.requeueRuntime([]collector.RuntimeSample{{Scheduler: "failed"}})
+
+	got := sink.takePendingRuntime(true)
+	if len(got) != 2 || got[0].Scheduler != "failed" || got[1].Scheduler != "new" {
+		t.Fatalf("unexpected requeued runtime samples: %+v", got)
+	}
+}
+
+func TestRuntimeQueueFlushInterval(t *testing.T) {
+	sink := &Sink{runtimeFlushInterval: time.Hour}
+	sink.queueRuntime(collector.RuntimeSample{Scheduler: "first"})
+	if got := sink.takePendingRuntime(false); len(got) != 1 {
+		t.Fatalf("initial runtime flush returned %d samples, want 1", len(got))
+	}
+	sink.queueRuntime(collector.RuntimeSample{Scheduler: "second"})
+	if got := sink.takePendingRuntime(false); len(got) != 0 {
+		t.Fatalf("runtime flush inside interval returned %d samples, want 0", len(got))
+	}
+	if got := sink.takePendingRuntime(true); len(got) != 1 || got[0].Scheduler != "second" {
+		t.Fatalf("forced runtime flush returned unexpected samples: %+v", got)
 	}
 }
 

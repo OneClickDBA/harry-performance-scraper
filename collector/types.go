@@ -19,6 +19,7 @@ type Scraper struct {
 	scrapeRequests          chan struct{}
 	databases               []*Database
 	logger                  *slog.Logger
+	instanceName            string
 	allConstLabels          []string
 	planCacheMu             sync.Mutex
 	lastSQLDetailCollection map[string]time.Time
