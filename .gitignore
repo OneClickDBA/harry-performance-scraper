@@ -21,3 +21,4 @@ minikube_tests.sh
 /docs/
 /site/
 db-sample-schemas-23.3/
+prepare_dev_tar.sh
