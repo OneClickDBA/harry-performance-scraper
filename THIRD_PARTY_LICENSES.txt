@@ -66,8 +66,8 @@ are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
 
 Generator: github.com/google/go-licenses/v2@v2.0.1
-go.mod SHA-256: 374854cf99fad0e286140831aa610362bb953290f802f439e4cba6ed89bb3f19
-go.sum SHA-256: 385e5fc64545e99a9a3a5cbec3d763e3d20994775acf1ea026163a3b83c34e13
+go.mod SHA-256: 70d9343b1f7cbffb8e502d526aacb630d146bb7fa597a9cfe4dc6052b3732e9a
+go.sum SHA-256: 6ce051022ce3eec7ea80244a99de1752de5a5b2b6e8c5effd182972136330946
 
 ===============================================================================
 DEPENDENCY INVENTORY: ALL RELEASE VARIANTS
@@ -783,9 +783,9 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.4
+Version: v0.51.5
 License: Apache-2.0
-Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1111,9 +1111,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.4
+Version: v0.51.5
 License: MIT
-Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1439,9 +1439,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.4
+Version: v0.51.5
 License: BSD-3-Clause
-Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1767,9 +1767,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.4
+Version: v0.51.5
 License: UPL-1.0
-Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -6152,9 +6152,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/jackc/pgx/v5
-Version: v5.10.0
+Version: v5.11.0
 License: MIT
-Source: https://github.com/jackc/pgx/blob/v5.10.0/LICENSE
+Source: https://github.com/jackc/pgx/blob/v5.11.0/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2013-2021 Jack Christensen
 
@@ -6451,9 +6451,9 @@ THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/oracle/oci-go-sdk/v65
-Version: v65.124.0
+Version: v65.125.0
 License: Apache-2.0
-Source: https://github.com/oracle/oci-go-sdk/blob/v65.124.0/LICENSE.txt
+Source: https://github.com/oracle/oci-go-sdk/blob/v65.125.0/LICENSE.txt
 -------------------------------------------------------------------------------
 Copyright (c) 2016, 2026, Oracle and/or its affiliates.  All rights reserved.
 This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
@@ -6561,9 +6561,9 @@ END OF TERMS AND CONDITIONS
 
 -------------------------------------------------------------------------------
 Dependency: github.com/oracle/oci-go-sdk/v65
-Version: v65.124.0
+Version: v65.125.0
 License: UPL-1.0
-Source: https://github.com/oracle/oci-go-sdk/blob/v65.124.0/LICENSE.txt
+Source: https://github.com/oracle/oci-go-sdk/blob/v65.125.0/LICENSE.txt
 -------------------------------------------------------------------------------
 Copyright (c) 2016, 2026, Oracle and/or its affiliates.  All rights reserved.
 This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl

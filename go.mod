@@ -6,10 +6,10 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.1
 	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets v1.5.0
 	github.com/BurntSushi/toml v1.6.0
-	github.com/godror/godror v0.51.4
+	github.com/godror/godror v0.51.5
 	github.com/hashicorp/vault/api v1.23.0
-	github.com/jackc/pgx/v5 v5.10.0
-	github.com/oracle/oci-go-sdk/v65 v65.124.0
+	github.com/jackc/pgx/v5 v5.11.0
+	github.com/oracle/oci-go-sdk/v65 v65.125.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	go.yaml.in/yaml/v2 v2.4.4
 )
