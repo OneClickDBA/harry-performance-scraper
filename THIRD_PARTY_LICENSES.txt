@@ -66,8 +66,8 @@ are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
 
 Generator: github.com/google/go-licenses/v2@v2.0.1
-go.mod SHA-256: 2d1d7963fedcfccc63f9c305a73f1f958cd64dcb60d47da98967330385488fe2
-go.sum SHA-256: 672c6a859b6fd9e67275e3207fe2e810585fe0a5cf07f1327470d0928e4555bc
+go.mod SHA-256: 70d9343b1f7cbffb8e502d526aacb630d146bb7fa597a9cfe4dc6052b3732e9a
+go.sum SHA-256: 6ce051022ce3eec7ea80244a99de1752de5a5b2b6e8c5effd182972136330946
 
 ===============================================================================
 DEPENDENCY INVENTORY: ALL RELEASE VARIANTS
@@ -783,9 +783,9 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.4
+Version: v0.51.5
 License: Apache-2.0
-Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1111,9 +1111,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.4
+Version: v0.51.5
 License: MIT
-Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1439,9 +1439,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.4
+Version: v0.51.5
 License: BSD-3-Clause
-Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1767,9 +1767,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.4
+Version: v0.51.5
 License: UPL-1.0
-Source: https://github.com/godror/godror/blob/v0.51.4/LICENSE.md
+Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
