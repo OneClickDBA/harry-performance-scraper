@@ -66,8 +66,8 @@ are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
 
 Generator: github.com/google/go-licenses/v2@v2.0.1
-go.mod SHA-256: 558145f76c287d91d35bb0c023b99aaabc933af9bdaabd1a04a894084cd7b78c
-go.sum SHA-256: 55698a1ef6e5bf777c75fa9456b35f28e8b1598bb0eb179c58d342e45f701aea
+go.mod SHA-256: e712d6d630d2a76a83613a483556713610732d05aed30561ed8dc57fffb75102
+go.sum SHA-256: c295396e16f8c466abd4a48a49f8b7149758bf28287c914acbbdc3b69fcde6ed
 
 ===============================================================================
 DEPENDENCY INVENTORY: ALL RELEASE VARIANTS
@@ -6152,9 +6152,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/jackc/pgx/v5
-Version: v5.10.0
+Version: v5.11.0
 License: MIT
-Source: https://github.com/jackc/pgx/blob/v5.10.0/LICENSE
+Source: https://github.com/jackc/pgx/blob/v5.11.0/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2013-2021 Jack Christensen
 
