@@ -154,6 +154,7 @@ jobs:
               -o "${package_dir}/harry-scraper${EXTENSION}" ./
 
           cp README.md LICENSE.txt THIRD_PARTY_LICENSES.txt TRADEMARKS.md \
+            example-config.yaml example-config-multi-database.yaml \
             "${package_dir}/"
 
           if [[ "${FORMAT}" == "zip" ]]; then
@@ -229,6 +230,7 @@ jobs:
           mkdir -p "${package_dir}"
           cp "${binary_dir}/harry-scraper" "${package_dir}/"
           cp README.md LICENSE.txt THIRD_PARTY_LICENSES.txt TRADEMARKS.md \
+            example-config.yaml example-config-multi-database.yaml \
             "${package_dir}/"
           tar -C dist -czf "dist/${name}.tar.gz" "${name}"
 
