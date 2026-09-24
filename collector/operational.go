@@ -275,12 +275,16 @@ func (e *Scraper) ScrapeOperationalSamples(d *Database, collectedAt time.Time) (
 }
 
 func newScrapeStatus(collectedAt time.Time, database, collector string, started time.Time, count int, err error) ScrapeStatusSample {
+	return newScrapeStatusWithDuration(collectedAt, database, collector, time.Since(started), count, err)
+}
+
+func newScrapeStatusWithDuration(collectedAt time.Time, database, collector string, duration time.Duration, count int, err error) ScrapeStatusSample {
 	status := ScrapeStatusSample{
 		CollectedAt:     collectedAt,
 		Database:        database,
 		Collector:       collector,
 		Success:         err == nil,
-		DurationSeconds: time.Since(started).Seconds(),
+		DurationSeconds: duration.Seconds(),
 		SampleCount:     count,
 	}
 	if err != nil {

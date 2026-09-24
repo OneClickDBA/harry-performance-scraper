@@ -90,6 +90,14 @@ digraph postgresql_table_relationships {
     label="oracle_latest_scrape_status\l\lCurrent state (non-partitioned)\lcollected_at\lsource_database PK\lcollector PK\lsuccess\lduration_seconds\lsample_count\lerror_message\l"
   ];
 
+  harry_runtime_samples [
+    label="harry_runtime_samples\l\lPartitioned by RANGE (observed_at)\lobserved_at\lscheduler\ltrigger\lscraper_instance\lha_scope\lscheduled_at\lstarted_at\lcollection_finished_at\lfinished_at\lconfigured_interval_seconds\lconfigured_query_timeout_seconds\lscheduling_lag_seconds\lcollection_duration_seconds\lpostgresql_write_duration_seconds\ltotal_duration_seconds\lmissed_intervals\ldatabases_attempted\ldatabases_succeeded\lsample_count\lerror_count\lpostgresql_write_success\lpostgresql_error_message\l\lIndexes\lha_scope, scheduler, observed_at desc\l"
+  ];
+
+  harry_latest_runtime_status [
+    label="harry_latest_runtime_status\l\lCurrent state (non-partitioned)\lha_scope PK\lscheduler PK\lobserved_at\ltrigger\lscraper_instance\lscheduled_at\lstarted_at\lcollection_finished_at\lfinished_at\lconfigured_interval_seconds\lconfigured_query_timeout_seconds\lscheduling_lag_seconds\lcollection_duration_seconds\lpostgresql_write_duration_seconds\ltotal_duration_seconds\lmissed_intervals\ldatabases_attempted\ldatabases_succeeded\lsample_count\lerror_count\lpostgresql_write_success\lpostgresql_error_message\l"
+  ];
+
   harry_repository_daily_ingest [
     label="harry_repository_daily_ingest\l\lPartitioned by RANGE (sample_day)\lsample_day PK\lsource_database PK\ladditional_metric_rows\lsql_sample_rows\lsql_text_writes\lsql_plan_operation_writes\lsession_sample_rows\lblocking_session_sample_rows\ldatabase_activity_sample_rows\ldatabase_status_sample_rows\linstance_sample_rows\lresource_limit_sample_rows\ltablespace_sample_rows\lasm_diskgroup_sample_rows\lsystem_counter_sample_rows\lwait_class_sample_rows\lsystem_metric_sample_rows\lscrape_status_rows\lfirst_sample_at\llast_sample_at\llast_sql_sample_at\llast_session_sample_at\llast_database_activity_sample_at\llast_flushed_at\l"
   ];
@@ -205,6 +213,17 @@ digraph postgresql_table_relationships {
 
   oracle_scrape_status -> oracle_latest_scrape_status [
     label="latest row upsert: source_database, collector",
+    color="#2f6f44"
+  ];
+
+  oracle_scrape_status -> harry_runtime_samples [
+    label="cycle completion totals by scheduler pass",
+    style=dashed,
+    color="#666666"
+  ];
+
+  harry_runtime_samples -> harry_latest_runtime_status [
+    label="latest row upsert: ha_scope, scheduler",
     color="#2f6f44"
   ];
 

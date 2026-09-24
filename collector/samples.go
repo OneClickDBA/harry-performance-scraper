@@ -28,6 +28,33 @@ type ScrapeSummary struct {
 	SampleCount     int
 }
 
+// RuntimeSample describes one complete scheduler cycle. The PostgreSQL sink
+// fills the write-phase fields after the sample transaction finishes.
+type RuntimeSample struct {
+	ObservedAt                     time.Time
+	Scheduler                      string
+	Trigger                        string
+	ScraperInstance                string
+	HAScope                        string
+	ScheduledAt                    time.Time
+	StartedAt                      time.Time
+	CollectionFinishedAt           time.Time
+	FinishedAt                     time.Time
+	ConfiguredIntervalSeconds      float64
+	ConfiguredQueryTimeoutSeconds  *float64
+	SchedulingLagSeconds           float64
+	CollectionDurationSeconds      float64
+	PostgreSQLWriteDurationSeconds float64
+	TotalDurationSeconds           float64
+	MissedIntervals                int64
+	DatabasesAttempted             int
+	DatabasesSucceeded             int
+	SampleCount                    int
+	ErrorCount                     int
+	PostgreSQLWriteSuccess         bool
+	PostgreSQLErrorMessage         *string
+}
+
 type DatabaseStatusSample struct {
 	CollectedAt    time.Time
 	Database       string
@@ -319,6 +346,7 @@ type SampleBatch struct {
 	Performance       PerformanceSamples
 	Operational       OperationalSamples
 	ScrapeStatuses    []ScrapeStatusSample
+	Runtime           *RuntimeSample
 }
 
 func (b SampleBatch) Count() int {

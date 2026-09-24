@@ -121,6 +121,17 @@ digraph oracle_to_postgresql_tables {
     >
   ];
 
+  scraper_runtime_sources [
+    shape=plain,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
+        <TR><TD BGCOLOR="#cfe8cf"><B>Harry scheduler and repository timing</B></TD></TR>
+        <TR><TD ALIGN="LEFT">Activity and scheduled-cycle timing</TD></TR>
+        <TR><TD ALIGN="LEFT">PostgreSQL write and commit results</TD></TR>
+      </TABLE>
+    >
+  ];
+
   oracle_sql_sources [
     shape=plain,
     label=<
@@ -230,6 +241,8 @@ digraph oracle_to_postgresql_tables {
     pg_oracle_system_metric_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_system_metric_samples"];
     pg_oracle_scrape_status [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_scrape_status"];
     pg_oracle_latest_scrape_status [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_latest_scrape_status"];
+    pg_harry_runtime_samples [shape=box, style="rounded,filled", fillcolor="#dff2df", label="harry_runtime_samples"];
+    pg_harry_latest_runtime_status [shape=box, style="rounded,filled", fillcolor="#dff2df", label="harry_latest_runtime_status"];
     pg_harry_repository_daily_ingest [shape=box, style="rounded,filled", fillcolor="#dff2df", label="harry_repository_daily_ingest"];
   }
 
@@ -250,5 +263,7 @@ digraph oracle_to_postgresql_tables {
   oracle_operational_counter_sources -> pg_oracle_system_metric_samples [label="selected bounded metrics"];
   scraper_status_sources -> pg_oracle_scrape_status [label="all collector outcomes"];
   scraper_status_sources -> pg_oracle_latest_scrape_status [label="latest outcome per collector"];
+  scraper_runtime_sources -> pg_harry_runtime_samples [label="one row per scheduler cycle"];
+  scraper_runtime_sources -> pg_harry_latest_runtime_status [label="latest cycle per HA scope and scheduler"];
   scraper_ingest_accounting_sources -> pg_harry_repository_daily_ingest [label="UTC daily typed counters"];
 }

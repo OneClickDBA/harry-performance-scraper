@@ -96,26 +96,32 @@ func (e *Scraper) RunActivitySampling(ctx context.Context, sink SampleSink) {
 		"interval", interval,
 		"query_timeout", e.Performance.Activity.GetQueryTimeout())
 
-	e.sampleActivity(ctx, sink, time.Now())
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	initialTick := time.Now()
+	e.sampleActivity(ctx, sink, initialTick, 0, "startup")
+	previousTick := initialTick
 	for {
 		select {
 		case tick := <-ticker.C:
-			e.sampleActivity(ctx, sink, tick)
+			missed := missedScheduledIntervals(previousTick, tick, interval)
+			previousTick = tick
+			e.sampleActivity(ctx, sink, tick, missed, "ticker")
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt time.Time) {
+func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt time.Time, missed int64, trigger string) {
 	type result struct {
 		database string
+		duration time.Duration
 		samples  []DatabaseActivitySample
 		err      error
 	}
 
+	collectionStartedAt := time.Now()
 	results := make(chan result, len(e.databases))
 	var wg sync.WaitGroup
 	for _, database := range e.databases {
@@ -126,8 +132,9 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			started := time.Now()
 			samples, err := e.scrapeActivitySamples(database, sampledAt)
-			results <- result{database: database.Name, samples: samples, err: err}
+			results <- result{database: database.Name, duration: time.Since(started), samples: samples, err: err}
 		}()
 	}
 	wg.Wait()
@@ -140,14 +147,14 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 	for result := range results {
 		if result.err != nil {
 			totalErrors++
-			statuses = append(statuses, newScrapeStatus(sampledAt, result.database, "activity", sampledAt, 0, result.err))
+			statuses = append(statuses, newScrapeStatusWithDuration(sampledAt, result.database, "activity", result.duration, 0, result.err))
 			e.logger.Error("Error scraping database activity",
 				"database", result.database,
 				"source", e.Performance.Activity.GetSource(),
 				"error", result.err)
 			continue
 		}
-		statuses = append(statuses, newScrapeStatus(sampledAt, result.database, "activity", sampledAt, len(result.samples), nil))
+		statuses = append(statuses, newScrapeStatusWithDuration(sampledAt, result.database, "activity", result.duration, len(result.samples), nil))
 		performance.DatabaseActivity = append(performance.DatabaseActivity, result.samples...)
 		for _, sample := range result.samples {
 			if sample.SampleSource == "ASH" && sample.SampleTime.After(latestASH[result.database]) {
@@ -155,16 +162,25 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 			}
 		}
 	}
-	if len(performance.DatabaseActivity) == 0 && len(statuses) == 0 {
-		return
+	collectionFinishedAt := time.Now()
+	summary := ScrapeSummary{
+		StartedAt:       collectionStartedAt,
+		FinishedAt:      collectionFinishedAt,
+		DurationSeconds: collectionFinishedAt.Sub(collectionStartedAt).Seconds(),
+		TotalErrors:     totalErrors,
+		SampleCount:     len(performance.DatabaseActivity),
 	}
-
-	startedAt := time.Now()
-	summary := ScrapeSummary{StartedAt: startedAt, TotalErrors: totalErrors}
-	if err := sink.WriteSamples(ctx, SampleBatch{
+	timeout := e.Performance.Activity.GetQueryTimeout()
+	batch := SampleBatch{
 		Performance:    performance,
 		ScrapeStatuses: statuses,
-	}, summary); err != nil {
+	}
+	batch.Runtime = e.newRuntimeSample(
+		"activity", trigger, sampledAt, collectionStartedAt, collectionFinishedAt,
+		e.Performance.Activity.GetInterval(), &timeout, missed, statuses, "activity",
+		summary.SampleCount, totalErrors,
+	)
+	if err := sink.WriteSamples(ctx, batch, summary); err != nil {
 		e.logger.Error("Failed to write database activity samples", "error", err)
 		return
 	}

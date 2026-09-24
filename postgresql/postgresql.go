@@ -20,37 +20,45 @@ import (
 )
 
 type Sink struct {
-	pool                    *pgxpool.Pool
-	logger                  *slog.Logger
-	retention               time.Duration
-	samplesTable            pgx.Identifier
-	sqlSamplesTable         pgx.Identifier
-	sqlTextsTable           pgx.Identifier
-	sqlPlansTable           pgx.Identifier
-	sessionSamplesTable     pgx.Identifier
-	blockingSessionsTable   pgx.Identifier
-	databaseActivityTable   pgx.Identifier
-	databaseStatusTable     pgx.Identifier
-	instanceTable           pgx.Identifier
-	resourceLimitTable      pgx.Identifier
-	tablespaceTable         pgx.Identifier
-	asmDiskgroupTable       pgx.Identifier
-	systemCounterTable      pgx.Identifier
-	waitClassTable          pgx.Identifier
-	systemMetricTable       pgx.Identifier
-	scrapeStatusTable       pgx.Identifier
-	latestScrapeStatusTable pgx.Identifier
-	repositoryIngestTable   pgx.Identifier
-	retentionMu             sync.Mutex
-	lastRetentionCleanup    time.Time
-	ingestMu                sync.Mutex
-	ingestFlushMu           sync.Mutex
-	pendingIngest           map[repositoryIngestKey]repositoryIngestCounts
-	lastIngestFlushAttempt  time.Time
-	ingestFlushInterval     time.Duration
+	pool                     *pgxpool.Pool
+	logger                   *slog.Logger
+	retention                time.Duration
+	samplesTable             pgx.Identifier
+	sqlSamplesTable          pgx.Identifier
+	sqlTextsTable            pgx.Identifier
+	sqlPlansTable            pgx.Identifier
+	sessionSamplesTable      pgx.Identifier
+	blockingSessionsTable    pgx.Identifier
+	databaseActivityTable    pgx.Identifier
+	databaseStatusTable      pgx.Identifier
+	instanceTable            pgx.Identifier
+	resourceLimitTable       pgx.Identifier
+	tablespaceTable          pgx.Identifier
+	asmDiskgroupTable        pgx.Identifier
+	systemCounterTable       pgx.Identifier
+	waitClassTable           pgx.Identifier
+	systemMetricTable        pgx.Identifier
+	scrapeStatusTable        pgx.Identifier
+	latestScrapeStatusTable  pgx.Identifier
+	runtimeSamplesTable      pgx.Identifier
+	latestRuntimeStatusTable pgx.Identifier
+	repositoryIngestTable    pgx.Identifier
+	retentionMu              sync.Mutex
+	lastRetentionCleanup     time.Time
+	ingestMu                 sync.Mutex
+	ingestFlushMu            sync.Mutex
+	pendingIngest            map[repositoryIngestKey]repositoryIngestCounts
+	lastIngestFlushAttempt   time.Time
+	ingestFlushInterval      time.Duration
+	runtimeMu                sync.Mutex
+	runtimeFlushInterval     time.Duration
+	lastRuntimeFlushAttempt  time.Time
+	pendingRuntime           []collector.RuntimeSample
 }
 
 const repositoryIngestFlushInterval = 5 * time.Minute
+const runtimeTelemetryFlushInterval = time.Minute
+const maxPendingRuntimeSamples = 10000
 
 func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfig) (*Sink, error) {
 	if strings.TrimSpace(cfg.URL) == "" {
@@ -72,29 +80,32 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 
 	sqlSamplesTable := identifier(cfg.SQLSamplesTable, "oracle_sql_samples")
 	s := &Sink{
-		pool:                    pool,
-		logger:                  logger,
-		retention:               cfg.GetRetention(),
-		samplesTable:            identifier(cfg.SamplesTable, "oracle_metric_samples"),
-		sqlSamplesTable:         sqlSamplesTable,
-		sqlTextsTable:           siblingIdentifier(sqlSamplesTable, "oracle_sql_texts"),
-		sqlPlansTable:           siblingIdentifier(sqlSamplesTable, "oracle_sql_plans"),
-		sessionSamplesTable:     identifier(cfg.SessionSamplesTable, "oracle_session_samples"),
-		blockingSessionsTable:   identifier(cfg.BlockingSessionsTable, "oracle_blocking_session_samples"),
-		databaseActivityTable:   identifier(cfg.DatabaseActivityTable, "oracle_database_activity_samples"),
-		databaseStatusTable:     siblingIdentifier(sqlSamplesTable, "oracle_database_status_samples"),
-		instanceTable:           siblingIdentifier(sqlSamplesTable, "oracle_instance_samples"),
-		resourceLimitTable:      siblingIdentifier(sqlSamplesTable, "oracle_resource_limit_samples"),
-		tablespaceTable:         siblingIdentifier(sqlSamplesTable, "oracle_tablespace_samples"),
-		asmDiskgroupTable:       siblingIdentifier(sqlSamplesTable, "oracle_asm_diskgroup_samples"),
-		systemCounterTable:      siblingIdentifier(sqlSamplesTable, "oracle_system_counter_samples"),
-		waitClassTable:          siblingIdentifier(sqlSamplesTable, "oracle_wait_class_samples"),
-		systemMetricTable:       siblingIdentifier(sqlSamplesTable, "oracle_system_metric_samples"),
-		scrapeStatusTable:       siblingIdentifier(sqlSamplesTable, "oracle_scrape_status"),
-		latestScrapeStatusTable: siblingIdentifier(sqlSamplesTable, "oracle_latest_scrape_status"),
-		repositoryIngestTable:   siblingIdentifier(sqlSamplesTable, "harry_repository_daily_ingest"),
-		pendingIngest:           make(map[repositoryIngestKey]repositoryIngestCounts),
-		ingestFlushInterval:     repositoryIngestFlushInterval,
+		pool:                     pool,
+		logger:                   logger,
+		retention:                cfg.GetRetention(),
+		samplesTable:             identifier(cfg.SamplesTable, "oracle_metric_samples"),
+		sqlSamplesTable:          sqlSamplesTable,
+		sqlTextsTable:            siblingIdentifier(sqlSamplesTable, "oracle_sql_texts"),
+		sqlPlansTable:            siblingIdentifier(sqlSamplesTable, "oracle_sql_plans"),
+		sessionSamplesTable:      identifier(cfg.SessionSamplesTable, "oracle_session_samples"),
+		blockingSessionsTable:    identifier(cfg.BlockingSessionsTable, "oracle_blocking_session_samples"),
+		databaseActivityTable:    identifier(cfg.DatabaseActivityTable, "oracle_database_activity_samples"),
+		databaseStatusTable:      siblingIdentifier(sqlSamplesTable, "oracle_database_status_samples"),
+		instanceTable:            siblingIdentifier(sqlSamplesTable, "oracle_instance_samples"),
+		resourceLimitTable:       siblingIdentifier(sqlSamplesTable, "oracle_resource_limit_samples"),
+		tablespaceTable:          siblingIdentifier(sqlSamplesTable, "oracle_tablespace_samples"),
+		asmDiskgroupTable:        siblingIdentifier(sqlSamplesTable, "oracle_asm_diskgroup_samples"),
+		systemCounterTable:       siblingIdentifier(sqlSamplesTable, "oracle_system_counter_samples"),
+		waitClassTable:           siblingIdentifier(sqlSamplesTable, "oracle_wait_class_samples"),
+		systemMetricTable:        siblingIdentifier(sqlSamplesTable, "oracle_system_metric_samples"),
+		scrapeStatusTable:        siblingIdentifier(sqlSamplesTable, "oracle_scrape_status"),
+		latestScrapeStatusTable:  siblingIdentifier(sqlSamplesTable, "oracle_latest_scrape_status"),
+		runtimeSamplesTable:      siblingIdentifier(sqlSamplesTable, "harry_runtime_samples"),
+		latestRuntimeStatusTable: siblingIdentifier(sqlSamplesTable, "harry_latest_runtime_status"),
+		repositoryIngestTable:    siblingIdentifier(sqlSamplesTable, "harry_repository_daily_ingest"),
+		pendingIngest:            make(map[repositoryIngestKey]repositoryIngestCounts),
+		ingestFlushInterval:      repositoryIngestFlushInterval,
+		runtimeFlushInterval:     runtimeTelemetryFlushInterval,
 	}
 
 	if err := pool.Ping(ctx); err != nil {
@@ -336,7 +347,75 @@ create index if not exists oracle_database_activity_samples_source_idx on %s (so
 	if err := s.migrateRepositoryIngestSchema(ctx); err != nil {
 		return err
 	}
-	return s.migrateOperationalSchema(ctx)
+	if err := s.migrateOperationalSchema(ctx); err != nil {
+		return err
+	}
+	return s.migrateRuntimeSchema(ctx)
+}
+
+func (s *Sink) migrateRuntimeSchema(ctx context.Context) error {
+	if _, err := s.pool.Exec(ctx, s.runtimeSchemaDDL()); err != nil {
+		return fmt.Errorf("migrate PostgreSQL runtime schema: %w", err)
+	}
+	return nil
+}
+
+func (s *Sink) runtimeSchemaDDL() string {
+	return fmt.Sprintf(`
+create table if not exists %s (
+	observed_at timestamptz not null,
+	scheduler text not null,
+	trigger text not null,
+	scraper_instance text not null,
+	ha_scope text not null,
+	scheduled_at timestamptz not null,
+	started_at timestamptz not null,
+	collection_finished_at timestamptz not null,
+	finished_at timestamptz not null,
+	configured_interval_seconds double precision not null,
+	configured_query_timeout_seconds double precision,
+	scheduling_lag_seconds double precision not null,
+	collection_duration_seconds double precision not null,
+	postgresql_write_duration_seconds double precision not null,
+	total_duration_seconds double precision not null,
+	missed_intervals bigint not null,
+	databases_attempted bigint not null,
+	databases_succeeded bigint not null,
+	sample_count bigint not null,
+	error_count bigint not null,
+	postgresql_write_success boolean not null,
+	postgresql_error_message text
+) partition by range (observed_at);
+
+create index if not exists harry_runtime_samples_scheduler_time_idx
+	on %s (ha_scope, scheduler, observed_at desc);
+
+create table if not exists %s (
+	observed_at timestamptz not null,
+	scheduler text not null,
+	trigger text not null,
+	scraper_instance text not null,
+	ha_scope text not null,
+	scheduled_at timestamptz not null,
+	started_at timestamptz not null,
+	collection_finished_at timestamptz not null,
+	finished_at timestamptz not null,
+	configured_interval_seconds double precision not null,
+	configured_query_timeout_seconds double precision,
+	scheduling_lag_seconds double precision not null,
+	collection_duration_seconds double precision not null,
+	postgresql_write_duration_seconds double precision not null,
+	total_duration_seconds double precision not null,
+	missed_intervals bigint not null,
+	databases_attempted bigint not null,
+	databases_succeeded bigint not null,
+	sample_count bigint not null,
+	error_count bigint not null,
+	postgresql_write_success boolean not null,
+	postgresql_error_message text,
+	primary key (ha_scope, scheduler)
+);
+`, s.runtimeSamplesTable.Sanitize(), s.runtimeSamplesTable.Sanitize(), s.latestRuntimeStatusTable.Sanitize())
 }
 
 func (s *Sink) migrateRepositoryIngestSchema(ctx context.Context) error {
@@ -707,14 +786,27 @@ from %s;
 	)
 }
 
-func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, summary collector.ScrapeSummary) error {
+func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, summary collector.ScrapeSummary) (writeErr error) {
+	writeStartedAt := time.Now()
+	pendingRuntime := s.takePendingRuntime(false)
+	committed := false
+	runtimeRecorded := false
+	defer func() {
+		if !committed {
+			s.requeueRuntime(pendingRuntime)
+		}
+		if !runtimeRecorded {
+			s.recordRuntimeResult(batch.Runtime, writeStartedAt, writeErr)
+		}
+	}()
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin postgresql transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
-	if err := s.ensureWritePartitions(ctx, tx, batch); err != nil {
+	if err := s.ensureWritePartitions(ctx, tx, batch, pendingRuntime); err != nil {
 		return err
 	}
 
@@ -773,10 +865,14 @@ func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, su
 	if err := s.writeScrapeStatuses(ctx, tx, batch.ScrapeStatuses); err != nil {
 		return err
 	}
+	if err := s.writeRuntimeSamples(ctx, tx, pendingRuntime); err != nil {
+		return err
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit postgresql transaction: %w", err)
 	}
+	committed = true
 	s.recordRepositoryIngest(batch)
 	if err := s.flushRepositoryIngest(ctx, false); err != nil {
 		s.logger.Warn("Unable to flush PostgreSQL repository ingestion accounting", "error", err)
@@ -798,6 +894,165 @@ func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, su
 		"errors", summary.TotalErrors,
 		"duration", summary.DurationSeconds)
 	s.cleanupRetention(ctx)
+	s.recordRuntimeResult(batch.Runtime, writeStartedAt, nil)
+	runtimeRecorded = true
+	return nil
+}
+
+func (s *Sink) recordRuntimeResult(sample *collector.RuntimeSample, writeStartedAt time.Time, writeErr error) {
+	if sample == nil {
+		return
+	}
+	completed := *sample
+	completed.FinishedAt = time.Now()
+	completed.ObservedAt = completed.FinishedAt
+	completed.PostgreSQLWriteDurationSeconds = completed.FinishedAt.Sub(writeStartedAt).Seconds()
+	completed.TotalDurationSeconds = completed.FinishedAt.Sub(completed.ScheduledAt).Seconds()
+	if completed.TotalDurationSeconds < 0 {
+		completed.TotalDurationSeconds = 0
+	}
+	completed.PostgreSQLWriteSuccess = writeErr == nil
+	if writeErr != nil {
+		message := writeErr.Error()
+		if len(message) > 2000 {
+			message = message[:2000]
+		}
+		completed.PostgreSQLErrorMessage = &message
+	}
+	s.queueRuntime(completed)
+}
+
+func (s *Sink) queueRuntime(samples ...collector.RuntimeSample) {
+	if len(samples) == 0 {
+		return
+	}
+	s.runtimeMu.Lock()
+	s.pendingRuntime = append(s.pendingRuntime, samples...)
+	dropped := len(s.pendingRuntime) - maxPendingRuntimeSamples
+	if dropped > 0 {
+		copy(s.pendingRuntime, s.pendingRuntime[dropped:])
+		s.pendingRuntime = s.pendingRuntime[:maxPendingRuntimeSamples]
+	}
+	s.runtimeMu.Unlock()
+	if dropped > 0 {
+		s.logger.Warn("Dropped oldest buffered runtime telemetry after PostgreSQL write failures", "samples", dropped)
+	}
+}
+
+func (s *Sink) takePendingRuntime(force bool) []collector.RuntimeSample {
+	s.runtimeMu.Lock()
+	defer s.runtimeMu.Unlock()
+	if len(s.pendingRuntime) == 0 {
+		return nil
+	}
+	now := time.Now()
+	interval := s.runtimeFlushInterval
+	if interval <= 0 {
+		interval = runtimeTelemetryFlushInterval
+	}
+	if !force && !s.lastRuntimeFlushAttempt.IsZero() && now.Sub(s.lastRuntimeFlushAttempt) < interval {
+		return nil
+	}
+	s.lastRuntimeFlushAttempt = now
+	samples := s.pendingRuntime
+	s.pendingRuntime = nil
+	return samples
+}
+
+func (s *Sink) requeueRuntime(samples []collector.RuntimeSample) {
+	if len(samples) == 0 {
+		return
+	}
+	s.runtimeMu.Lock()
+	s.pendingRuntime = append(samples, s.pendingRuntime...)
+	dropped := len(s.pendingRuntime) - maxPendingRuntimeSamples
+	if dropped > 0 {
+		s.pendingRuntime = s.pendingRuntime[dropped:]
+	}
+	s.runtimeMu.Unlock()
+	if dropped > 0 {
+		s.logger.Warn("Dropped oldest buffered runtime telemetry after PostgreSQL write failures", "samples", dropped)
+	}
+}
+
+func (s *Sink) writeRuntimeSamples(ctx context.Context, tx pgx.Tx, samples []collector.RuntimeSample) error {
+	if len(samples) == 0 {
+		return nil
+	}
+	columns := []string{
+		"observed_at", "scheduler", "trigger", "scraper_instance", "ha_scope",
+		"scheduled_at", "started_at", "collection_finished_at", "finished_at",
+		"configured_interval_seconds", "configured_query_timeout_seconds",
+		"scheduling_lag_seconds", "collection_duration_seconds", "postgresql_write_duration_seconds",
+		"total_duration_seconds", "missed_intervals", "databases_attempted", "databases_succeeded",
+		"sample_count", "error_count", "postgresql_write_success", "postgresql_error_message",
+	}
+	rows := make([][]any, 0, len(samples))
+	for _, sample := range samples {
+		rows = append(rows, []any{
+			sample.ObservedAt, sample.Scheduler, sample.Trigger, sample.ScraperInstance, sample.HAScope,
+			sample.ScheduledAt, sample.StartedAt, sample.CollectionFinishedAt, sample.FinishedAt,
+			sample.ConfiguredIntervalSeconds, sample.ConfiguredQueryTimeoutSeconds,
+			sample.SchedulingLagSeconds, sample.CollectionDurationSeconds, sample.PostgreSQLWriteDurationSeconds,
+			sample.TotalDurationSeconds, sample.MissedIntervals, sample.DatabasesAttempted, sample.DatabasesSucceeded,
+			sample.SampleCount, sample.ErrorCount, sample.PostgreSQLWriteSuccess, sample.PostgreSQLErrorMessage,
+		})
+	}
+	if err := copyRows(ctx, tx, s.runtimeSamplesTable, columns, rows, "runtime samples"); err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf(`
+insert into %s (%s)
+values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+on conflict (ha_scope, scheduler) do update set
+	observed_at = excluded.observed_at,
+	trigger = excluded.trigger,
+	scraper_instance = excluded.scraper_instance,
+	scheduled_at = excluded.scheduled_at,
+	started_at = excluded.started_at,
+	collection_finished_at = excluded.collection_finished_at,
+	finished_at = excluded.finished_at,
+	configured_interval_seconds = excluded.configured_interval_seconds,
+	configured_query_timeout_seconds = excluded.configured_query_timeout_seconds,
+	scheduling_lag_seconds = excluded.scheduling_lag_seconds,
+	collection_duration_seconds = excluded.collection_duration_seconds,
+	postgresql_write_duration_seconds = excluded.postgresql_write_duration_seconds,
+	total_duration_seconds = excluded.total_duration_seconds,
+	missed_intervals = excluded.missed_intervals,
+	databases_attempted = excluded.databases_attempted,
+	databases_succeeded = excluded.databases_succeeded,
+	sample_count = excluded.sample_count,
+	error_count = excluded.error_count,
+	postgresql_write_success = excluded.postgresql_write_success,
+	postgresql_error_message = excluded.postgresql_error_message
+where excluded.observed_at >= %s.observed_at`,
+		s.latestRuntimeStatusTable.Sanitize(), strings.Join(columns, ", "), s.latestRuntimeStatusTable.Sanitize())
+	type latestKey struct {
+		scope     string
+		scheduler string
+	}
+	latest := make(map[latestKey]int)
+	for index, sample := range samples {
+		key := latestKey{scope: sample.HAScope, scheduler: sample.Scheduler}
+		if current, ok := latest[key]; !ok || sample.ObservedAt.After(samples[current].ObservedAt) {
+			latest[key] = index
+		}
+	}
+	batch := &pgx.Batch{}
+	for _, index := range latest {
+		batch.Queue(query, rows[index]...)
+	}
+	results := tx.SendBatch(ctx, batch)
+	for range latest {
+		if _, err := results.Exec(); err != nil {
+			_ = results.Close()
+			return fmt.Errorf("upsert latest runtime status: %w", err)
+		}
+	}
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("close latest runtime status batch: %w", err)
+	}
 	return nil
 }
 
@@ -1788,7 +2043,7 @@ where excluded.collected_at >= %s.collected_at`,
 	return nil
 }
 
-func (s *Sink) ensureWritePartitions(ctx context.Context, tx pgx.Tx, batch collector.SampleBatch) error {
+func (s *Sink) ensureWritePartitions(ctx context.Context, tx pgx.Tx, batch collector.SampleBatch, runtimeSamples []collector.RuntimeSample) error {
 	samples := batch.AdditionalMetrics
 	performance := batch.Performance
 	metricTimes := make([]time.Time, 0, len(samples))
@@ -1849,6 +2104,10 @@ func (s *Sink) ensureWritePartitions(ctx context.Context, tx pgx.Tx, batch colle
 		if err := ensureDailyPartitions(ctx, tx, operationalTable.table, operationalTable.times); err != nil {
 			return fmt.Errorf("ensure %s partitions: %w", operationalTable.table.Sanitize(), err)
 		}
+	}
+	runtimeTimes := collectedTimes(runtimeSamples, func(v collector.RuntimeSample) time.Time { return v.ObservedAt })
+	if err := ensureDailyPartitions(ctx, tx, s.runtimeSamplesTable, runtimeTimes); err != nil {
+		return fmt.Errorf("ensure runtime sample partitions: %w", err)
 	}
 
 	return nil
@@ -1956,6 +2215,11 @@ func (s *Sink) cleanupRetention(ctx context.Context) {
 		s.logger.Warn("Unable to clean PostgreSQL latest scrape statuses", "error", err, "retention", s.retention.String())
 		return
 	}
+	deletedLatestRuntime, err := s.deleteExpiredLatestRuntimeStatuses(ctx, retentionCutoff)
+	if err != nil {
+		s.logger.Warn("Unable to clean PostgreSQL latest runtime statuses", "error", err, "retention", s.retention.String())
+		return
+	}
 	deletedSQLTexts, err := s.deleteExpiredSQLTexts(ctx, retentionCutoff)
 	if err != nil {
 		s.logger.Warn("Unable to clean PostgreSQL SQL texts", "error", err, "retention", s.retention.String())
@@ -1971,6 +2235,9 @@ func (s *Sink) cleanupRetention(ctx context.Context) {
 	}
 	if deletedLatestStatuses > 0 {
 		s.logger.Info("Cleaned PostgreSQL latest scrape statuses", "statuses_deleted", deletedLatestStatuses, "retention", s.retention.String())
+	}
+	if deletedLatestRuntime > 0 {
+		s.logger.Info("Cleaned PostgreSQL latest runtime statuses", "statuses_deleted", deletedLatestRuntime, "retention", s.retention.String())
 	}
 	if deletedSQLTexts > 0 {
 		s.logger.Info("Cleaned PostgreSQL SQL texts", "sql_texts_deleted", deletedSQLTexts, "retention", s.retention.String())
@@ -1989,6 +2256,15 @@ func (s *Sink) deleteExpiredLatestScrapeStatuses(ctx context.Context, cutoff tim
 	result, err := s.pool.Exec(ctx, query, cutoff)
 	if err != nil {
 		return 0, fmt.Errorf("delete latest scrape statuses older than %s: %w", cutoff.Format(time.RFC3339), err)
+	}
+	return result.RowsAffected(), nil
+}
+
+func (s *Sink) deleteExpiredLatestRuntimeStatuses(ctx context.Context, cutoff time.Time) (int64, error) {
+	query := fmt.Sprintf("delete from %s where observed_at < $1", s.latestRuntimeStatusTable.Sanitize())
+	result, err := s.pool.Exec(ctx, query, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("delete latest runtime statuses older than %s: %w", cutoff.Format(time.RFC3339), err)
 	}
 	return result.RowsAffected(), nil
 }
@@ -2039,6 +2315,7 @@ func (s *Sink) partitionedTables() []pgx.Identifier {
 		s.waitClassTable,
 		s.systemMetricTable,
 		s.scrapeStatusTable,
+		s.runtimeSamplesTable,
 		s.repositoryIngestTable,
 	}
 }
@@ -2103,10 +2380,40 @@ func partitionDay(parent pgx.Identifier, partition string) (time.Time, bool) {
 func (s *Sink) Close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if err := s.flushRuntime(ctx); err != nil {
+		s.logger.Warn("Unable to flush PostgreSQL runtime telemetry during shutdown", "error", err)
+	}
 	if err := s.flushRepositoryIngest(ctx, true); err != nil {
 		s.logger.Warn("Unable to flush PostgreSQL repository ingestion accounting during shutdown", "error", err)
 	}
 	s.pool.Close()
+}
+
+func (s *Sink) flushRuntime(ctx context.Context) error {
+	samples := s.takePendingRuntime(true)
+	if len(samples) == 0 {
+		return nil
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		s.requeueRuntime(samples)
+		return fmt.Errorf("begin runtime telemetry flush: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if err := ensureDailyPartitions(ctx, tx, s.runtimeSamplesTable,
+		collectedTimes(samples, func(v collector.RuntimeSample) time.Time { return v.ObservedAt })); err != nil {
+		s.requeueRuntime(samples)
+		return fmt.Errorf("ensure runtime telemetry partitions: %w", err)
+	}
+	if err := s.writeRuntimeSamples(ctx, tx, samples); err != nil {
+		s.requeueRuntime(samples)
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		s.requeueRuntime(samples)
+		return fmt.Errorf("commit runtime telemetry flush: %w", err)
+	}
+	return nil
 }
 
 func identifier(name, fallback string) pgx.Identifier {

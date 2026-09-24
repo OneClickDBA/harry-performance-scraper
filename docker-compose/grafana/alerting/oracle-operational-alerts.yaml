@@ -739,3 +739,349 @@ groups:
           severity: warning
           service: harry-performance-scraper
         isPaused: false
+
+  - orgId: 1
+    name: Harry runtime pressure alerts
+    folder: Harry - Performance Scraper for Oracle Database
+    interval: 1m
+    rules:
+      - uid: oracle_activity_timeout_pressure
+        title: Oracle activity collection is approaching its timeout
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: postgres
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                with runtime as (
+                  select configured_query_timeout_seconds
+                  from harry_latest_runtime_status
+                  where scheduler = 'activity'
+                    and observed_at >= now() - interval '3 minutes'
+                  order by observed_at desc
+                  limit 1
+                )
+                select
+                  now() as "time",
+                  status.source_database,
+                  status.duration_seconds * 100.0
+                    / nullif(runtime.configured_query_timeout_seconds, 0) as value
+                from oracle_latest_scrape_status status
+                cross join runtime
+                where status.collector = 'activity'
+                  and status.collected_at >= now() - interval '3 minutes'
+                  and status.success
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [80]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "$B > 80"
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: math
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: oracle-operational-overview
+          __panelId__: "11"
+          summary: >-
+            Activity collection uses over 80% of its timeout on
+            {{ $labels.source_database }}
+          description: >-
+            The Oracle activity query is approaching its configured timeout.
+            Review Oracle load, query duration, network latency, and scraper
+            logs before DAH samples become incomplete.
+        labels:
+          severity: warning
+          service: harry-performance-scraper
+        isPaused: false
+
+      - uid: harry_scheduler_cycle_pressure
+        title: Harry scheduler cycle is approaching its interval
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: postgres
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  ha_scope,
+                  scheduler,
+                  scraper_instance,
+                  total_duration_seconds * 100.0
+                    / nullif(configured_interval_seconds, 0) as value
+                from harry_latest_runtime_status
+                where postgresql_write_success
+                  and observed_at >= now() - interval '3 minutes'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [80]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "$B > 80"
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: math
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: harry-postgresql-repository-health
+          __panelId__: "30"
+          summary: >-
+            Harry {{ $labels.scheduler }} cycle uses over 80% of its interval
+          description: >-
+            Scheduling lag, Oracle collection, and PostgreSQL repository time
+            are approaching the configured cycle interval. Review the runtime
+            phase panel before samples are skipped.
+        labels:
+          severity: warning
+          service: harry-performance-scraper
+        isPaused: false
+
+      - uid: harry_postgresql_write_pressure
+        title: Harry PostgreSQL write is consuming too much of the scrape interval
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: postgres
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  ha_scope,
+                  scheduler,
+                  scraper_instance,
+                  postgresql_write_duration_seconds * 100.0
+                    / nullif(configured_interval_seconds, 0) as value
+                from harry_latest_runtime_status
+                where postgresql_write_success
+                  and observed_at >= now() - interval '3 minutes'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [50]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "$B > 50"
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: math
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: harry-postgresql-repository-health
+          __panelId__: "29"
+          summary: >-
+            Harry PostgreSQL write uses over 50% of the
+            {{ $labels.scheduler }} interval
+          description: >-
+            Repository pool wait, partition checks, inserts, latest-state
+            updates, commit, accounting, and retention are consuming a large
+            part of the available interval. Review PostgreSQL I/O, locks,
+            checkpoints, WAL, and query activity.
+        labels:
+          severity: warning
+          service: harry-performance-scraper
+        isPaused: false
+
+      - uid: harry_scheduler_delay
+        title: Harry scheduler is delayed or missing intervals
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: postgres
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  ha_scope,
+                  scheduler,
+                  max(greatest(
+                    scheduling_lag_seconds * 100.0
+                      / nullif(configured_interval_seconds, 0),
+                    case when missed_intervals > 0 then 100.0 else 0.0 end
+                  )) as value
+                from harry_runtime_samples
+                where observed_at >= now() - interval '5 minutes'
+                group by ha_scope, scheduler
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [50]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "$B > 50"
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: math
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          __dashboardUid__: harry-postgresql-repository-health
+          __panelId__: "29"
+          summary: >-
+            Harry {{ $labels.scheduler }} scheduler is delayed
+          description: >-
+            The scheduler started more than half an interval late or observed
+            dropped ticker intervals. Review process CPU scheduling, long
+            collection cycles, PostgreSQL writes, host pressure, and logs.
+        labels:
+          severity: warning
+          service: harry-performance-scraper
+        isPaused: false

@@ -33,6 +33,11 @@ func maskDsn(dsn string) string {
 // NewScraper creates a new Scraper instance
 func NewScraper(logger *slog.Logger, m *MetricsConfiguration) *Scraper {
 	var databases []*Database
+	instanceName, err := os.Hostname()
+	if err != nil || strings.TrimSpace(instanceName) == "" {
+		instanceName = "unknown"
+	}
+	instanceName = fmt.Sprintf("%s:%d", instanceName, os.Getpid())
 
 	var allConstLabels []string
 	// All the metrics of the same name need to have the same set of labels
@@ -57,6 +62,7 @@ func NewScraper(logger *slog.Logger, m *MetricsConfiguration) *Scraper {
 		metricDefinitionHashes:  map[string][]byte{},
 		scrapeRequests:          make(chan struct{}, 1),
 		logger:                  logger,
+		instanceName:            instanceName,
 		MetricsConfiguration:    m,
 		databases:               databases,
 		allConstLabels:          allConstLabels,
@@ -108,28 +114,36 @@ func (e *Scraper) RunScheduledScrapes(ctx context.Context, sink SampleSink) {
 		e.logger.Info("metrics.scrapeInterval is not set; defaulting PostgreSQL export interval", "interval", interval)
 	}
 
-	e.doScrape(ctx, sink, time.Now())
-
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	initialTick := time.Now()
+	e.doScrape(ctx, sink, initialTick, interval, 0, "startup")
+	previousTick := initialTick
 
 	for {
 		select {
 		case tick := <-ticker.C:
-			e.doScrape(ctx, sink, tick)
+			missed := missedScheduledIntervals(previousTick, tick, interval)
+			previousTick = tick
+			e.doScrape(ctx, sink, tick, interval, missed, "ticker")
 		case <-e.scrapeRequests:
-			e.doScrape(ctx, sink, time.Now())
+			e.doScrape(ctx, sink, time.Now(), interval, 0, "startup_warmup")
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (e *Scraper) doScrape(ctx context.Context, sink SampleSink, tick time.Time) {
+func (e *Scraper) doScrape(ctx context.Context, sink SampleSink, tick time.Time, interval time.Duration, missed int64, trigger string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	batch, summary := e.scrapeSamples(&tick)
+	batch.Runtime = e.newRuntimeSample(
+		"scheduled", trigger, tick, summary.StartedAt, summary.FinishedAt,
+		interval, nil, missed, batch.ScrapeStatuses, "scheduled",
+		summary.SampleCount, summary.TotalErrors,
+	)
 	if err := sink.WriteSamples(ctx, batch, summary); err != nil {
 		e.logger.Error("failed to write samples", "error", err, "samples", batch.Count())
 	}
@@ -215,17 +229,17 @@ func (e *Scraper) scrapeSamples(tick *time.Time) (SampleBatch, ScrapeSummary) {
 
 	finished := time.Now()
 	return SampleBatch{
-			AdditionalMetrics: samples,
-			Performance:       performance,
-			Operational:       operational,
-			ScrapeStatuses:    statuses,
-		}, ScrapeSummary{
-			StartedAt:       begun,
-			FinishedAt:      finished,
-			DurationSeconds: finished.Sub(begun).Seconds(),
-			TotalErrors:     totalErrors,
-			SampleCount:     len(samples) + performance.Count() + operational.Count(),
-		}
+		AdditionalMetrics: samples,
+		Performance:       performance,
+		Operational:       operational,
+		ScrapeStatuses:    statuses,
+	}, ScrapeSummary{
+		StartedAt:       begun,
+		FinishedAt:      finished,
+		DurationSeconds: finished.Sub(begun).Seconds(),
+		TotalErrors:     totalErrors,
+		SampleCount:     len(samples) + performance.Count() + operational.Count(),
+	}
 }
 
 func (e *Scraper) scrapeDatabaseSamples(

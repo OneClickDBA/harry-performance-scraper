@@ -777,6 +777,159 @@
       ],
       "title": "Oracle System Ratios and Utilization",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "description": "Maximum observed collector duration per display bucket for the selected Oracle database. Rising duration without query failures is an early pressure signal.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 14,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 3,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "select\n  date_bin(greatest('${__interval}'::interval, interval '10 seconds'), collected_at, '1970-01-01'::timestamptz) as \"time\",\n  collector as metric,\n  max(duration_seconds)::double precision as value\nfrom oracle_scrape_status\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\ngroup by 1, 2\norder by 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Oracle Collector Duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "description": "Activity-query duration as a percentage of its configured timeout. Sustained growth toward 100% precedes timeout failures and missing DAH samples.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 14,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 3,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "with runtime as (\n  select configured_query_timeout_seconds\n  from harry_latest_runtime_status\n  where scheduler = 'activity'\n  order by observed_at desc\n  limit 1\n)\nselect\n  date_bin(greatest('${__interval}'::interval, interval '10 seconds'), s.collected_at, '1970-01-01'::timestamptz) as \"time\",\n  'Activity timeout used' as metric,\n  max(s.duration_seconds * 100.0 / nullif(runtime.configured_query_timeout_seconds, 0))::double precision as value\nfrom oracle_scrape_status s\ncross join runtime\nwhere $__timeFilter(s.collected_at)\n  and s.source_database = ${source_database:sqlstring}\n  and s.collector = 'activity'\ngroup by 1\norder by 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Activity Query Timeout Utilization",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
@@ -824,6 +977,6 @@
   "timezone": "",
   "title": "Oracle Operational Overview",
   "uid": "oracle-operational-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
