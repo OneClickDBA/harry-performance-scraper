@@ -5,7 +5,7 @@
 
 databases:
   ## Database connection information for the "default" database.
-  default:
+  first_26ai:
     ## Database username
     username: pdbadmin
     ## Database password
@@ -42,7 +42,7 @@ databases:
     ## Oracle AI Database Connection pool minimum size
     # poolMinConnections: 15
 
-  second:
+  second_26ai:
     username: pdbadmin
     password: ${DB_PASSWORD}
     url: second26ai:1521/freepdb1
