@@ -364,7 +364,7 @@
       "id": 29,
       "options": {"legend": {"calcs": ["lastNotNull","max"],"displayMode": "table","placement": "right","showLegend": true},"tooltip": {"mode": "multi","sort": "desc"}},
       "pluginVersion": "9.5.15",
-      "targets": [{"datasource": {"type": "postgres","uid": "PostgreSQL"},"editorMode": "code","format": "time_series","rawQuery": true,"rawSql": "select\n  date_bin(greatest('${__interval}'::interval, interval '10 seconds'), r.observed_at, '1970-01-01'::timestamptz) as time,\n  r.scheduler || ' - ' || phases.phase as metric,\n  avg(phases.seconds)::double precision as value\nfrom harry_runtime_samples r\ncross join lateral (values\n  ('Oracle collection', r.collection_duration_seconds),\n  ('PostgreSQL write', r.postgresql_write_duration_seconds),\n  ('Scheduling lag', r.scheduling_lag_seconds)\n) phases(phase, seconds)\nwhere $__timeFilter(r.observed_at)\n  and r.observed_at >= now() - make_interval(hours => 24)\ngroup by 1, 2\norder by 1, 2;","refId": "A"}],
+      "targets": [{"datasource": {"type": "postgres","uid": "PostgreSQL"},"editorMode": "code","format": "time_series","rawQuery": true,"rawSql": "select\n  date_bin(greatest('${__interval}'::interval, interval '10 seconds'), r.observed_at, '1970-01-01'::timestamptz) as time,\n  r.scheduler || ' - ' || phases.phase as metric,\n  avg(phases.seconds)::double precision as value\nfrom harry_runtime_samples r\ncross join lateral (values\n  ('Oracle collection', r.collection_duration_seconds),\n  ('PostgreSQL write', r.postgresql_write_duration_seconds),\n  ('Scheduling lag', r.scheduling_lag_seconds)\n) phases(phase, seconds)\nwhere $__timeFilter(r.observed_at)\ngroup by 1, 2\norder by 1, 2;","refId": "A"}],
       "title": "Scheduler Phase Duration",
       "type": "timeseries"
     },
@@ -383,7 +383,7 @@
       "id": 30,
       "options": {"legend": {"calcs": ["lastNotNull","max"],"displayMode": "table","placement": "right","showLegend": true},"tooltip": {"mode": "multi","sort": "desc"}},
       "pluginVersion": "9.5.15",
-      "targets": [{"datasource": {"type": "postgres","uid": "PostgreSQL"},"editorMode": "code","format": "time_series","rawQuery": true,"rawSql": "select\n  date_bin(greatest('${__interval}'::interval, interval '10 seconds'), r.observed_at, '1970-01-01'::timestamptz) as time,\n  r.scheduler || ' - ' || values.series as metric,\n  max(values.seconds)::double precision as value\nfrom harry_runtime_samples r\ncross join lateral (values\n  ('cycle duration', r.total_duration_seconds),\n  ('configured interval', r.configured_interval_seconds)\n) values(series, seconds)\nwhere $__timeFilter(r.observed_at)\n  and r.observed_at >= now() - make_interval(hours => 24)\ngroup by 1, 2\norder by 1, 2;","refId": "A"}],
+      "targets": [{"datasource": {"type": "postgres","uid": "PostgreSQL"},"editorMode": "code","format": "time_series","rawQuery": true,"rawSql": "select\n  date_bin(greatest('${__interval}'::interval, interval '10 seconds'), r.observed_at, '1970-01-01'::timestamptz) as time,\n  r.scheduler || ' - ' || values.series as metric,\n  max(values.seconds)::double precision as value\nfrom harry_runtime_samples r\ncross join lateral (values\n  ('cycle duration', r.total_duration_seconds),\n  ('configured interval', r.configured_interval_seconds)\n) values(series, seconds)\nwhere $__timeFilter(r.observed_at)\ngroup by 1, 2\norder by 1, 2;","refId": "A"}],
       "title": "Cycle Duration vs Configured Interval",
       "type": "timeseries"
     },
@@ -421,7 +421,7 @@
       "id": 32,
       "options": {"legend": {"calcs": ["lastNotNull","max"],"displayMode": "table","placement": "right","showLegend": true},"tooltip": {"mode": "multi","sort": "desc"}},
       "pluginVersion": "9.5.15",
-      "targets": [{"datasource": {"type": "postgres","uid": "PostgreSQL"},"editorMode": "code","format": "time_series","rawQuery": true,"rawSql": "select\n  date_bin(greatest('${__interval}'::interval, interval '10 seconds'), r.observed_at, '1970-01-01'::timestamptz) as time,\n  r.scheduler || ' - ' || results.series as metric,\n  max(results.value)::double precision as value\nfrom harry_runtime_samples r\ncross join lateral (values\n  ('missed intervals', r.missed_intervals),\n  ('errors', r.error_count),\n  ('databases incomplete', greatest(r.databases_attempted - r.databases_succeeded, 0))\n) results(series, value)\nwhere $__timeFilter(r.observed_at)\n  and r.observed_at >= now() - make_interval(hours => 24)\ngroup by 1, 2\norder by 1, 2;","refId": "A"}],
+      "targets": [{"datasource": {"type": "postgres","uid": "PostgreSQL"},"editorMode": "code","format": "time_series","rawQuery": true,"rawSql": "select\n  date_bin(greatest('${__interval}'::interval, interval '10 seconds'), r.observed_at, '1970-01-01'::timestamptz) as time,\n  r.scheduler || ' - ' || results.series as metric,\n  max(results.value)::double precision as value\nfrom harry_runtime_samples r\ncross join lateral (values\n  ('missed intervals', r.missed_intervals),\n  ('errors', r.error_count),\n  ('databases incomplete', greatest(r.databases_attempted - r.databases_succeeded, 0))\n) results(series, value)\nwhere $__timeFilter(r.observed_at)\ngroup by 1, 2\norder by 1, 2;","refId": "A"}],
       "title": "Scheduler Cycle Results",
       "type": "timeseries"
     }
@@ -457,6 +457,6 @@
   "timezone": "",
   "title": "Harry PostgreSQL Repository Health",
   "uid": "harry-postgresql-repository-health",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }
