@@ -732,25 +732,42 @@ create table if not exists %s (
 );
 
 create or replace view %s as
-select distinct on (source_database, tablespace_name)
-	collected_at, source_database, tablespace_name, contents, used_bytes, free_bytes, max_bytes, used_percent
-from %s
-order by source_database, tablespace_name, collected_at desc;
+	select samples.collected_at, samples.source_database, samples.tablespace_name,
+		samples.contents, samples.used_bytes, samples.free_bytes, samples.max_bytes,
+		samples.used_percent
+	from %s samples
+	join %s status
+		on status.source_database = samples.source_database
+		and status.collector = 'operational.tablespaces'
+		and status.collected_at = samples.collected_at
+	where samples.collected_at >= current_timestamp - interval '1 day';
 
 create or replace view %s as
-select distinct on (source_database, resource_name, inst_id)
-	collected_at, source_database, inst_id, resource_name, current_value, max_value,
-	initial_limit, limit_value, limit_unlimited,
-	case when limit_value > 0 then current_value * 100.0 / limit_value end as used_percent
-from %s
-order by source_database, resource_name, inst_id, collected_at desc;
+	select samples.collected_at, samples.source_database, samples.inst_id,
+		samples.resource_name, samples.current_value, samples.max_value,
+		samples.initial_limit, samples.limit_value, samples.limit_unlimited,
+		case when samples.limit_value > 0
+			then samples.current_value * 100.0 / samples.limit_value
+		end as used_percent
+	from %s samples
+	join %s status
+		on status.source_database = samples.source_database
+		and status.collector = 'operational.resource_limits'
+		and status.collected_at = samples.collected_at
+	where samples.collected_at >= current_timestamp - interval '1 day';
 
 create or replace view %s as
-select distinct on (source_database, diskgroup_name, inst_id)
-	collected_at, source_database, inst_id, diskgroup_name, total_bytes, free_bytes, usable_bytes,
-	case when total_bytes > 0 then (total_bytes - free_bytes) * 100.0 / total_bytes end as used_percent
-from %s
-order by source_database, diskgroup_name, inst_id, collected_at desc;
+	select samples.collected_at, samples.source_database, samples.inst_id,
+		samples.diskgroup_name, samples.total_bytes, samples.free_bytes, samples.usable_bytes,
+		case when samples.total_bytes > 0
+			then (samples.total_bytes - samples.free_bytes) * 100.0 / samples.total_bytes
+		end as used_percent
+	from %s samples
+	join %s status
+		on status.source_database = samples.source_database
+		and status.collector = 'operational.asm_diskgroups'
+		and status.collected_at = samples.collected_at
+	where samples.collected_at >= current_timestamp - interval '1 day';
 
 create or replace view %s as
 select collected_at, source_database, inst_id, con_id, stat_name, cumulative_value, delta_value,
@@ -778,9 +795,9 @@ from %s;
 		systemMetrics, systemMetrics,
 		scrapeStatus, scrapeStatus,
 		latestScrapeStatus,
-		siblingIdentifier(s.tablespaceTable, "oracle_latest_tablespace_samples").Sanitize(), tablespaces,
-		siblingIdentifier(s.resourceLimitTable, "oracle_latest_resource_limit_samples").Sanitize(), resourceLimits,
-		siblingIdentifier(s.asmDiskgroupTable, "oracle_latest_asm_diskgroup_samples").Sanitize(), asmDiskgroups,
+		siblingIdentifier(s.tablespaceTable, "oracle_latest_tablespace_samples").Sanitize(), tablespaces, latestScrapeStatus,
+		siblingIdentifier(s.resourceLimitTable, "oracle_latest_resource_limit_samples").Sanitize(), resourceLimits, latestScrapeStatus,
+		siblingIdentifier(s.asmDiskgroupTable, "oracle_latest_asm_diskgroup_samples").Sanitize(), asmDiskgroups, latestScrapeStatus,
 		siblingIdentifier(s.systemCounterTable, "oracle_system_counter_rates").Sanitize(), systemCounters,
 		siblingIdentifier(s.waitClassTable, "oracle_wait_class_rates").Sanitize(), waitClasses,
 	)

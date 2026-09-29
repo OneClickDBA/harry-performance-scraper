@@ -62,6 +62,26 @@ func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
 	if !strings.Contains(ddl, "primary key (source_database, collector)") {
 		t.Fatalf("latest scrape status table does not define its expected primary key")
 	}
+	for _, collector := range []string{
+		"operational.tablespaces",
+		"operational.resource_limits",
+		"operational.asm_diskgroups",
+	} {
+		if !strings.Contains(ddl, "status.collector = '"+collector+"'") {
+			t.Fatalf("latest operational view does not use current status for %s", collector)
+		}
+	}
+	if strings.Count(ddl, "join "+latestTable+" status") != 3 {
+		t.Fatalf("latest operational views do not all join the latest scrape status table")
+	}
+	if strings.Count(ddl, "where samples.collected_at >= current_timestamp - interval '1 day'") != 3 {
+		t.Fatalf("latest operational views do not all bound partition history")
+	}
+	if strings.Contains(ddl, "select distinct on (source_database, tablespace_name)") ||
+		strings.Contains(ddl, "select distinct on (source_database, resource_name, inst_id)") ||
+		strings.Contains(ddl, "select distinct on (source_database, diskgroup_name, inst_id)") {
+		t.Fatalf("latest operational views still scan and deduplicate retained history")
+	}
 }
 
 func TestRuntimeSchemaDDL(t *testing.T) {
