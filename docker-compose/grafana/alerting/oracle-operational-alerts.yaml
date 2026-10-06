@@ -645,7 +645,7 @@ groups:
                     sample_day::date as sample_day,
                     source_database,
                     additional_metric_rows + sql_sample_rows + sql_text_writes +
-                    sql_plan_operation_writes + session_sample_rows +
+                    sql_cursor_metadata_writes + sql_plan_operation_writes + session_sample_rows +
                     blocking_session_sample_rows + database_activity_sample_rows +
                     database_status_sample_rows + instance_sample_rows +
                     resource_limit_sample_rows + tablespace_sample_rows +

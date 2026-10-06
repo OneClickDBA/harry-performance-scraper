@@ -159,6 +159,7 @@ func TestRepositoryIngestSchemaDDL(t *testing.T) {
 		"partition by range (sample_day)",
 		"primary key (sample_day, source_database)",
 		"database_activity_sample_rows bigint not null default 0",
+		"sql_cursor_metadata_writes bigint not null default 0",
 		"last_flushed_at timestamptz not null",
 	} {
 		if !strings.Contains(ddl, expected) {
@@ -174,6 +175,7 @@ func TestCollectRepositoryIngest(t *testing.T) {
 		AdditionalMetrics: []collector.MetricSample{{CollectedAt: first, Database: "DB1"}},
 		Performance: collector.PerformanceSamples{
 			SQL:              []collector.SQLSample{{CollectedAt: first, Database: "DB1"}},
+			SQLDetails:       []collector.SQLSample{{CollectedAt: first, Database: "DB1"}},
 			SQLTexts:         []collector.SQLTextSample{{CollectedAt: first, Database: "DB1"}},
 			SQLPlans:         []collector.SQLPlanOperation{{CollectedAt: first, Database: "DB1"}},
 			Sessions:         []collector.SessionSample{{CollectedAt: nextDay, Database: "DB1"}},
@@ -198,7 +200,8 @@ func TestCollectRepositoryIngest(t *testing.T) {
 	}
 	firstEntry := counts[repositoryIngestKey{day: dayStartUTC(first), database: "DB1"}]
 	if firstEntry.additionalMetricRows != 1 || firstEntry.sqlSampleRows != 1 ||
-		firstEntry.sqlTextWrites != 1 || firstEntry.sqlPlanOperationWrites != 1 {
+		firstEntry.sqlTextWrites != 1 || firstEntry.sqlCursorMetadataWrites != 1 ||
+		firstEntry.sqlPlanOperationWrites != 1 {
 		t.Fatalf("unexpected first-day counters: %+v", firstEntry)
 	}
 	if !firstEntry.lastSQLSampleAt.Equal(first) {
@@ -302,6 +305,142 @@ func TestRepositoryIngestPostgreSQL(t *testing.T) {
 	if !firstSampleAt.Equal(first) || !lastSampleAt.Equal(last) {
 		t.Fatalf("sample range = %s to %s, want %s to %s", firstSampleAt, lastSampleAt, first, last)
 	}
+}
+
+func TestSQLCursorMetadataPostgreSQL(t *testing.T) {
+	url := os.Getenv("HARRY_POSTGRES_TEST_URL")
+	if url == "" {
+		t.Skip("HARRY_POSTGRES_TEST_URL is not set")
+	}
+	ctx := context.Background()
+	sink, err := New(ctx, slog.New(slog.NewTextHandler(io.Discard, nil)), collector.PostgreSQLConfig{URL: url})
+	if err != nil {
+		t.Fatalf("create PostgreSQL sink: %v", err)
+	}
+	defer sink.Close()
+
+	const database = "HARRY_CURSOR_METADATA_INTEGRATION_TEST"
+	const sqlID = "metadata123"
+	childNumber := int64(2)
+	planHashValue := int64(987654321)
+	parsingSchema := "APP_OWNER"
+	firstModule := "JDBC Thin Client"
+	changedModule := "Order API"
+	first := dayStartUTC(time.Now().UTC()).Add(time.Hour)
+
+	deleteMetadata := "delete from " + sink.sqlCursorMetadataTable.Sanitize() + " where source_database = $1"
+	deleteSamples := "delete from " + sink.sqlSamplesTable.Sanitize() + " where source_database = $1"
+	if _, err := sink.pool.Exec(ctx, deleteMetadata, database); err != nil {
+		t.Fatalf("reset SQL cursor metadata: %v", err)
+	}
+	if _, err := sink.pool.Exec(ctx, deleteSamples, database); err != nil {
+		t.Fatalf("reset SQL samples: %v", err)
+	}
+	defer func() {
+		if _, err := sink.pool.Exec(context.Background(), deleteSamples, database); err != nil {
+			t.Errorf("clean up SQL samples: %v", err)
+		}
+		if _, err := sink.pool.Exec(context.Background(), deleteMetadata, database); err != nil {
+			t.Errorf("clean up SQL cursor metadata: %v", err)
+		}
+	}()
+
+	detail := collector.SQLSample{
+		CollectedAt: first, Database: database, InstID: 1, SQLID: sqlID,
+		ChildNumber: &childNumber, PlanHashValue: &planHashValue,
+		ParsingSchemaName: &parsingSchema, Module: &firstModule,
+	}
+	performanceSample := detail
+	performanceSample.ChildNumber = nil
+	performanceSample.ParsingSchemaName = nil
+	performanceSample.Module = nil
+	performanceSample.Executions = ptr(int64(1))
+	if err := sink.WriteSamples(ctx, collector.SampleBatch{
+		Performance: collector.PerformanceSamples{
+			SQL:        []collector.SQLSample{performanceSample},
+			SQLDetails: []collector.SQLSample{detail},
+		},
+	}, collector.ScrapeSummary{}); err != nil {
+		t.Fatalf("write SQL sample and cursor metadata: %v", err)
+	}
+
+	enrichedView := siblingIdentifier(sink.sqlSamplesTable, "oracle_sql_samples_enriched").Sanitize()
+	var children, gotSchema, gotModule string
+	query := "select child_number, parsing_schema_name, module from " + enrichedView +
+		" where source_database = $1 and sql_id = $2"
+	if err := sink.pool.QueryRow(ctx, query, database, sqlID).Scan(&children, &gotSchema, &gotModule); err != nil {
+		t.Fatalf("read enriched SQL sample: %v", err)
+	}
+	if children != "2" || gotSchema != parsingSchema || gotModule != firstModule {
+		t.Fatalf("enriched context = children:%q schema:%q module:%q", children, gotSchema, gotModule)
+	}
+
+	writeMetadata := func(sample collector.SQLSample) {
+		t.Helper()
+		tx, err := sink.pool.Begin(ctx)
+		if err != nil {
+			t.Fatalf("begin metadata transaction: %v", err)
+		}
+		defer tx.Rollback(ctx)
+		if err := sink.writeSQLCursorMetadata(ctx, tx, []collector.SQLSample{sample}); err != nil {
+			t.Fatalf("write metadata: %v", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatalf("commit metadata: %v", err)
+		}
+	}
+	readMetadata := func() (time.Time, string) {
+		t.Helper()
+		var lastSeen time.Time
+		var module string
+		query := "select last_seen_at, module from " + sink.sqlCursorMetadataTable.Sanitize() +
+			" where source_database = $1 and inst_id = $2 and sql_id = $3 and child_number = $4 and plan_hash_value = $5"
+		if err := sink.pool.QueryRow(ctx, query, database, int64(1), sqlID, childNumber, planHashValue).Scan(&lastSeen, &module); err != nil {
+			t.Fatalf("read metadata: %v", err)
+		}
+		return lastSeen, module
+	}
+
+	sameDay := detail
+	sameDay.CollectedAt = first.Add(time.Hour)
+	writeMetadata(sameDay)
+	lastSeen, module := readMetadata()
+	if !lastSeen.Equal(first) || module != firstModule {
+		t.Fatalf("unchanged same-day metadata was rewritten: last_seen=%s module=%q", lastSeen, module)
+	}
+
+	changed := sameDay
+	changed.CollectedAt = first.Add(2 * time.Hour)
+	changed.Module = &changedModule
+	writeMetadata(changed)
+	lastSeen, module = readMetadata()
+	if !lastSeen.Equal(changed.CollectedAt) || module != changedModule {
+		t.Fatalf("changed metadata was not stored immediately: last_seen=%s module=%q", lastSeen, module)
+	}
+
+	nextDay := changed
+	nextDay.CollectedAt = first.Add(24 * time.Hour)
+	writeMetadata(nextDay)
+	lastSeen, module = readMetadata()
+	if !lastSeen.Equal(nextDay.CollectedAt) || module != changedModule {
+		t.Fatalf("next-day metadata was not refreshed: last_seen=%s module=%q", lastSeen, module)
+	}
+
+	stale := detail
+	stale.Database = database + "_STALE"
+	stale.CollectedAt = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	writeMetadata(stale)
+	deleted, err := sink.deleteExpiredSQLCursorMetadata(ctx, time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("delete expired SQL cursor metadata: %v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("expired SQL cursor metadata deleted = %d, want 1", deleted)
+	}
+}
+
+func ptr[T any](value T) *T {
+	return &value
 }
 
 func TestPartitionDay(t *testing.T) {
@@ -433,6 +572,46 @@ func TestCollectSQLTextUpdates(t *testing.T) {
 		if _, ok := references[sqlTextKey{database: "DB1", sqlID: referencedSQLID}]; !ok {
 			t.Fatalf("expected reference for SQL ID %s", referencedSQLID)
 		}
+	}
+}
+
+func TestCollectSQLCursorMetadata(t *testing.T) {
+	first := time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
+	last := first.Add(time.Hour)
+	childNumber := int64(2)
+	planHashValue := int64(987654321)
+	oldSchema := "OLD_OWNER"
+	newSchema := "APP_OWNER"
+	module := "JDBC Thin Client"
+
+	metadata := collectSQLCursorMetadata([]collector.SQLSample{
+		{
+			CollectedAt: first, Database: "DB1", InstID: 1, SQLID: "abc123",
+			ChildNumber: &childNumber, PlanHashValue: &planHashValue,
+			ParsingSchemaName: &oldSchema,
+		},
+		{
+			CollectedAt: last, Database: "DB1", InstID: 1, SQLID: "abc123",
+			ChildNumber: &childNumber, PlanHashValue: &planHashValue,
+			ParsingSchemaName: &newSchema, Module: &module,
+		},
+		{CollectedAt: last, Database: "DB1", InstID: 1, SQLID: "missing-cursor-identity"},
+	})
+
+	if len(metadata) != 1 {
+		t.Fatalf("metadata rows = %d, want 1", len(metadata))
+	}
+	key := sqlCursorMetadataKey{
+		database: "DB1", instID: 1, sqlID: "abc123",
+		childNumber: childNumber, planHashValue: planHashValue,
+	}
+	sample, ok := metadata[key]
+	if !ok {
+		t.Fatal("expected SQL cursor metadata row")
+	}
+	if !sample.CollectedAt.Equal(last) || sample.ParsingSchemaName == nil ||
+		*sample.ParsingSchemaName != newSchema || sample.Module == nil || *sample.Module != module {
+		t.Fatalf("unexpected latest SQL cursor metadata: %+v", sample)
 	}
 }
 

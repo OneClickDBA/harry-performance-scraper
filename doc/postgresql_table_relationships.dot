@@ -34,6 +34,10 @@ digraph postgresql_table_relationships {
     label="oracle_sql_texts\l\lsource_database PK\lsql_id PK\lsql_fulltext\lfirst_seen_at\llast_text_seen_at\llast_referenced_at\l\lIndexes\llast_referenced_at\l"
   ];
 
+  oracle_sql_cursor_metadata [
+    label="oracle_sql_cursor_metadata\l\lsource_database PK\linst_id PK\lsql_id PK\lchild_number PK\lplan_hash_value PK\lparsing_schema_name\lmodule\lfirst_seen_at\llast_seen_at\l\lIndexes\llast_seen_at\l"
+  ];
+
   oracle_sql_plans [
     label="oracle_sql_plans\l\lsource_database PK\linst_id PK\lsql_id PK\lchild_number PK\lplan_hash_value PK\lplan_line_id PK\lparent_id\ldepth\lposition\loperation\loptions\lobject_owner\lobject_name\lobject_type\loptimizer\lcost\lcardinality\lbytes\lcpu_cost\lio_cost\ltemp_space\lpartition_start\lpartition_stop\laccess_predicates\lfilter_predicates\lfirst_seen_at\llast_seen_at\llast_referenced_at\l\lIndexes\lsource_database, sql_id, plan_hash_value\llast_referenced_at\l"
   ];
@@ -99,7 +103,7 @@ digraph postgresql_table_relationships {
   ];
 
   harry_repository_daily_ingest [
-    label="harry_repository_daily_ingest\l\lPartitioned by RANGE (sample_day)\lsample_day PK\lsource_database PK\ladditional_metric_rows\lsql_sample_rows\lsql_text_writes\lsql_plan_operation_writes\lsession_sample_rows\lblocking_session_sample_rows\ldatabase_activity_sample_rows\ldatabase_status_sample_rows\linstance_sample_rows\lresource_limit_sample_rows\ltablespace_sample_rows\lasm_diskgroup_sample_rows\lsystem_counter_sample_rows\lwait_class_sample_rows\lsystem_metric_sample_rows\lscrape_status_rows\lfirst_sample_at\llast_sample_at\llast_sql_sample_at\llast_session_sample_at\llast_database_activity_sample_at\llast_flushed_at\l"
+    label="harry_repository_daily_ingest\l\lPartitioned by RANGE (sample_day)\lsample_day PK\lsource_database PK\ladditional_metric_rows\lsql_sample_rows\lsql_text_writes\lsql_cursor_metadata_writes\lsql_plan_operation_writes\lsession_sample_rows\lblocking_session_sample_rows\ldatabase_activity_sample_rows\ldatabase_status_sample_rows\linstance_sample_rows\lresource_limit_sample_rows\ltablespace_sample_rows\lasm_diskgroup_sample_rows\lsystem_counter_sample_rows\lwait_class_sample_rows\lsystem_metric_sample_rows\lscrape_status_rows\lfirst_sample_at\llast_sample_at\llast_sql_sample_at\llast_session_sample_at\llast_database_activity_sample_at\llast_flushed_at\l"
   ];
 
   // Logical relationships used by dashboards and analysis queries.
@@ -134,6 +138,18 @@ digraph postgresql_table_relationships {
   ];
 
   oracle_sql_samples -> oracle_sql_plans [
+    label="logical: source_database, inst_id, sql_id, child_number, plan_hash_value",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_sql_samples -> oracle_sql_cursor_metadata [
+    label="logical: source_database, inst_id, sql_id, plan_hash_value",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_sql_cursor_metadata -> oracle_sql_plans [
     label="logical: source_database, inst_id, sql_id, child_number, plan_hash_value",
     style=dashed,
     color="#666666"
@@ -230,7 +246,7 @@ digraph postgresql_table_relationships {
   repository_ingest_sources [
     shape=note,
     fillcolor="#e4f2e4",
-    label="Successful writes to all sample,\lstatus, SQL text, and SQL plan datasets\l"
+    label="Successful writes to all sample,\lstatus, SQL text, cursor metadata, and SQL plan datasets\l"
   ];
 
   repository_ingest_sources -> harry_repository_daily_ingest [
