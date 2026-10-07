@@ -146,7 +146,7 @@ digraph oracle_to_postgresql_tables {
     shape=plain,
     label=<
       <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
-        <TR><TD BGCOLOR="#f3d99b"><B>Oracle sources for cached SQL plans</B></TD></TR>
+        <TR><TD BGCOLOR="#f3d99b"><B>Oracle sources for bounded SQL details</B></TD></TR>
         <TR><TD ALIGN="LEFT">GV$SQL</TD></TR>
         <TR><TD ALIGN="LEFT">GV$SQL_PLAN</TD></TR>
       </TABLE>
@@ -207,6 +207,12 @@ digraph oracle_to_postgresql_tables {
       fillcolor="#e8f1ff",
       label="oracle_sql_texts"
     ];
+    pg_oracle_sql_cursor_metadata [
+      shape=box,
+      style="rounded,filled",
+      fillcolor="#e8f1ff",
+      label="oracle_sql_cursor_metadata"
+    ];
     pg_oracle_sql_plans [
       shape=box,
       style="rounded,filled",
@@ -249,6 +255,7 @@ digraph oracle_to_postgresql_tables {
   oracle_metric_sources -> pg_oracle_metric_samples [label="additional metric definitions"];
   oracle_sql_sources -> pg_oracle_sql_samples [label="performance sampler"];
   oracle_sql_plan_sources -> pg_oracle_sql_texts [label="bounded SQL_FULLTEXT dictionary"];
+  oracle_sql_plan_sources -> pg_oracle_sql_cursor_metadata [label="bounded cursor schema and module metadata"];
   oracle_sql_plan_sources -> pg_oracle_sql_plans [label="bounded cursor-plan collector"];
   oracle_session_sources -> pg_oracle_session_samples [label="performance sampler"];
   oracle_blocking_session_sources -> pg_oracle_blocking_session_samples [label="blocking sampler"];

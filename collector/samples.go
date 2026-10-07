@@ -354,7 +354,8 @@ func (b SampleBatch) Count() int {
 }
 
 func (p PerformanceSamples) Count() int {
-	return len(p.SQL) + len(p.SQLTexts) + len(p.SQLPlans) + len(p.Sessions) + len(p.BlockingSessions) + len(p.DatabaseActivity)
+	return len(p.SQL) + len(p.SQLDetails) + len(p.SQLTexts) + len(p.SQLPlans) +
+		len(p.Sessions) + len(p.BlockingSessions) + len(p.DatabaseActivity)
 }
 
 type SampleSink interface {
