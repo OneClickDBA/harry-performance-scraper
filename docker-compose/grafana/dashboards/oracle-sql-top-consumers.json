@@ -987,16 +987,16 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "child_number"
+              "options": "child_numbers"
             },
             "properties": [
               {
                 "id": "displayName",
-                "value": "Child"
+                "value": "Children"
               },
               {
                 "id": "custom.width",
-                "value": 65
+                "value": 95
               }
             ]
           },
@@ -1111,6 +1111,38 @@
                 "value": 145
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "parsing_schemas"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Schemas"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "modules"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Modules"
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
           }
         ]
       },
@@ -1143,7 +1175,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select s.inst_id, s.sql_id, s.child_number, s.plan_hash_value,\n  min(s.collected_at) as first_seen, max(s.collected_at) as last_seen,\n  count(*) as samples,\n  max(s.executions) - min(s.executions) as executions_delta,\n  round((max(coalesce(s.elapsed_time_micro, 0)) - min(coalesce(s.elapsed_time_micro, 0))) / 1000000.0, 3) as elapsed_seconds_delta,\n  case when exists (\n    select 1 from oracle_sql_plans p\n    where p.source_database = s.source_database\n      and p.sql_id = s.sql_id\n      and p.plan_hash_value = s.plan_hash_value\n  ) then 'Available' else 'Not collected or aged out' end as plan_status\nfrom oracle_sql_samples s\nwhere $__timeFilter(s.collected_at)\n  and s.source_database = ${source_database:sqlstring}\n  and s.sql_id = nullif(${sql_id:sqlstring}, '')\ngroup by s.source_database, s.inst_id, s.sql_id, s.child_number, s.plan_hash_value\norder by last_seen desc, elapsed_seconds_delta desc;",
+          "rawSql": "with samples as (\n  select s.source_database, s.inst_id, s.sql_id, s.plan_hash_value,\n    min(s.collected_at) as first_seen, max(s.collected_at) as last_seen,\n    count(*) as samples,\n    max(s.executions) - min(s.executions) as executions_delta,\n    round((max(coalesce(s.elapsed_time_micro, 0)) - min(coalesce(s.elapsed_time_micro, 0))) / 1000000.0, 3) as elapsed_seconds_delta\n  from oracle_sql_samples s\n  where $__timeFilter(s.collected_at)\n    and s.source_database = ${source_database:sqlstring}\n    and s.sql_id = nullif(${sql_id:sqlstring}, '')\n  group by s.source_database, s.inst_id, s.sql_id, s.plan_hash_value\n)\nselect s.inst_id, s.sql_id,\n  metadata.child_numbers,\n  s.plan_hash_value,\n  metadata.parsing_schemas,\n  metadata.modules,\n  s.first_seen, s.last_seen, s.samples, s.executions_delta, s.elapsed_seconds_delta,\n  case when exists (\n    select 1 from oracle_sql_plans p\n    where p.source_database = s.source_database\n      and p.sql_id = s.sql_id\n      and p.plan_hash_value = s.plan_hash_value\n  ) then 'Available' else 'Not collected or aged out' end as plan_status\nfrom samples s\nleft join lateral (\n  select\n    string_agg(distinct m.child_number::text, ', ' order by m.child_number::text) as child_numbers,\n    string_agg(distinct m.parsing_schema_name, ', ' order by m.parsing_schema_name)\n      filter (where m.parsing_schema_name is not null) as parsing_schemas,\n    string_agg(distinct m.module, ', ' order by m.module)\n      filter (where m.module is not null) as modules\n  from oracle_sql_cursor_metadata m\n  where m.source_database = s.source_database\n    and m.inst_id = s.inst_id\n    and m.sql_id = s.sql_id\n    and m.plan_hash_value = s.plan_hash_value\n) metadata on true\norder by s.last_seen desc, s.elapsed_seconds_delta desc;\n",
           "refId": "A",
           "sql": {
             "columns": [

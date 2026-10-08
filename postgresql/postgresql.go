@@ -26,6 +26,7 @@ type Sink struct {
 	samplesTable             pgx.Identifier
 	sqlSamplesTable          pgx.Identifier
 	sqlTextsTable            pgx.Identifier
+	sqlCursorMetadataTable   pgx.Identifier
 	sqlPlansTable            pgx.Identifier
 	sessionSamplesTable      pgx.Identifier
 	blockingSessionsTable    pgx.Identifier
@@ -59,6 +60,8 @@ type Sink struct {
 const repositoryIngestFlushInterval = 5 * time.Minute
 const runtimeTelemetryFlushInterval = time.Minute
 const maxPendingRuntimeSamples = 10000
+const sqlCursorMetadataDeleteBatchSize = 2000
+const sqlCursorMetadataDeleteMaxBatches = 5
 
 func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfig) (*Sink, error) {
 	if strings.TrimSpace(cfg.URL) == "" {
@@ -86,6 +89,7 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 		samplesTable:             identifier(cfg.SamplesTable, "oracle_metric_samples"),
 		sqlSamplesTable:          sqlSamplesTable,
 		sqlTextsTable:            siblingIdentifier(sqlSamplesTable, "oracle_sql_texts"),
+		sqlCursorMetadataTable:   siblingIdentifier(sqlSamplesTable, "oracle_sql_cursor_metadata"),
 		sqlPlansTable:            siblingIdentifier(sqlSamplesTable, "oracle_sql_plans"),
 		sessionSamplesTable:      identifier(cfg.SessionSamplesTable, "oracle_session_samples"),
 		blockingSessionsTable:    identifier(cfg.BlockingSessionsTable, "oracle_blocking_session_samples"),
@@ -125,7 +129,9 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 func (s *Sink) Migrate(ctx context.Context) error {
 	samples := s.samplesTable.Sanitize()
 	sqlSamples := s.sqlSamplesTable.Sanitize()
+	sqlSamplesEnriched := siblingIdentifier(s.sqlSamplesTable, "oracle_sql_samples_enriched").Sanitize()
 	sqlTexts := s.sqlTextsTable.Sanitize()
+	sqlCursorMetadata := s.sqlCursorMetadataTable.Sanitize()
 	sqlPlans := s.sqlPlansTable.Sanitize()
 	sessionSamples := s.sessionSamplesTable.Sanitize()
 	blockingSessions := s.blockingSessionsTable.Sanitize()
@@ -157,6 +163,21 @@ create table if not exists %s (
 );
 
 create index if not exists oracle_sql_texts_last_referenced_at_idx on %s (last_referenced_at);
+
+create table if not exists %s (
+	source_database text not null,
+	inst_id bigint not null,
+	sql_id text not null,
+	child_number bigint not null,
+	plan_hash_value bigint not null,
+	parsing_schema_name text,
+	module text,
+	first_seen_at timestamptz not null,
+	last_seen_at timestamptz not null,
+	primary key (source_database, inst_id, sql_id, child_number, plan_hash_value)
+);
+
+create index if not exists oracle_sql_cursor_metadata_last_seen_at_idx on %s (last_seen_at);
 
 create table if not exists %s (
 	source_database text not null,
@@ -223,6 +244,52 @@ create table if not exists %s (
 create index if not exists oracle_sql_samples_collected_at_idx on %s (collected_at);
 create index if not exists oracle_sql_samples_sql_id_idx on %s (source_database, sql_id, child_number);
 create index if not exists oracle_sql_samples_elapsed_idx on %s (elapsed_time_micro desc);
+
+create or replace view %s as
+select
+	samples.collected_at,
+	samples.source_database,
+	samples.inst_id,
+	samples.sql_id,
+	coalesce(samples.child_number::text, context.child_numbers) as child_number,
+	samples.plan_hash_value,
+	coalesce(samples.parsing_schema_name, context.parsing_schema_names) as parsing_schema_name,
+	coalesce(samples.module, context.modules) as module,
+	samples.executions,
+	samples.elapsed_time_micro,
+	samples.cpu_time_micro,
+	samples.user_io_wait_micro,
+	samples.application_wait_micro,
+	samples.concurrency_wait_micro,
+	samples.cluster_wait_micro,
+	samples.buffer_gets,
+	samples.disk_reads,
+	samples.direct_writes,
+	samples.rows_processed,
+	samples.fetches,
+	samples.loads,
+	samples.invalidations,
+	samples.parse_calls,
+	samples.last_active_time
+from %s samples
+left join (
+	select
+		source_database,
+		inst_id,
+		sql_id,
+		plan_hash_value,
+		string_agg(distinct child_number::text, ', ' order by child_number::text) as child_numbers,
+		string_agg(distinct parsing_schema_name, ', ' order by parsing_schema_name)
+			filter (where parsing_schema_name is not null) as parsing_schema_names,
+		string_agg(distinct module, ', ' order by module)
+			filter (where module is not null) as modules
+	from %s
+	group by source_database, inst_id, sql_id, plan_hash_value
+) context
+	on context.source_database = samples.source_database
+	and context.inst_id = samples.inst_id
+	and context.sql_id = samples.sql_id
+	and context.plan_hash_value = samples.plan_hash_value;
 
 create table if not exists %s (
 	collected_at timestamptz not null,
@@ -333,8 +400,10 @@ alter table %s add column if not exists client_identifier text;
 create index if not exists oracle_database_activity_samples_source_idx on %s (source_database, sample_source, sample_time);
 `, samples, samples, samples, samples,
 		sqlTexts, sqlTexts,
+		sqlCursorMetadata, sqlCursorMetadata,
 		sqlPlans, sqlPlans, sqlPlans,
 		sqlSamples, sqlSamples, sqlSamples, sqlSamples,
+		sqlSamplesEnriched, sqlSamples, sqlCursorMetadata,
 		sessionSamples, sessionSamples, sessionSamples, sessionSamples,
 		blockingSessions, blockingSessions, blockingSessions,
 		databaseActivity, databaseActivity, databaseActivity, databaseActivity, databaseActivity,
@@ -433,6 +502,7 @@ create table if not exists %s (
 	additional_metric_rows bigint not null default 0,
 	sql_sample_rows bigint not null default 0,
 	sql_text_writes bigint not null default 0,
+	sql_cursor_metadata_writes bigint not null default 0,
 	sql_plan_operation_writes bigint not null default 0,
 	session_sample_rows bigint not null default 0,
 	blocking_session_sample_rows bigint not null default 0,
@@ -454,7 +524,9 @@ create table if not exists %s (
 	last_flushed_at timestamptz not null,
 	primary key (sample_day, source_database)
 ) partition by range (sample_day);
-`, s.repositoryIngestTable.Sanitize())
+
+alter table %s add column if not exists sql_cursor_metadata_writes bigint not null default 0;
+`, s.repositoryIngestTable.Sanitize(), s.repositoryIngestTable.Sanitize())
 }
 
 func (s *Sink) migrateOperationalSchema(ctx context.Context) error {
@@ -732,25 +804,42 @@ create table if not exists %s (
 );
 
 create or replace view %s as
-select distinct on (source_database, tablespace_name)
-	collected_at, source_database, tablespace_name, contents, used_bytes, free_bytes, max_bytes, used_percent
-from %s
-order by source_database, tablespace_name, collected_at desc;
+	select samples.collected_at, samples.source_database, samples.tablespace_name,
+		samples.contents, samples.used_bytes, samples.free_bytes, samples.max_bytes,
+		samples.used_percent
+	from %s samples
+	join %s status
+		on status.source_database = samples.source_database
+		and status.collector = 'operational.tablespaces'
+		and status.collected_at = samples.collected_at
+	where samples.collected_at >= current_timestamp - interval '1 day';
 
 create or replace view %s as
-select distinct on (source_database, resource_name, inst_id)
-	collected_at, source_database, inst_id, resource_name, current_value, max_value,
-	initial_limit, limit_value, limit_unlimited,
-	case when limit_value > 0 then current_value * 100.0 / limit_value end as used_percent
-from %s
-order by source_database, resource_name, inst_id, collected_at desc;
+	select samples.collected_at, samples.source_database, samples.inst_id,
+		samples.resource_name, samples.current_value, samples.max_value,
+		samples.initial_limit, samples.limit_value, samples.limit_unlimited,
+		case when samples.limit_value > 0
+			then samples.current_value * 100.0 / samples.limit_value
+		end as used_percent
+	from %s samples
+	join %s status
+		on status.source_database = samples.source_database
+		and status.collector = 'operational.resource_limits'
+		and status.collected_at = samples.collected_at
+	where samples.collected_at >= current_timestamp - interval '1 day';
 
 create or replace view %s as
-select distinct on (source_database, diskgroup_name, inst_id)
-	collected_at, source_database, inst_id, diskgroup_name, total_bytes, free_bytes, usable_bytes,
-	case when total_bytes > 0 then (total_bytes - free_bytes) * 100.0 / total_bytes end as used_percent
-from %s
-order by source_database, diskgroup_name, inst_id, collected_at desc;
+	select samples.collected_at, samples.source_database, samples.inst_id,
+		samples.diskgroup_name, samples.total_bytes, samples.free_bytes, samples.usable_bytes,
+		case when samples.total_bytes > 0
+			then (samples.total_bytes - samples.free_bytes) * 100.0 / samples.total_bytes
+		end as used_percent
+	from %s samples
+	join %s status
+		on status.source_database = samples.source_database
+		and status.collector = 'operational.asm_diskgroups'
+		and status.collected_at = samples.collected_at
+	where samples.collected_at >= current_timestamp - interval '1 day';
 
 create or replace view %s as
 select collected_at, source_database, inst_id, con_id, stat_name, cumulative_value, delta_value,
@@ -778,9 +867,9 @@ from %s;
 		systemMetrics, systemMetrics,
 		scrapeStatus, scrapeStatus,
 		latestScrapeStatus,
-		siblingIdentifier(s.tablespaceTable, "oracle_latest_tablespace_samples").Sanitize(), tablespaces,
-		siblingIdentifier(s.resourceLimitTable, "oracle_latest_resource_limit_samples").Sanitize(), resourceLimits,
-		siblingIdentifier(s.asmDiskgroupTable, "oracle_latest_asm_diskgroup_samples").Sanitize(), asmDiskgroups,
+		siblingIdentifier(s.tablespaceTable, "oracle_latest_tablespace_samples").Sanitize(), tablespaces, latestScrapeStatus,
+		siblingIdentifier(s.resourceLimitTable, "oracle_latest_resource_limit_samples").Sanitize(), resourceLimits, latestScrapeStatus,
+		siblingIdentifier(s.asmDiskgroupTable, "oracle_latest_asm_diskgroup_samples").Sanitize(), asmDiskgroups, latestScrapeStatus,
 		siblingIdentifier(s.systemCounterTable, "oracle_system_counter_rates").Sanitize(), systemCounters,
 		siblingIdentifier(s.waitClassTable, "oracle_wait_class_rates").Sanitize(), waitClasses,
 	)
@@ -844,6 +933,9 @@ func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, su
 	if err := s.writeSQLTexts(ctx, tx, batch.Performance); err != nil {
 		return err
 	}
+	if err := s.writeSQLCursorMetadata(ctx, tx, batch.Performance.SQLDetails); err != nil {
+		return err
+	}
 	if err := s.writeSQLPlans(ctx, tx, batch.Performance); err != nil {
 		return err
 	}
@@ -885,6 +977,7 @@ func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, su
 		"samples", len(samples),
 		"sql_samples", len(batch.Performance.SQL),
 		"sql_texts", len(batch.Performance.SQLTexts),
+		"sql_cursor_metadata", len(batch.Performance.SQLDetails),
 		"sql_plan_operations", len(batch.Performance.SQLPlans),
 		"session_samples", len(batch.Performance.Sessions),
 		"blocking_session_samples", len(batch.Performance.BlockingSessions),
@@ -1065,6 +1158,7 @@ type repositoryIngestCounts struct {
 	additionalMetricRows         int64
 	sqlSampleRows                int64
 	sqlTextWrites                int64
+	sqlCursorMetadataWrites      int64
 	sqlPlanOperationWrites       int64
 	sessionSampleRows            int64
 	blockingSessionSampleRows    int64
@@ -1101,6 +1195,7 @@ func (c *repositoryIngestCounts) add(other repositoryIngestCounts) {
 	c.additionalMetricRows += other.additionalMetricRows
 	c.sqlSampleRows += other.sqlSampleRows
 	c.sqlTextWrites += other.sqlTextWrites
+	c.sqlCursorMetadataWrites += other.sqlCursorMetadataWrites
 	c.sqlPlanOperationWrites += other.sqlPlanOperationWrites
 	c.sessionSampleRows += other.sessionSampleRows
 	c.blockingSessionSampleRows += other.blockingSessionSampleRows
@@ -1166,6 +1261,9 @@ func collectRepositoryIngest(batch collector.SampleBatch) map[repositoryIngestKe
 	addRepositoryIngestValues(counts, batch.Performance.SQLTexts,
 		func(v collector.SQLTextSample) (time.Time, string) { return v.CollectedAt, v.Database },
 		func(c *repositoryIngestCounts, _ time.Time) { c.sqlTextWrites++ })
+	addRepositoryIngestValues(counts, batch.Performance.SQLDetails,
+		func(v collector.SQLSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.sqlCursorMetadataWrites++ })
 	addRepositoryIngestValues(counts, batch.Performance.SQLPlans,
 		func(v collector.SQLPlanOperation) (time.Time, string) { return v.CollectedAt, v.Database },
 		func(c *repositoryIngestCounts, _ time.Time) { c.sqlPlanOperationWrites++ })
@@ -1298,7 +1396,7 @@ func (s *Sink) writeRepositoryIngest(
 	query := fmt.Sprintf(`
 insert into %s (
 	sample_day, source_database, additional_metric_rows, sql_sample_rows,
-	sql_text_writes, sql_plan_operation_writes, session_sample_rows,
+	sql_text_writes, sql_cursor_metadata_writes, sql_plan_operation_writes, session_sample_rows,
 	blocking_session_sample_rows, database_activity_sample_rows,
 	database_status_sample_rows, instance_sample_rows, resource_limit_sample_rows,
 	tablespace_sample_rows, asm_diskgroup_sample_rows, system_counter_sample_rows,
@@ -1308,12 +1406,13 @@ insert into %s (
 )
 values (
 	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-	$13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
+	$13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
 )
 on conflict (sample_day, source_database) do update set
 	additional_metric_rows = %s.additional_metric_rows + excluded.additional_metric_rows,
 	sql_sample_rows = %s.sql_sample_rows + excluded.sql_sample_rows,
 	sql_text_writes = %s.sql_text_writes + excluded.sql_text_writes,
+	sql_cursor_metadata_writes = %s.sql_cursor_metadata_writes + excluded.sql_cursor_metadata_writes,
 	sql_plan_operation_writes = %s.sql_plan_operation_writes + excluded.sql_plan_operation_writes,
 	session_sample_rows = %s.session_sample_rows + excluded.session_sample_rows,
 	blocking_session_sample_rows = %s.blocking_session_sample_rows + excluded.blocking_session_sample_rows,
@@ -1334,13 +1433,14 @@ on conflict (sample_day, source_database) do update set
 	last_database_activity_sample_at = greatest(%s.last_database_activity_sample_at, excluded.last_database_activity_sample_at),
 	last_flushed_at = greatest(%s.last_flushed_at, excluded.last_flushed_at)`,
 		table, table, table, table, table, table, table, table, table, table, table, table,
+		table,
 		table, table, table, table, table, table, table, table, table, table, table)
 	batch := &pgx.Batch{}
 	for _, key := range keys {
 		value := counts[key]
 		batch.Queue(query,
 			key.day, key.database, value.additionalMetricRows, value.sqlSampleRows,
-			value.sqlTextWrites, value.sqlPlanOperationWrites, value.sessionSampleRows,
+			value.sqlTextWrites, value.sqlCursorMetadataWrites, value.sqlPlanOperationWrites, value.sessionSampleRows,
 			value.blockingSessionSampleRows, value.databaseActivitySampleRows,
 			value.databaseStatusSampleRows, value.instanceSampleRows, value.resourceLimitSampleRows,
 			value.tablespaceSampleRows, value.asmDiskgroupSampleRows, value.systemCounterSampleRows,
@@ -1505,6 +1605,83 @@ func collectSQLTextUpdates(performance collector.PerformanceSamples) (map[sqlTex
 		addOptionalReference(sample.Database, sample.TopLevelSQLID, sample.CollectedAt)
 	}
 	return texts, references
+}
+
+type sqlCursorMetadataKey struct {
+	database      string
+	instID        int64
+	sqlID         string
+	childNumber   int64
+	planHashValue int64
+}
+
+func collectSQLCursorMetadata(samples []collector.SQLSample) map[sqlCursorMetadataKey]collector.SQLSample {
+	metadata := make(map[sqlCursorMetadataKey]collector.SQLSample)
+	for _, sample := range samples {
+		if strings.TrimSpace(sample.Database) == "" || strings.TrimSpace(sample.SQLID) == "" ||
+			sample.ChildNumber == nil || sample.PlanHashValue == nil || sample.CollectedAt.IsZero() {
+			continue
+		}
+		key := sqlCursorMetadataKey{
+			database:      sample.Database,
+			instID:        sample.InstID,
+			sqlID:         sample.SQLID,
+			childNumber:   *sample.ChildNumber,
+			planHashValue: *sample.PlanHashValue,
+		}
+		if current, ok := metadata[key]; !ok || sample.CollectedAt.After(current.CollectedAt) {
+			metadata[key] = sample
+		}
+	}
+	return metadata
+}
+
+func (s *Sink) writeSQLCursorMetadata(ctx context.Context, tx pgx.Tx, samples []collector.SQLSample) error {
+	metadata := collectSQLCursorMetadata(samples)
+	if len(metadata) == 0 {
+		return nil
+	}
+
+	query := fmt.Sprintf(`insert into %s as existing (
+		source_database, inst_id, sql_id, child_number, plan_hash_value,
+		parsing_schema_name, module, first_seen_at, last_seen_at
+	) values ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+	on conflict (source_database, inst_id, sql_id, child_number, plan_hash_value)
+	do update set
+		parsing_schema_name = case
+			when excluded.last_seen_at >= existing.last_seen_at then excluded.parsing_schema_name
+			else existing.parsing_schema_name
+		end,
+		module = case
+			when excluded.last_seen_at >= existing.last_seen_at then excluded.module
+			else existing.module
+		end,
+		first_seen_at = least(existing.first_seen_at, excluded.first_seen_at),
+		last_seen_at = greatest(existing.last_seen_at, excluded.last_seen_at)
+	where existing.last_seen_at < ((excluded.last_seen_at at time zone 'UTC')::date at time zone 'UTC')
+		or (excluded.last_seen_at >= existing.last_seen_at and (
+			existing.parsing_schema_name is distinct from excluded.parsing_schema_name
+			or existing.module is distinct from excluded.module
+		))`, s.sqlCursorMetadataTable.Sanitize())
+
+	batch := &pgx.Batch{}
+	for key, sample := range metadata {
+		batch.Queue(query,
+			key.database, key.instID, key.sqlID, key.childNumber, key.planHashValue,
+			sample.ParsingSchemaName, sample.Module, sample.CollectedAt,
+		)
+	}
+	results := tx.SendBatch(ctx, batch)
+	for range metadata {
+		if _, err := results.Exec(); err != nil {
+			_ = results.Close()
+			return fmt.Errorf("upsert SQL cursor metadata: %w", err)
+		}
+	}
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("close SQL cursor metadata upsert batch: %w", err)
+	}
+	return nil
 }
 
 type sqlPlanReferenceKey struct {
@@ -2230,6 +2407,11 @@ func (s *Sink) cleanupRetention(ctx context.Context) {
 		s.logger.Warn("Unable to clean PostgreSQL SQL plans", "error", err, "retention", s.retention.String())
 		return
 	}
+	deletedSQLCursorMetadata, err := s.deleteExpiredSQLCursorMetadata(ctx, retentionCutoff)
+	if err != nil {
+		s.logger.Warn("Unable to clean PostgreSQL SQL cursor metadata", "error", err, "retention", s.retention.String())
+		return
+	}
 	if dropped > 0 {
 		s.logger.Info("Cleaned PostgreSQL sample partitions", "partitions_dropped", dropped, "retention", s.retention.String())
 	}
@@ -2244,6 +2426,9 @@ func (s *Sink) cleanupRetention(ctx context.Context) {
 	}
 	if deletedSQLPlans > 0 {
 		s.logger.Info("Cleaned PostgreSQL SQL plans", "sql_plan_operations_deleted", deletedSQLPlans, "retention", s.retention.String())
+	}
+	if deletedSQLCursorMetadata > 0 {
+		s.logger.Info("Cleaned PostgreSQL SQL cursor metadata", "sql_cursor_metadata_deleted", deletedSQLCursorMetadata, "retention", s.retention.String())
 	}
 }
 
@@ -2285,6 +2470,36 @@ func (s *Sink) deleteExpiredSQLPlans(ctx context.Context, cutoff time.Time) (int
 		return 0, fmt.Errorf("delete SQL plans last referenced before %s: %w", cutoff.Format(time.RFC3339), err)
 	}
 	return result.RowsAffected(), nil
+}
+
+func (s *Sink) deleteExpiredSQLCursorMetadata(ctx context.Context, cutoff time.Time) (int64, error) {
+	table := s.sqlCursorMetadataTable.Sanitize()
+	query := fmt.Sprintf(`
+with expired as materialized (
+	select ctid
+	from %s
+	where last_seen_at < $1
+	order by last_seen_at
+	limit %d
+	for update skip locked
+)
+delete from %s metadata
+using expired
+where metadata.ctid = expired.ctid`, table, sqlCursorMetadataDeleteBatchSize, table)
+
+	var deleted int64
+	for range sqlCursorMetadataDeleteMaxBatches {
+		result, err := s.pool.Exec(ctx, query, cutoff)
+		if err != nil {
+			return deleted, fmt.Errorf("delete SQL cursor metadata last seen before %s: %w", cutoff.Format(time.RFC3339), err)
+		}
+		rows := result.RowsAffected()
+		deleted += rows
+		if rows < sqlCursorMetadataDeleteBatchSize {
+			break
+		}
+	}
+	return deleted, nil
 }
 
 func (s *Sink) dropExpiredPartitions(ctx context.Context, cutoff time.Time) (int, error) {

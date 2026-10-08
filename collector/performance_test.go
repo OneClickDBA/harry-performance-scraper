@@ -26,7 +26,9 @@ func TestNativeActivityAndSQLQueriesAvoidASHAndSQLTextByDefault(t *testing.T) {
 	detailQuery, detailArgs := buildSQLDetailQuery([]string{"sql1", "sql2"})
 	if !strings.Contains(strings.ToLower(detailQuery), "gv$sql") ||
 		!strings.Contains(strings.ToLower(detailQuery), "where q.sql_id in (:1, :2)") ||
-		!strings.Contains(strings.ToLower(detailQuery), "where child_rank = 1") {
+		!strings.Contains(strings.ToLower(detailQuery), "where child_rank = 1") ||
+		!strings.Contains(strings.ToLower(detailQuery), "q.parsing_schema_name") ||
+		!strings.Contains(strings.ToLower(detailQuery), "q.module") {
 		t.Fatalf("SQL detail query must bind selected SQL IDs and bound child cursors: %s", detailQuery)
 	}
 	if len(detailArgs) != 2 || detailArgs[0] != "sql1" || detailArgs[1] != "sql2" {

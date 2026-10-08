@@ -45,9 +45,10 @@ where q.sql_id is not null
 order by q.last_active_time desc`
 
 const sqlDetailQueryPrefix = `
-select inst_id, sql_id, child_number, plan_hash_value, sql_fulltext
+select inst_id, sql_id, child_number, plan_hash_value, parsing_schema_name, module, sql_fulltext
 from (
-	select q.inst_id, q.sql_id, q.child_number, q.plan_hash_value, q.sql_fulltext,
+	select q.inst_id, q.sql_id, q.child_number, q.plan_hash_value,
+		q.parsing_schema_name, q.module, q.sql_fulltext,
 		row_number() over (
 			partition by q.inst_id, q.sql_id, q.plan_hash_value
 			order by q.elapsed_time desc, q.child_number
@@ -644,14 +645,19 @@ func (e *Scraper) scrapeSQLDetails(d *Database, collectedAt time.Time, sqlIDs []
 	for rows.Next() {
 		var sample SQLSample
 		var childNumber, planHashValue sql.NullInt64
-		var sqlFullText sql.NullString
-		if err := rows.Scan(&sample.InstID, &sample.SQLID, &childNumber, &planHashValue, &sqlFullText); err != nil {
+		var parsingSchema, module, sqlFullText sql.NullString
+		if err := rows.Scan(
+			&sample.InstID, &sample.SQLID, &childNumber, &planHashValue,
+			&parsingSchema, &module, &sqlFullText,
+		); err != nil {
 			return nil, err
 		}
 		sample.CollectedAt = collectedAt
 		sample.Database = d.Name
 		sample.ChildNumber = int64Ptr(childNumber)
 		sample.PlanHashValue = int64Ptr(planHashValue)
+		sample.ParsingSchemaName = stringPtr(parsingSchema)
+		sample.Module = stringPtr(module)
 		sample.SQLFullText = stringPtr(sqlFullText)
 		samples = append(samples, sample)
 	}
