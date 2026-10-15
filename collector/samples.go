@@ -56,32 +56,43 @@ type RuntimeSample struct {
 }
 
 type DatabaseStatusSample struct {
-	CollectedAt    time.Time
-	Database       string
-	InstID         int64
-	InstanceName   string
-	InstanceStatus string
-	DatabaseStatus string
-	StartupTime    time.Time
-	OpenMode       string
-	DatabaseRole   string
-	CDB            string
-	ConID          int64
-	ConName        string
-	PlatformName   string
+	CollectedAt         time.Time
+	Database            string
+	InstID              int64
+	InstanceName        string
+	InstanceStatus      string
+	DatabaseStatus      string
+	StartupTime         time.Time
+	OpenMode            string
+	DatabaseRole        string
+	CDB                 string
+	ConID               int64
+	ConName             string
+	PlatformName        string
+	DBID                *int64
+	DBUniqueName        *string
+	DatabaseProduct     *string
+	DatabaseEdition     *string
+	DatabaseVersion     *string
+	DatabaseVersionFull *string
+	ProtectionMode      *string
+	ProtectionLevel     *string
 }
 
 type InstanceSample struct {
-	CollectedAt        time.Time
-	Database           string
-	InstID             int64
-	UserSessions       int64
-	ActiveUserSessions int64
-	BackgroundSessions int64
-	ProcessCount       int64
-	CPUCount           *int64
-	SGAMaxBytes        *int64
-	PGAAggregateLimit  *int64
+	CollectedAt          time.Time
+	Database             string
+	InstID               int64
+	UserSessions         int64
+	ActiveUserSessions   int64
+	BackgroundSessions   int64
+	ProcessCount         int64
+	CPUCount             *int64
+	SGAMaxBytes          *int64
+	PGAAggregateLimit    *int64
+	SGAAllocatedBytes    *int64
+	PGAAllocatedBytes    *int64
+	PGAMaxAllocatedBytes *int64
 }
 
 type ResourceLimitSample struct {
@@ -97,14 +108,15 @@ type ResourceLimitSample struct {
 }
 
 type TablespaceSample struct {
-	CollectedAt time.Time
-	Database    string
-	Tablespace  string
-	Contents    string
-	UsedBytes   int64
-	FreeBytes   int64
-	MaxBytes    int64
-	UsedPercent float64
+	CollectedAt    time.Time
+	Database       string
+	Tablespace     string
+	Contents       string
+	UsedBytes      int64
+	FreeBytes      int64
+	MaxBytes       int64
+	UsedPercent    float64
+	AllocatedBytes *int64
 }
 
 type ASMDiskgroupSample struct {

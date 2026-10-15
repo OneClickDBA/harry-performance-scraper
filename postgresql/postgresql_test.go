@@ -77,6 +77,19 @@ func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
 	if strings.Count(ddl, "where samples.collected_at >= current_timestamp - interval '1 day'") != 3 {
 		t.Fatalf("latest operational views do not all bound partition history")
 	}
+	for _, column := range []string{
+		"dbid bigint", "db_unique_name text", "database_product text", "database_edition text",
+		"database_version text", "database_version_full text", "protection_mode text",
+		"protection_level text", "sga_allocated_bytes bigint", "pga_allocated_bytes bigint",
+		"pga_max_allocated_bytes bigint", "allocated_bytes bigint",
+	} {
+		if !strings.Contains(ddl, "add column if not exists "+column) {
+			t.Fatalf("operational DDL does not migrate %q", column)
+		}
+	}
+	if !strings.Contains(ddl, "samples.used_percent, samples.allocated_bytes") {
+		t.Fatal("latest tablespace view does not expose allocated_bytes")
+	}
 	if strings.Contains(ddl, "select distinct on (source_database, tablespace_name)") ||
 		strings.Contains(ddl, "select distinct on (source_database, resource_name, inst_id)") ||
 		strings.Contains(ddl, "select distinct on (source_database, diskgroup_name, inst_id)") {
@@ -119,6 +132,81 @@ func TestRuntimeQueuePreservesOrderAndIsDrained(t *testing.T) {
 	}
 	if remaining := sink.takePendingRuntime(true); len(remaining) != 0 {
 		t.Fatalf("runtime queue was not drained: %+v", remaining)
+	}
+}
+
+func TestOperationalAnalyticsColumnsPostgreSQL(t *testing.T) {
+	url := os.Getenv("HARRY_POSTGRES_TEST_URL")
+	if url == "" {
+		t.Skip("HARRY_POSTGRES_TEST_URL is not set")
+	}
+	ctx := context.Background()
+	sink, err := New(ctx, slog.New(slog.NewTextHandler(io.Discard, nil)), collector.PostgreSQLConfig{URL: url})
+	if err != nil {
+		t.Fatalf("create PostgreSQL sink: %v", err)
+	}
+	defer sink.Close()
+
+	const database = "HARRY_ANALYTICS_COLUMNS_INTEGRATION_TEST"
+	collectedAt := time.Now().UTC().Truncate(time.Second)
+	dbid := int64(123456789)
+	uniqueName, product, edition := "PROD_EU", "Oracle Database 19c Enterprise Edition", "Enterprise Edition"
+	version, versionFull := "19.0.0.0.0", "19.28.0.0.0"
+	protectionMode, protectionLevel := "MAXIMUM PERFORMANCE", "MAXIMUM PERFORMANCE"
+	sga, pga, pgaMax, allocated := int64(64<<30), int64(8<<30), int64(12<<30), int64(1500<<20)
+
+	cleanup := func() {
+		for _, table := range []pgx.Identifier{
+			sink.databaseStatusTable, sink.instanceTable, sink.tablespaceTable, sink.systemCounterTable,
+		} {
+			if _, err := sink.pool.Exec(context.Background(), "delete from "+table.Sanitize()+" where source_database = $1", database); err != nil {
+				t.Errorf("clean up %s: %v", table.Sanitize(), err)
+			}
+		}
+	}
+	cleanup()
+	defer cleanup()
+
+	batch := collector.SampleBatch{Operational: collector.OperationalSamples{
+		DatabaseStatus: []collector.DatabaseStatusSample{{
+			CollectedAt: collectedAt, Database: database, InstID: 1, InstanceName: "PROD1",
+			InstanceStatus: "OPEN", DatabaseStatus: "ACTIVE", StartupTime: collectedAt.Add(-time.Hour),
+			OpenMode: "READ WRITE", DatabaseRole: "PRIMARY", CDB: "YES", ConID: 1,
+			ConName: "CDB$ROOT", PlatformName: "Linux x86 64-bit", DBID: &dbid,
+			DBUniqueName: &uniqueName, DatabaseProduct: &product, DatabaseEdition: &edition,
+			DatabaseVersion: &version, DatabaseVersionFull: &versionFull,
+			ProtectionMode: &protectionMode, ProtectionLevel: &protectionLevel,
+		}},
+		Instances: []collector.InstanceSample{{
+			CollectedAt: collectedAt, Database: database, InstID: 1,
+			SGAAllocatedBytes: &sga, PGAAllocatedBytes: &pga, PGAMaxAllocatedBytes: &pgaMax,
+		}},
+		Tablespaces: []collector.TablespaceSample{{
+			CollectedAt: collectedAt, Database: database, Tablespace: "APP_DATA", Contents: "PERMANENT",
+			UsedBytes: 1, FreeBytes: 2, MaxBytes: 3, UsedPercent: 33.3, AllocatedBytes: &allocated,
+		}},
+		SystemCounters: []collector.SystemCounterSample{{
+			CollectedAt: collectedAt, Database: database, InstID: 1, ConID: 0,
+			StatName: "DB CPU", CumulativeValue: 100,
+		}},
+	}}
+	if err := sink.WriteSamples(ctx, batch, collector.ScrapeSummary{}); err != nil {
+		t.Fatalf("write operational analytics samples: %v", err)
+	}
+
+	var gotDBID, gotSGA, gotAllocated int64
+	var gotUniqueName, gotEdition string
+	if err := sink.pool.QueryRow(ctx, "select dbid, db_unique_name, database_edition from "+sink.databaseStatusTable.Sanitize()+" where source_database = $1", database).Scan(&gotDBID, &gotUniqueName, &gotEdition); err != nil {
+		t.Fatalf("read database identity: %v", err)
+	}
+	if err := sink.pool.QueryRow(ctx, "select sga_allocated_bytes from "+sink.instanceTable.Sanitize()+" where source_database = $1", database).Scan(&gotSGA); err != nil {
+		t.Fatalf("read instance memory: %v", err)
+	}
+	if err := sink.pool.QueryRow(ctx, "select allocated_bytes from "+sink.tablespaceTable.Sanitize()+" where source_database = $1", database).Scan(&gotAllocated); err != nil {
+		t.Fatalf("read tablespace allocation: %v", err)
+	}
+	if gotDBID != dbid || gotUniqueName != uniqueName || gotEdition != edition || gotSGA != sga || gotAllocated != allocated {
+		t.Fatalf("unexpected persisted analytics fields: dbid=%d unique=%q edition=%q sga=%d allocated=%d", gotDBID, gotUniqueName, gotEdition, gotSGA, gotAllocated)
 	}
 }
 

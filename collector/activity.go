@@ -6,6 +6,7 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -119,6 +120,7 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 		duration time.Duration
 		samples  []DatabaseActivitySample
 		err      error
+		skipped  bool
 	}
 
 	collectionStartedAt := time.Now()
@@ -126,7 +128,16 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 	var wg sync.WaitGroup
 	for _, database := range e.databases {
 		database := database
-		if database.IsValid() != nil || !database.StartupReady() {
+		if !database.StartupReady() {
+			results <- result{database: database.Name, err: errors.New("database connection startup is still in progress"), skipped: true}
+			continue
+		}
+		if retryAfter := database.IsValid(); retryAfter != nil {
+			results <- result{database: database.Name, err: fmt.Errorf("database connection backoff active; retry in %s", retryAfter.Round(time.Second)), skipped: true}
+			continue
+		}
+		if err := database.activityUnavailable(); err != nil {
+			results <- result{database: database.Name, err: err, skipped: true}
 			continue
 		}
 		wg.Add(1)
@@ -134,6 +145,9 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 			defer wg.Done()
 			started := time.Now()
 			samples, err := e.scrapeActivitySamples(database, sampledAt)
+			if err != nil {
+				database.suspendActivity(err)
+			}
 			results <- result{database: database.Name, duration: time.Since(started), samples: samples, err: err}
 		}()
 	}
@@ -148,10 +162,17 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 		if result.err != nil {
 			totalErrors++
 			statuses = append(statuses, newScrapeStatusWithDuration(sampledAt, result.database, "activity", result.duration, 0, result.err))
-			e.logger.Error("Error scraping database activity",
-				"database", result.database,
-				"source", e.Performance.Activity.GetSource(),
-				"error", result.err)
+			if result.skipped {
+				e.logger.Debug("Skipping database activity while connection is unavailable",
+					"database", result.database,
+					"source", e.Performance.Activity.GetSource(),
+					"error", result.err)
+			} else {
+				e.logger.Error("Error scraping database activity",
+					"database", result.database,
+					"source", e.Performance.Activity.GetSource(),
+					"error", result.err)
+			}
 			continue
 		}
 		statuses = append(statuses, newScrapeStatusWithDuration(sampledAt, result.database, "activity", result.duration, len(result.samples), nil))

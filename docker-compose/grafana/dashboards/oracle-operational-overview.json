@@ -138,16 +138,36 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "inst_id"
+              "options": "db_unique_name"
             },
             "properties": [
               {
                 "id": "displayName",
-                "value": "Inst"
-              },
+                "value": "DB Unique Name"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "dbid"
+            },
+            "properties": [
               {
-                "id": "custom.width",
-                "value": 60
+                "id": "displayName",
+                "value": "DBID"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "database_version_full"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Version"
               }
             ]
           }
@@ -181,12 +201,355 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select distinct on (inst_id)\n  inst_id,\n  instance_name,\n  instance_status,\n  database_status,\n  open_mode,\n  database_role,\n  con_name,\n  startup_time,\n  platform_name\nfrom oracle_database_status_samples\nwhere source_database = ${source_database:sqlstring}\norder by inst_id, collected_at desc;",
+          "rawSql": "select\n  s.db_unique_name,\n  s.dbid,\n  s.database_product,\n  s.database_edition,\n  s.database_version_full,\n  s.database_role,\n  s.protection_mode,\n  s.protection_level,\n  s.platform_name\nfrom oracle_database_status_samples s\njoin oracle_latest_scrape_status st\n  on st.source_database = s.source_database\n and st.collector = 'operational.database_status'\n and st.collected_at = s.collected_at\nwhere s.source_database = ${source_database:sqlstring}\norder by s.inst_id\nlimit 1;",
           "refId": "A"
         }
       ],
-      "title": "Database and Instance Status",
-      "type": "table"
+      "title": "Database Identity and Protection",
+      "type": "table",
+      "description": "Stable database identity, Oracle product version, role, and currently observed Data Guard protection state."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 12,
+      "options": {
+        "footer": {
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  s.inst_id,\n  s.instance_name,\n  s.instance_status,\n  s.database_status,\n  s.open_mode,\n  s.con_name,\n  s.startup_time\nfrom oracle_database_status_samples s\njoin oracle_latest_scrape_status st\n  on st.source_database = s.source_database\n and st.collector = 'operational.database_status'\n and st.collected_at = s.collected_at\nwhere s.source_database = ${source_database:sqlstring}\norder by s.inst_id;",
+          "refId": "A"
+        }
+      ],
+      "title": "Instance Status",
+      "type": "table",
+      "description": "Current status of each visible Oracle instance. Missing RAC instances remain an availability signal."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 55
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sga_allocated_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SGA Allocated"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sga_max_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SGA Maximum"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_allocated_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Allocated"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_max_allocated_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Peak"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_aggregate_limit"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Limit"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_current_percent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Current %"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 75
+                    },
+                    {
+                      "color": "red",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_peak_percent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Peak %"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 80
+                    },
+                    {
+                      "color": "red",
+                      "value": 95
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 13,
+      "options": {
+        "footer": {
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  s.inst_id,\n  s.cpu_count,\n  s.sga_allocated_bytes,\n  s.sga_max_bytes,\n  s.pga_allocated_bytes,\n  s.pga_max_allocated_bytes,\n  s.pga_aggregate_limit,\n  case when s.pga_aggregate_limit > 0\n    then s.pga_allocated_bytes * 100.0 / s.pga_aggregate_limit\n  end as pga_current_percent,\n  case when s.pga_aggregate_limit > 0\n    then s.pga_max_allocated_bytes * 100.0 / s.pga_aggregate_limit\n  end as pga_peak_percent\nfrom oracle_instance_samples s\njoin oracle_latest_scrape_status st\n  on st.source_database = s.source_database\n and st.collector = 'operational.instance'\n and st.collected_at = s.collected_at\nwhere s.source_database = ${source_database:sqlstring}\norder by s.inst_id;",
+          "refId": "A"
+        }
+      ],
+      "title": "Instance Memory Allocation",
+      "type": "table",
+      "description": "Observed Oracle memory allocation compared with configured capacity. PGA maximum is the high-water value since instance startup."
     },
     {
       "datasource": {
@@ -229,7 +592,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 16
       },
       "id": 3,
       "options": {
@@ -298,16 +661,188 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "used_percent"
+              "options": "allocated_used_percent"
             },
             "properties": [
+              {
+                "id": "displayName",
+                "value": "Allocated Used %"
+              },
               {
                 "id": "unit",
                 "value": "percent"
               },
               {
+                "id": "decimals",
+                "value": 1
+              },
+              {
                 "id": "custom.displayMode",
                 "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 85
+                    },
+                    {
+                      "color": "orange",
+                      "value": 95
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "maximum_used_percent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Maximum Used %"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 80
+                    },
+                    {
+                      "color": "red",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "used_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Used"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "allocated_free_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Free in Allocation"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "allocated_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Allocated"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "autoextend_headroom_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Autoextend Headroom"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Maximum"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
               }
             ]
           }
@@ -317,7 +852,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 8
+        "y": 16
       },
       "id": 4,
       "options": {
@@ -341,12 +876,13 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select\n  tablespace_name,\n  contents,\n  round(used_percent::numeric, 2) as used_percent,\n  pg_size_pretty(used_bytes) as used,\n  pg_size_pretty(free_bytes) as free,\n  pg_size_pretty(max_bytes) as maximum\nfrom oracle_latest_tablespace_samples\nwhere source_database = ${source_database:sqlstring}\norder by used_percent desc;",
+          "rawSql": "select\n  tablespace_name,\n  contents,\n  round((used_bytes * 100.0 / nullif(allocated_bytes, 0))::numeric, 2) as allocated_used_percent,\n  round(used_percent::numeric, 2) as maximum_used_percent,\n  used_bytes,\n  case when allocated_bytes is not null then greatest(allocated_bytes - used_bytes, 0) end as allocated_free_bytes,\n  allocated_bytes,\n  case when allocated_bytes is not null then greatest(max_bytes - allocated_bytes, 0) end as autoextend_headroom_bytes,\n  max_bytes\nfrom oracle_latest_tablespace_samples\nwhere source_database = ${source_database:sqlstring}\norder by maximum_used_percent desc, allocated_used_percent desc;",
           "refId": "A"
         }
       ],
       "title": "Tablespace Capacity",
-      "type": "table"
+      "type": "table",
+      "description": "Used space is compared with both current file allocation and maximum autoextend capacity. Allocation pressure is a watch signal; maximum pressure is the capacity risk."
     },
     {
       "datasource": {
@@ -381,17 +917,63 @@
               }
             ]
           },
-          "unit": "ops"
+          "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DB CPU cores"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#58A55C",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DB time demand"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#E0A03A",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Configured CPU capacity"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#E24A4A",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 17
+        "y": 25
       },
-      "id": 5,
+      "id": 14,
       "options": {
         "legend": {
           "calcs": [
@@ -417,12 +999,13 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "select\n  collected_at as \"time\",\n  stat_name || ' - inst ' || inst_id || ' con ' || con_id as metric,\n  value_per_second as value\nfrom oracle_system_counter_rates\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\n  and value_per_second is not null\norder by 1;",
+          "rawSql": "with demand as (\n  select\n    collected_at,\n    case stat_name when 'DB CPU' then 'DB CPU cores' else 'DB time demand' end as metric,\n    sum(value_per_second) / 1000000.0 as value\n  from oracle_system_counter_rates\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and con_id = 0\n    and stat_name in ('DB CPU', 'DB time')\n    and value_per_second is not null\n  group by collected_at, stat_name\n), capacity as (\n  select collected_at, 'Configured CPU capacity' as metric, sum(cpu_count)::double precision as value\n  from oracle_instance_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n    and cpu_count is not null\n  group by collected_at\n)\nselect collected_at as \"time\", metric, value from demand\nunion all\nselect collected_at as \"time\", metric, value from capacity\norder by 1, 2;",
           "refId": "A"
         }
       ],
-      "title": "Database Activity Rates",
-      "type": "timeseries"
+      "title": "Oracle CPU and Database Time Demand",
+      "type": "timeseries",
+      "description": "DB CPU as consumed CPU cores and DB time as average foreground database demand. Configured CPU capacity is shown as a reference, aggregated across visible RAC instances."
     },
     {
       "datasource": {
@@ -465,7 +1048,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 17
+        "y": 25
       },
       "id": 6,
       "options": {
@@ -498,6 +1081,547 @@
         }
       ],
       "title": "Wait Time by Class",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 14,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 3,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 34
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "select\n  collected_at as \"time\",\n  case stat_name\n    when 'parse count (total)' then 'Parses'\n    when 'execute count' then 'Executions'\n    when 'user commits' then 'Commits'\n    when 'user rollbacks' then 'Rollbacks'\n  end as metric,\n  sum(value_per_second)::double precision as value\nfrom oracle_system_counter_rates\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\n  and con_id = 0\n  and stat_name in ('parse count (total)', 'execute count', 'user commits', 'user rollbacks')\n  and value_per_second is not null\ngroup by collected_at, stat_name\norder by 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "SQL and Transaction Rates",
+      "type": "timeseries",
+      "description": "Database-wide foreground SQL calls and transaction outcomes. CDB totals are used and RAC instances are aggregated."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 14,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 3,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "select\n  collected_at as \"time\",\n  case stat_name\n    when 'session logical reads' then 'Logical reads'\n    when 'physical reads' then 'Physical reads'\n    when 'physical writes' then 'Physical writes'\n  end as metric,\n  sum(value_per_second)::double precision as value\nfrom oracle_system_counter_rates\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\n  and con_id = 0\n  and stat_name in ('session logical reads', 'physical reads', 'physical writes')\n  and value_per_second is not null\ngroup by collected_at, stat_name\norder by 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Database Block Activity",
+      "type": "timeseries",
+      "description": "Logical and physical Oracle database block rates, aggregated across RAC instances at CDB level."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 14,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 3,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "iops"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Read IOPS"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#2F80ED",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Write IOPS"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9830",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "select\n  collected_at as \"time\",\n  case stat_name\n    when 'physical read total IO requests' then 'Read IOPS'\n    else 'Write IOPS'\n  end as metric,\n  sum(value_per_second)::double precision as value\nfrom oracle_system_counter_rates\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\n  and con_id = 0\n  and stat_name in ('physical read total IO requests', 'physical write total IO requests')\n  and value_per_second is not null\ngroup by collected_at, stat_name\norder by 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Physical IOPS",
+      "type": "timeseries",
+      "description": "Oracle-visible physical read and write I/O requests per second, aggregated across RAC instances."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 14,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 3,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Read throughput"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#2F80ED",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Write throughput"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9830",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "select\n  collected_at as \"time\",\n  case stat_name\n    when 'physical read total bytes' then 'Read throughput'\n    else 'Write throughput'\n  end as metric,\n  sum(value_per_second)::double precision as value\nfrom oracle_system_counter_rates\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\n  and con_id = 0\n  and stat_name in ('physical read total bytes', 'physical write total bytes')\n  and value_per_second is not null\ngroup by collected_at, stat_name\norder by 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Physical I/O Throughput",
+      "type": "timeseries",
+      "description": "Oracle-visible physical read and write throughput, aggregated across RAC instances."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 14,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 3,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Redo generation"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#E24A4A",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 52
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "select\n  collected_at as \"time\",\n  'Redo generation' as metric,\n  sum(value_per_second)::double precision as value\nfrom oracle_system_counter_rates\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\n  and con_id = 0\n  and stat_name = 'redo size'\n  and value_per_second is not null\ngroup by collected_at\norder by 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Redo Generation",
+      "type": "timeseries",
+      "description": "Database-wide redo generation rate at CDB level, aggregated across RAC instances."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 14,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 3,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 52
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "select\n  collected_at as \"time\",\n  metric_name || ' - inst ' || inst_id || ' con ' || con_id as metric,\n  value\nfrom oracle_system_metric_samples\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\norder by 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Oracle System Ratios and Utilization",
       "type": "timeseries"
     },
     {
@@ -569,7 +1693,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 26
+        "y": 61
       },
       "id": 7,
       "options": {
@@ -669,7 +1793,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 26
+        "y": 61
       },
       "id": 8,
       "options": {
@@ -705,84 +1829,6 @@
         "type": "postgres",
         "uid": "PostgreSQL"
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 14,
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 3,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            }
-          },
-          "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 34
-      },
-      "id": 9,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "pluginVersion": "9.5.15",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "PostgreSQL"
-          },
-          "editorMode": "code",
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "select\n  collected_at as \"time\",\n  metric_name || ' - inst ' || inst_id || ' con ' || con_id as metric,\n  value\nfrom oracle_system_metric_samples\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\norder by 1;",
-          "refId": "A"
-        }
-      ],
-      "title": "Oracle System Ratios and Utilization",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "PostgreSQL"
-      },
       "description": "Maximum observed collector duration per display bucket for the selected Oracle database. Rising duration without query failures is an early pressure signal.",
       "fieldConfig": {
         "defaults": {
@@ -810,7 +1856,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 43
+        "y": 69
       },
       "id": 10,
       "options": {
@@ -896,7 +1942,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 43
+        "y": 69
       },
       "id": 11,
       "options": {
@@ -977,6 +2023,6 @@
   "timezone": "",
   "title": "Oracle Operational Overview",
   "uid": "oracle-operational-overview",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

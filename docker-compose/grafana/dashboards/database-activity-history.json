@@ -263,7 +263,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 6
       },
       "id": 1,
       "options": {
@@ -296,6 +296,132 @@
       ],
       "title": "Average Active Sessions by Wait Class",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Average demand",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DB CPU cores"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#58A55C",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DB time demand"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#E0A03A",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "select\n  collected_at as \"time\",\n  case stat_name when 'DB CPU' then 'DB CPU cores' else 'DB time demand' end as metric,\n  sum(value_per_second) / 1000000.0 as value\nfrom oracle_system_counter_rates\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\n  and con_id = 0\n  and stat_name in ('DB CPU', 'DB time')\n  and value_per_second is not null\ngroup by collected_at, stat_name\norder by 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Database CPU and DB Time Reference",
+      "type": "timeseries",
+      "description": "Database-level time-model reference. DB CPU is consumed CPU cores; DB time is average foreground database demand. This complements sampled AAS but cannot be attributed to SQL or wait class."
     },
     {
       "datasource": {
@@ -473,7 +599,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 10
+        "y": 24
       },
       "id": 2,
       "options": {
@@ -745,7 +871,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 10
+        "y": 24
       },
       "id": 3,
       "options": {
@@ -837,7 +963,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 16
       },
       "id": 4,
       "options": {
@@ -1111,7 +1237,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 33
       },
       "id": 5,
       "options": {
@@ -1303,7 +1429,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 36
+        "y": 42
       },
       "id": 6,
       "options": {
@@ -1527,7 +1653,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 36
+        "y": 42
       },
       "id": 7,
       "options": {
@@ -1621,13 +1747,13 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Oracle Database Activity History (DAH)",
   "uid": "database-activity-history-dah",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

@@ -27,6 +27,38 @@ select
 from gv$instance i
 join gv$database d on d.inst_id = i.inst_id`
 
+const databaseIdentityOperationalQuery = `
+with product as (
+	select
+		product,
+		case
+			when upper(product) like '%ENTERPRISE EDITION%' then 'Enterprise Edition'
+			when upper(product) like '%STANDARD EDITION 2%' then 'Standard Edition 2'
+			when upper(product) like '%STANDARD EDITION%' then 'Standard Edition'
+			when upper(product) like '%EXPRESS EDITION%' then 'Express Edition'
+			when upper(product) like '%FREE%' then 'Free'
+			when upper(product) like '%PERSONAL EDITION%' then 'Personal Edition'
+		end as edition,
+		version,
+		version_full
+	from product_component_version
+	where upper(product) like 'ORACLE%DATABASE%'
+	order by product
+	fetch first 1 row only
+)
+select
+	d.inst_id,
+	d.dbid,
+	d.db_unique_name,
+	p.product,
+	p.edition,
+	p.version,
+	p.version_full,
+	d.protection_mode,
+	d.protection_level
+from gv$database d
+left join product p on 1 = 1`
+
 const instanceOperationalQuery = `
 with sessions as (
 	select
@@ -66,6 +98,32 @@ left join sessions s on s.inst_id = i.inst_id
 left join processes p on p.inst_id = i.inst_id
 left join parameters r on r.inst_id = i.inst_id`
 
+const instanceMemoryOperationalQuery = `
+with sga as (
+	select inst_id, sum(value) as allocated_bytes
+	from gv$sga
+	where con_id = 0
+	group by inst_id
+),
+pga as (
+	select
+		inst_id,
+		max(case when name = 'total PGA allocated' then value end) as allocated_bytes,
+		max(case when name = 'maximum PGA allocated' then value end) as max_allocated_bytes
+	from gv$pgastat
+	where con_id = 0
+		and name in ('total PGA allocated', 'maximum PGA allocated')
+	group by inst_id
+)
+select
+	i.inst_id,
+	s.allocated_bytes,
+	p.allocated_bytes,
+	p.max_allocated_bytes
+from gv$instance i
+left join sga s on s.inst_id = i.inst_id
+left join pga p on p.inst_id = i.inst_id`
+
 const resourceLimitOperationalQuery = `
 select
 	inst_id,
@@ -100,6 +158,15 @@ select
 	end
 from dba_temp_free_space`
 
+const tablespaceAllocationOperationalQuery = `
+select tablespace_name, sum(bytes)
+from dba_data_files
+group by tablespace_name
+union all
+select tablespace_name, sum(bytes)
+from dba_temp_files
+group by tablespace_name`
+
 const asmDiskgroupOperationalQuery = `
 select
 	inst_id,
@@ -124,6 +191,22 @@ where name in (
 	'session logical reads',
 	'redo size'
 )`
+
+const cpuIOCounterOperationalQuery = `
+select inst_id, con_id, name, value
+from gv$sysstat
+where con_id = 0
+	and name in (
+		'physical read total IO requests',
+		'physical write total IO requests',
+		'physical read total bytes',
+		'physical write total bytes'
+	)
+union all
+select inst_id, con_id, stat_name, value
+from gv$sys_time_model
+where con_id = 0
+	and stat_name in ('DB CPU', 'DB time')`
 
 const waitClassOperationalQuery = `
 select inst_id, con_id, wait_class, round(time_waited * 10000)
@@ -234,8 +317,14 @@ func (e *Scraper) ScrapeOperationalSamples(d *Database, collectedAt time.Time) (
 		{name: "database_status", collect: func(ctx context.Context) (int, error) {
 			return e.scrapeDatabaseStatus(ctx, d, collectedAt, &samples)
 		}},
+		{name: "database_identity", collect: func(ctx context.Context) (int, error) {
+			return e.scrapeDatabaseIdentity(ctx, d, &samples)
+		}},
 		{name: "instance", collect: func(ctx context.Context) (int, error) {
 			return e.scrapeInstances(ctx, d, collectedAt, &samples)
+		}},
+		{name: "instance_memory", collect: func(ctx context.Context) (int, error) {
+			return e.scrapeInstanceMemory(ctx, d, &samples)
 		}},
 		{name: "resource_limits", collect: func(ctx context.Context) (int, error) {
 			return e.scrapeResourceLimits(ctx, d, collectedAt, &samples)
@@ -243,11 +332,17 @@ func (e *Scraper) ScrapeOperationalSamples(d *Database, collectedAt time.Time) (
 		{name: "tablespaces", collect: func(ctx context.Context) (int, error) {
 			return e.scrapeTablespaces(ctx, d, collectedAt, &samples)
 		}},
+		{name: "tablespace_allocation", collect: func(ctx context.Context) (int, error) {
+			return e.scrapeTablespaceAllocation(ctx, d, &samples)
+		}},
 		{name: "asm_diskgroups", collect: func(ctx context.Context) (int, error) {
 			return e.scrapeASMDiskgroups(ctx, d, collectedAt, &samples)
 		}},
 		{name: "system_counters", collect: func(ctx context.Context) (int, error) {
 			return e.scrapeSystemCounters(ctx, d, collectedAt, &samples)
+		}},
+		{name: "cpu_io_counters", collect: func(ctx context.Context) (int, error) {
+			return e.scrapeCPUAndIOCounters(ctx, d, collectedAt, &samples)
 		}},
 		{name: "wait_classes", collect: func(ctx context.Context) (int, error) {
 			return e.scrapeWaitClasses(ctx, d, collectedAt, &samples)
@@ -334,6 +429,71 @@ func (e *Scraper) scrapeDatabaseStatus(ctx context.Context, d *Database, collect
 	return len(out.DatabaseStatus) - before, err
 }
 
+type databaseIdentityRow struct {
+	instID              int64
+	dbid                *int64
+	dbUniqueName        *string
+	databaseProduct     *string
+	databaseEdition     *string
+	databaseVersion     *string
+	databaseVersionFull *string
+	protectionMode      *string
+	protectionLevel     *string
+}
+
+func applyDatabaseIdentity(samples []DatabaseStatusSample, identities []databaseIdentityRow) int {
+	byInstance := make(map[int64]databaseIdentityRow, len(identities))
+	for _, identity := range identities {
+		byInstance[identity.instID] = identity
+	}
+	updated := 0
+	for i := range samples {
+		identity, ok := byInstance[samples[i].InstID]
+		if !ok {
+			continue
+		}
+		samples[i].DBID = identity.dbid
+		samples[i].DBUniqueName = identity.dbUniqueName
+		samples[i].DatabaseProduct = identity.databaseProduct
+		samples[i].DatabaseEdition = identity.databaseEdition
+		samples[i].DatabaseVersion = identity.databaseVersion
+		samples[i].DatabaseVersionFull = identity.databaseVersionFull
+		samples[i].ProtectionMode = identity.protectionMode
+		samples[i].ProtectionLevel = identity.protectionLevel
+		updated++
+	}
+	return updated
+}
+
+func (e *Scraper) scrapeDatabaseIdentity(ctx context.Context, d *Database, out *OperationalSamples) (int, error) {
+	var identities []databaseIdentityRow
+	err := queryOperationalRows(ctx, d, databaseIdentityOperationalQuery, func(rows *sql.Rows) error {
+		var row databaseIdentityRow
+		var dbid sql.NullInt64
+		var uniqueName, product, edition, version, versionFull, protectionMode, protectionLevel sql.NullString
+		if err := rows.Scan(
+			&row.instID, &dbid, &uniqueName, &product, &edition, &version, &versionFull,
+			&protectionMode, &protectionLevel,
+		); err != nil {
+			return err
+		}
+		row.dbid = int64Ptr(dbid)
+		row.dbUniqueName = stringPtr(uniqueName)
+		row.databaseProduct = stringPtr(product)
+		row.databaseEdition = stringPtr(edition)
+		row.databaseVersion = stringPtr(version)
+		row.databaseVersionFull = stringPtr(versionFull)
+		row.protectionMode = stringPtr(protectionMode)
+		row.protectionLevel = stringPtr(protectionLevel)
+		identities = append(identities, row)
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return applyDatabaseIdentity(out.DatabaseStatus, identities), nil
+}
+
 func (e *Scraper) scrapeInstances(ctx context.Context, d *Database, collectedAt time.Time, out *OperationalSamples) (int, error) {
 	before := len(out.Instances)
 	err := queryOperationalRows(ctx, d, instanceOperationalQuery, func(rows *sql.Rows) error {
@@ -351,6 +511,52 @@ func (e *Scraper) scrapeInstances(ctx context.Context, d *Database, collectedAt 
 		return nil
 	})
 	return len(out.Instances) - before, err
+}
+
+type instanceMemoryRow struct {
+	instID               int64
+	sgaAllocatedBytes    *int64
+	pgaAllocatedBytes    *int64
+	pgaMaxAllocatedBytes *int64
+}
+
+func applyInstanceMemory(samples []InstanceSample, memory []instanceMemoryRow) int {
+	byInstance := make(map[int64]instanceMemoryRow, len(memory))
+	for _, row := range memory {
+		byInstance[row.instID] = row
+	}
+	updated := 0
+	for i := range samples {
+		row, ok := byInstance[samples[i].InstID]
+		if !ok {
+			continue
+		}
+		samples[i].SGAAllocatedBytes = row.sgaAllocatedBytes
+		samples[i].PGAAllocatedBytes = row.pgaAllocatedBytes
+		samples[i].PGAMaxAllocatedBytes = row.pgaMaxAllocatedBytes
+		updated++
+	}
+	return updated
+}
+
+func (e *Scraper) scrapeInstanceMemory(ctx context.Context, d *Database, out *OperationalSamples) (int, error) {
+	var memory []instanceMemoryRow
+	err := queryOperationalRows(ctx, d, instanceMemoryOperationalQuery, func(rows *sql.Rows) error {
+		var row instanceMemoryRow
+		var sga, pga, pgaMax sql.NullInt64
+		if err := rows.Scan(&row.instID, &sga, &pga, &pgaMax); err != nil {
+			return err
+		}
+		row.sgaAllocatedBytes = int64Ptr(sga)
+		row.pgaAllocatedBytes = int64Ptr(pga)
+		row.pgaMaxAllocatedBytes = int64Ptr(pgaMax)
+		memory = append(memory, row)
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return applyInstanceMemory(out.Instances, memory), nil
 }
 
 func (e *Scraper) scrapeResourceLimits(ctx context.Context, d *Database, collectedAt time.Time, out *OperationalSamples) (int, error) {
@@ -390,6 +596,46 @@ func (e *Scraper) scrapeTablespaces(ctx context.Context, d *Database, collectedA
 	return len(out.Tablespaces) - before, err
 }
 
+type tablespaceAllocationRow struct {
+	tablespace     string
+	allocatedBytes *int64
+}
+
+func applyTablespaceAllocation(samples []TablespaceSample, allocations []tablespaceAllocationRow) int {
+	byTablespace := make(map[string]*int64, len(allocations))
+	for _, allocation := range allocations {
+		byTablespace[allocation.tablespace] = allocation.allocatedBytes
+	}
+	updated := 0
+	for i := range samples {
+		allocated, ok := byTablespace[samples[i].Tablespace]
+		if !ok {
+			continue
+		}
+		samples[i].AllocatedBytes = allocated
+		updated++
+	}
+	return updated
+}
+
+func (e *Scraper) scrapeTablespaceAllocation(ctx context.Context, d *Database, out *OperationalSamples) (int, error) {
+	var allocations []tablespaceAllocationRow
+	err := queryOperationalRows(ctx, d, tablespaceAllocationOperationalQuery, func(rows *sql.Rows) error {
+		var row tablespaceAllocationRow
+		var allocated sql.NullInt64
+		if err := rows.Scan(&row.tablespace, &allocated); err != nil {
+			return err
+		}
+		row.allocatedBytes = int64Ptr(allocated)
+		allocations = append(allocations, row)
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return applyTablespaceAllocation(out.Tablespaces, allocations), nil
+}
+
 func (e *Scraper) scrapeASMDiskgroups(ctx context.Context, d *Database, collectedAt time.Time, out *OperationalSamples) (int, error) {
 	before := len(out.ASMDiskgroups)
 	err := queryOperationalRows(ctx, d, asmDiskgroupOperationalQuery, func(rows *sql.Rows) error {
@@ -407,6 +653,18 @@ func (e *Scraper) scrapeASMDiskgroups(ctx context.Context, d *Database, collecte
 
 func (e *Scraper) scrapeSystemCounters(ctx context.Context, d *Database, collectedAt time.Time, out *OperationalSamples) (int, error) {
 	return e.scrapeOperationalCounterRows(ctx, d, collectedAt, systemCounterOperationalQuery, "system", func(
+		row operationalCounterRow, delta *int64, interval *float64, reset bool,
+	) {
+		out.SystemCounters = append(out.SystemCounters, SystemCounterSample{
+			CollectedAt: collectedAt, Database: d.Name, InstID: row.instID, ConID: row.conID,
+			StatName: row.name, CumulativeValue: row.value, DeltaValue: delta,
+			IntervalSeconds: interval, CounterReset: reset,
+		})
+	})
+}
+
+func (e *Scraper) scrapeCPUAndIOCounters(ctx context.Context, d *Database, collectedAt time.Time, out *OperationalSamples) (int, error) {
+	return e.scrapeOperationalCounterRows(ctx, d, collectedAt, cpuIOCounterOperationalQuery, "system", func(
 		row operationalCounterRow, delta *int64, interval *float64, reset bool,
 	) {
 		out.SystemCounters = append(out.SystemCounters, SystemCounterSample{

@@ -109,9 +109,9 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-harry_monitoring}
       - POSTGRES_USER=${POSTGRES_USER:-harry_monitoring}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-harry_monitoring}
-      #   - DB_USERNAME=pdbadmin
+      #   - DB_USERNAME=c##harry_monitoring
       #   - DB_PASSWORD=${DB_PASSWORD}
-      #   - DB_CONNECT_STRING=free26ai:1521/freepdb1
+      #   - DB_CONNECT_STRING=free26ai:1521/free
     volumes:
       - ./scraper:/scraper
       - ./wallet:/scraper/wallet

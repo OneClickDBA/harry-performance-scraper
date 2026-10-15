@@ -23,26 +23,27 @@ select
 	q.plan_hash_value,
 	cast(null as varchar2(128)) as parsing_schema_name,
 	cast(null as varchar2(64)) as module,
-	q.executions,
-	q.elapsed_time,
-	q.cpu_time,
-	q.user_io_wait_time,
-	q.application_wait_time,
-	q.concurrency_wait_time,
-	q.cluster_wait_time,
-	q.buffer_gets,
-	q.disk_reads,
-	q.direct_writes,
-	q.rows_processed,
-	q.fetches,
-	q.loads,
-	q.invalidations,
-	q.parse_calls,
-	q.last_active_time
+	sum(q.executions),
+	sum(q.elapsed_time),
+	sum(q.cpu_time),
+	sum(q.user_io_wait_time),
+	sum(q.application_wait_time),
+	sum(q.concurrency_wait_time),
+	sum(q.cluster_wait_time),
+	sum(q.buffer_gets),
+	sum(q.disk_reads),
+	sum(q.direct_writes),
+	sum(q.rows_processed),
+	sum(q.fetches),
+	sum(q.loads),
+	sum(q.invalidations),
+	sum(q.parse_calls),
+	max(q.last_active_time)
 from gv$sqlstats q
 where q.sql_id is not null
 	and q.last_active_time >= sysdate - (:1 / 86400)
-order by q.last_active_time desc`
+group by q.inst_id, q.sql_id, q.plan_hash_value
+order by max(q.last_active_time) desc`
 
 const sqlDetailQueryPrefix = `
 select inst_id, sql_id, child_number, plan_hash_value, parsing_schema_name, module, sql_fulltext
@@ -314,7 +315,11 @@ func monotonicDelta(current, previous int64) int64 {
 	if current >= previous {
 		return current - previous
 	}
-	return current
+	// GV$SQLSTATS aggregates a changing set of contributing cursors. A lower
+	// value can therefore mean that a cursor aged out, not that a counter reset
+	// to zero. Counting the complete lower value would manufacture workload.
+	// Skip the ambiguous interval and resume deltas from the new baseline.
+	return 0
 }
 
 func (v *sqlCounterValues) add(other sqlCounterValues) {

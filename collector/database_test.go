@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -33,6 +34,10 @@ type testQueryConnector struct {
 
 type trackedQueryConnector struct {
 	tracker *queryConcurrencyTracker
+}
+
+type failingConnector struct {
+	err error
 }
 
 type trackedQueryConn struct {
@@ -67,6 +72,14 @@ func (c trackedQueryConnector) Connect(context.Context) (driver.Conn, error) {
 }
 
 func (trackedQueryConnector) Driver() driver.Driver {
+	return testQueryDriver{}
+}
+
+func (c failingConnector) Connect(context.Context) (driver.Conn, error) {
+	return nil, c.err
+}
+
+func (failingConnector) Driver() driver.Driver {
 	return testQueryDriver{}
 }
 
@@ -187,6 +200,39 @@ func TestIsValid(t *testing.T) {
 	}
 }
 
+func TestActivitySuspensionPersistsUntilConnectivityRecovers(t *testing.T) {
+	database := &Database{}
+
+	database.suspendActivity(errors.New("network is unreachable"))
+	if err := database.activityUnavailable(); err == nil || !strings.Contains(err.Error(), "network is unreachable") {
+		t.Fatalf("expected activity suspension to retain the connectivity error, got %v", err)
+	}
+
+	database.resumeActivity()
+	if err := database.activityUnavailable(); err != nil {
+		t.Fatalf("expected activity collection to resume, got %v", err)
+	}
+}
+
+func TestPingFailureBacksOffUnknownNetworkErrors(t *testing.T) {
+	networkErr := errors.New("dial tcp: network is unreachable")
+	db := sql.OpenDB(failingConnector{err: networkErr})
+	t.Cleanup(func() { _ = db.Close() })
+	database := &Database{Session: db}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	err := database.ping(logger, time.Minute)
+	if !errors.Is(err, networkErr) {
+		t.Fatalf("expected network failure, got %v", err)
+	}
+	if retryAfter := database.IsValid(); retryAfter == nil || *retryAfter <= 0 {
+		t.Fatalf("expected failed ping to open connection backoff, got %v", retryAfter)
+	}
+	if err := database.activityUnavailable(); err == nil || !strings.Contains(err.Error(), networkErr.Error()) {
+		t.Fatalf("expected failed ping to suspend activity collection, got %v", err)
+	}
+}
+
 func TestInvalidate(t *testing.T) {
 	db := &Database{}
 	backoff := time.Minute
@@ -275,8 +321,14 @@ func TestDatabaseStateAccessIsRaceSafe(t *testing.T) {
 				} else {
 					db.clearInvalid()
 				}
+				if (i+j)%3 == 0 {
+					db.suspendActivity(errors.New("temporarily unavailable"))
+				} else {
+					db.resumeActivity()
+				}
 				db.setUp(float64((i + j) % 2))
 				_ = db.IsValid()
+				_ = db.activityUnavailable()
 				_ = db.getUp()
 			}
 		}(i)

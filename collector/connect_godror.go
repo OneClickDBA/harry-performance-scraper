@@ -9,7 +9,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -137,33 +136,4 @@ func connect(logger *slog.Logger, dbname string, dbconfig DatabaseConfig) (*sql.
 		gate:      godrorConnectionCreationGate,
 	})
 	return db, nil
-}
-
-func isInvalidCredentialsError(err error) bool {
-	err = errors.Unwrap(err)
-	if err == nil {
-		return false
-	}
-	oraErr, ok := err.(*godror.OraErr)
-	if !ok {
-		return false
-	}
-	return oraErr.Code() == ora01017code || oraErr.Code() == ora28000code
-}
-
-func isTemporaryConnectionError(err error) bool {
-	err = errors.Unwrap(err)
-	if err == nil {
-		return false
-	}
-	oraErr, ok := err.(*godror.OraErr)
-	if !ok {
-		return false
-	}
-	switch oraErr.Code() {
-	case ora01033code, ora03113code, ora03114code, ora12537code:
-		return true
-	default:
-		return false
-	}
 }

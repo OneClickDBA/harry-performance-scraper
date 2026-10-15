@@ -4,6 +4,7 @@
 package collector
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -56,11 +57,79 @@ func TestOperationalCounterDeltaHandlesBaselineIncrementAndReset(t *testing.T) {
 
 func TestOperationalQueriesUseBoundedMetricSets(t *testing.T) {
 	for name, query := range map[string]string{
-		"system counters": systemCounterOperationalQuery,
-		"system metrics":  systemMetricOperationalQuery,
+		"system counters":    systemCounterOperationalQuery,
+		"CPU and I/O":        cpuIOCounterOperationalQuery,
+		"system metrics":     systemMetricOperationalQuery,
+		"database identity":  databaseIdentityOperationalQuery,
+		"instance memory":    instanceMemoryOperationalQuery,
+		"storage allocation": tablespaceAllocationOperationalQuery,
 	} {
 		if len(query) == 0 {
 			t.Fatalf("%s query must not be empty", name)
 		}
+	}
+	for _, counter := range []string{
+		"DB CPU", "DB time", "physical read total IO requests",
+		"physical write total IO requests", "physical read total bytes",
+		"physical write total bytes",
+	} {
+		if !strings.Contains(cpuIOCounterOperationalQuery, "'"+counter+"'") {
+			t.Errorf("CPU and I/O query does not contain %q", counter)
+		}
+	}
+	if strings.Count(cpuIOCounterOperationalQuery, "con_id = 0") != 2 {
+		t.Fatal("CPU and I/O query must restrict SYSSTAT and SYS_TIME_MODEL to instance-level counters")
+	}
+}
+
+func TestOperationalEnrichmentMergesWithoutCreatingBaseSamples(t *testing.T) {
+	dbid := int64(123456)
+	uniqueName := "PROD_EU"
+	product := "Oracle Database 19c Enterprise Edition"
+	edition := "Enterprise Edition"
+	version := "19.0.0.0.0"
+	versionFull := "19.28.0.0.0"
+	protectionMode := "MAXIMUM PERFORMANCE"
+	protectionLevel := "MAXIMUM PERFORMANCE"
+	databaseStatus := []DatabaseStatusSample{{InstID: 1}, {InstID: 2}}
+	if updated := applyDatabaseIdentity(databaseStatus, []databaseIdentityRow{{
+		instID: 1, dbid: &dbid, dbUniqueName: &uniqueName, databaseProduct: &product,
+		databaseEdition: &edition, databaseVersion: &version, databaseVersionFull: &versionFull,
+		protectionMode: &protectionMode, protectionLevel: &protectionLevel,
+	}}); updated != 1 {
+		t.Fatalf("database identity updates = %d, want 1", updated)
+	}
+	if databaseStatus[0].DBID == nil || *databaseStatus[0].DBID != dbid ||
+		databaseStatus[0].DatabaseEdition == nil || *databaseStatus[0].DatabaseEdition != edition {
+		t.Fatalf("database identity was not merged: %+v", databaseStatus[0])
+	}
+	if databaseStatus[1].DBID != nil {
+		t.Fatalf("unmatched database-status sample was modified: %+v", databaseStatus[1])
+	}
+
+	sga, pga, pgaMax := int64(64<<30), int64(8<<30), int64(12<<30)
+	instances := []InstanceSample{{InstID: 1}}
+	if updated := applyInstanceMemory(instances, []instanceMemoryRow{{
+		instID: 1, sgaAllocatedBytes: &sga, pgaAllocatedBytes: &pga, pgaMaxAllocatedBytes: &pgaMax,
+	}}); updated != 1 {
+		t.Fatalf("instance memory updates = %d, want 1", updated)
+	}
+	if instances[0].SGAAllocatedBytes == nil || *instances[0].SGAAllocatedBytes != sga ||
+		instances[0].PGAMaxAllocatedBytes == nil || *instances[0].PGAMaxAllocatedBytes != pgaMax {
+		t.Fatalf("instance memory was not merged: %+v", instances[0])
+	}
+
+	allocated := int64(1500 << 20)
+	tablespaces := []TablespaceSample{{Tablespace: "APP_DATA"}, {Tablespace: "USERS"}}
+	if updated := applyTablespaceAllocation(tablespaces, []tablespaceAllocationRow{{
+		tablespace: "APP_DATA", allocatedBytes: &allocated,
+	}}); updated != 1 {
+		t.Fatalf("tablespace allocation updates = %d, want 1", updated)
+	}
+	if tablespaces[0].AllocatedBytes == nil || *tablespaces[0].AllocatedBytes != allocated {
+		t.Fatalf("tablespace allocation was not merged: %+v", tablespaces[0])
+	}
+	if tablespaces[1].AllocatedBytes != nil {
+		t.Fatalf("unmatched tablespace sample was modified: %+v", tablespaces[1])
 	}
 }

@@ -7,11 +7,11 @@ databases:
   ## Database connection information for the "default" database.
   first_26ai:
     ## Database username
-    username: pdbadmin
+    username: c##harry_monitoring
     ## Database password
     password: ${DB_PASSWORD}
     ## Database connection url
-    url: free26ai:1521/freepdb1
+    url: free26ai:1521/free
 
     ## Metrics query timeout for this database, in seconds
     queryTimeout: 5
@@ -43,9 +43,9 @@ databases:
     # poolMinConnections: 15
 
   second_26ai:
-    username: pdbadmin
+    username: c##harry_monitoring
     password: ${DB_PASSWORD}
-    url: second26ai:1521/freepdb1
+    url: second26ai:1521/free
     queryTimeout: 5
     maxOpenConns: 10
     maxIdleConns: 10
