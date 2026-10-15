@@ -23,6 +23,9 @@ func TestNativeActivityAndSQLQueriesAvoidASHAndSQLTextByDefault(t *testing.T) {
 	if !strings.Contains(strings.ToLower(sqlPerformanceQuery), "last_active_time >= sysdate - (:1 / 86400)") {
 		t.Fatal("frequent SQL counter lookback must use the monitored database clock")
 	}
+	if !strings.Contains(strings.ToLower(sqlPerformanceQuery), "group by q.inst_id, q.sql_id, q.plan_hash_value") {
+		t.Fatal("frequent SQL counters must aggregate CDB container contributions")
+	}
 	detailQuery, detailArgs := buildSQLDetailQuery([]string{"sql1", "sql2"})
 	if !strings.Contains(strings.ToLower(detailQuery), "gv$sql") ||
 		!strings.Contains(strings.ToLower(detailQuery), "where q.sql_id in (:1, :2)") ||
@@ -145,8 +148,8 @@ func TestSQLConsumerDeltaHandlesCounterResetAndNewCursor(t *testing.T) {
 	})
 
 	got := scraper.takeTopSQLConsumers("DB1", 2)
-	want := []string{"new", "reset"}
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+	want := []string{"new"}
+	if len(got) != len(want) || got[0] != want[0] {
 		t.Fatalf("top consumers after reset = %#v, want %#v", got, want)
 	}
 }

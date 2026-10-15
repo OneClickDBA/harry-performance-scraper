@@ -47,9 +47,11 @@ type Database struct {
 	invalidUntil  *time.Time
 	DatabaseLabel string
 	startupReady  atomic.Bool
+	activityError string
 
 	reconnectMU        sync.RWMutex
 	reconnectAttemptMU sync.Mutex
+	activityMU         sync.RWMutex
 }
 
 type MetricsCache struct {

@@ -37,6 +37,7 @@ digraph oracle_to_postgresql_tables {
         <TR><TD BGCOLOR="#f3d99b"><B>Database and instance status</B></TD></TR>
         <TR><TD ALIGN="LEFT">GV$INSTANCE</TD></TR>
         <TR><TD ALIGN="LEFT">GV$DATABASE</TD></TR>
+        <TR><TD ALIGN="LEFT">PRODUCT_COMPONENT_VERSION</TD></TR>
       </TABLE>
     >
   ];
@@ -50,6 +51,8 @@ digraph oracle_to_postgresql_tables {
         <TR><TD ALIGN="LEFT">GV$PROCESS</TD></TR>
         <TR><TD ALIGN="LEFT">GV$PARAMETER</TD></TR>
         <TR><TD ALIGN="LEFT">GV$INSTANCE</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$SGA</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$PGASTAT</TD></TR>
       </TABLE>
     >
   ];
@@ -72,6 +75,8 @@ digraph oracle_to_postgresql_tables {
         <TR><TD ALIGN="LEFT">DBA_TABLESPACE_USAGE_METRICS</TD></TR>
         <TR><TD ALIGN="LEFT">DBA_TABLESPACES</TD></TR>
         <TR><TD ALIGN="LEFT">DBA_TEMP_FREE_SPACE</TD></TR>
+        <TR><TD ALIGN="LEFT">DBA_DATA_FILES</TD></TR>
+        <TR><TD ALIGN="LEFT">DBA_TEMP_FILES</TD></TR>
       </TABLE>
     >
   ];
@@ -94,6 +99,7 @@ digraph oracle_to_postgresql_tables {
       <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
         <TR><TD BGCOLOR="#f3d99b"><B>Counters, waits, and ratios</B></TD></TR>
         <TR><TD ALIGN="LEFT">GV$SYSSTAT</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$SYS_TIME_MODEL</TD></TR>
         <TR><TD ALIGN="LEFT">GV$SYSTEM_WAIT_CLASS</TD></TR>
         <TR><TD ALIGN="LEFT">GV$CON_SYSMETRIC</TD></TR>
       </TABLE>

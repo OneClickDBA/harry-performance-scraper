@@ -681,10 +681,27 @@ create table if not exists %s (
 	cdb text not null,
 	con_id bigint not null,
 	con_name text not null,
-	platform_name text not null
+	platform_name text not null,
+	dbid bigint,
+	db_unique_name text,
+	database_product text,
+	database_edition text,
+	database_version text,
+	database_version_full text,
+	protection_mode text,
+	protection_level text
 ) partition by range (collected_at);
 create index if not exists oracle_database_status_database_time_idx
 	on %s (source_database, collected_at desc);
+
+alter table %s add column if not exists dbid bigint;
+alter table %s add column if not exists db_unique_name text;
+alter table %s add column if not exists database_product text;
+alter table %s add column if not exists database_edition text;
+alter table %s add column if not exists database_version text;
+alter table %s add column if not exists database_version_full text;
+alter table %s add column if not exists protection_mode text;
+alter table %s add column if not exists protection_level text;
 
 create table if not exists %s (
 	collected_at timestamptz not null,
@@ -696,10 +713,17 @@ create table if not exists %s (
 	process_count bigint not null,
 	cpu_count bigint,
 	sga_max_bytes bigint,
-	pga_aggregate_limit bigint
+	pga_aggregate_limit bigint,
+	sga_allocated_bytes bigint,
+	pga_allocated_bytes bigint,
+	pga_max_allocated_bytes bigint
 ) partition by range (collected_at);
 create index if not exists oracle_instance_database_time_idx
 	on %s (source_database, inst_id, collected_at desc);
+
+alter table %s add column if not exists sga_allocated_bytes bigint;
+alter table %s add column if not exists pga_allocated_bytes bigint;
+alter table %s add column if not exists pga_max_allocated_bytes bigint;
 
 create table if not exists %s (
 	collected_at timestamptz not null,
@@ -723,10 +747,13 @@ create table if not exists %s (
 	used_bytes bigint not null,
 	free_bytes bigint not null,
 	max_bytes bigint not null,
-	used_percent double precision not null
+	used_percent double precision not null,
+	allocated_bytes bigint
 ) partition by range (collected_at);
 create index if not exists oracle_tablespace_database_time_idx
 	on %s (source_database, tablespace_name, collected_at desc);
+
+alter table %s add column if not exists allocated_bytes bigint;
 
 create table if not exists %s (
 	collected_at timestamptz not null,
@@ -806,7 +833,7 @@ create table if not exists %s (
 create or replace view %s as
 	select samples.collected_at, samples.source_database, samples.tablespace_name,
 		samples.contents, samples.used_bytes, samples.free_bytes, samples.max_bytes,
-		samples.used_percent
+		samples.used_percent, samples.allocated_bytes
 	from %s samples
 	join %s status
 		on status.source_database = samples.source_database
@@ -858,9 +885,11 @@ select collected_at, source_database, inst_id, con_id, wait_class, cumulative_wa
 from %s;
 `,
 		databaseStatus, databaseStatus,
-		instances, instances,
+		databaseStatus, databaseStatus, databaseStatus, databaseStatus,
+		databaseStatus, databaseStatus, databaseStatus, databaseStatus,
+		instances, instances, instances, instances, instances,
 		resourceLimits, resourceLimits,
-		tablespaces, tablespaces,
+		tablespaces, tablespaces, tablespaces,
 		asmDiskgroups, asmDiskgroups,
 		systemCounters, systemCounters,
 		waitClasses, waitClasses,
@@ -2062,12 +2091,17 @@ func (s *Sink) writeOperationalSamples(ctx context.Context, tx pgx.Tx, samples c
 			sample.CollectedAt, sample.Database, sample.InstID, sample.InstanceName,
 			sample.InstanceStatus, sample.DatabaseStatus, sample.StartupTime, sample.OpenMode,
 			sample.DatabaseRole, sample.CDB, sample.ConID, sample.ConName, sample.PlatformName,
+			sample.DBID, sample.DBUniqueName, sample.DatabaseProduct, sample.DatabaseEdition,
+			sample.DatabaseVersion, sample.DatabaseVersionFull, sample.ProtectionMode,
+			sample.ProtectionLevel,
 		})
 	}
 	if err := copyRows(ctx, tx, s.databaseStatusTable, []string{
 		"collected_at", "source_database", "inst_id", "instance_name", "instance_status",
 		"database_status", "startup_time", "open_mode", "database_role", "cdb", "con_id",
-		"con_name", "platform_name",
+		"con_name", "platform_name", "dbid", "db_unique_name", "database_product",
+		"database_edition", "database_version", "database_version_full", "protection_mode",
+		"protection_level",
 	}, rows, "database status samples"); err != nil {
 		return err
 	}
@@ -2078,11 +2112,13 @@ func (s *Sink) writeOperationalSamples(ctx context.Context, tx pgx.Tx, samples c
 			sample.CollectedAt, sample.Database, sample.InstID, sample.UserSessions,
 			sample.ActiveUserSessions, sample.BackgroundSessions, sample.ProcessCount,
 			sample.CPUCount, sample.SGAMaxBytes, sample.PGAAggregateLimit,
+			sample.SGAAllocatedBytes, sample.PGAAllocatedBytes, sample.PGAMaxAllocatedBytes,
 		})
 	}
 	if err := copyRows(ctx, tx, s.instanceTable, []string{
 		"collected_at", "source_database", "inst_id", "user_sessions", "active_user_sessions",
 		"background_sessions", "process_count", "cpu_count", "sga_max_bytes", "pga_aggregate_limit",
+		"sga_allocated_bytes", "pga_allocated_bytes", "pga_max_allocated_bytes",
 	}, rows, "instance samples"); err != nil {
 		return err
 	}
@@ -2107,11 +2143,12 @@ func (s *Sink) writeOperationalSamples(ctx context.Context, tx pgx.Tx, samples c
 		rows = append(rows, []any{
 			sample.CollectedAt, sample.Database, sample.Tablespace, sample.Contents,
 			sample.UsedBytes, sample.FreeBytes, sample.MaxBytes, sample.UsedPercent,
+			sample.AllocatedBytes,
 		})
 	}
 	if err := copyRows(ctx, tx, s.tablespaceTable, []string{
 		"collected_at", "source_database", "tablespace_name", "contents", "used_bytes",
-		"free_bytes", "max_bytes", "used_percent",
+		"free_bytes", "max_bytes", "used_percent", "allocated_bytes",
 	}, rows, "tablespace samples"); err != nil {
 		return err
 	}

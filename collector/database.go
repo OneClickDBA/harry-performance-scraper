@@ -14,15 +14,6 @@ import (
 	"time"
 )
 
-const (
-	ora01017code = 1017
-	ora01033code = 1033
-	ora28000code = 28000
-	ora03113code = 3113
-	ora03114code = 3114
-	ora12537code = 12537
-)
-
 var errDatabaseSessionNotInitialized = errors.New("database session is not initialized")
 
 func (d *Database) constLabels(labels map[string]string) map[string]string {
@@ -74,6 +65,7 @@ func (d *Database) WarmupConnectionPool(logger *slog.Logger, backoff time.Durati
 	if session == nil {
 		d.setUp(0)
 		d.invalidate(backoff)
+		d.suspendActivity(connectErr)
 		if connectErr != nil {
 			return connectErr
 		}
@@ -83,17 +75,29 @@ func (d *Database) WarmupConnectionPool(logger *slog.Logger, backoff time.Durati
 	if err := d.warmupSession(logger, session); err != nil {
 		d.setUp(0)
 		d.invalidate(backoff)
+		d.suspendActivity(err)
 		return err
 	}
 
 	d.setUp(1)
 	d.clearInvalid()
+	d.resumeActivity()
 	return nil
 }
 
 func (d *Database) warmupSession(logger *slog.Logger, session *sql.DB) error {
 	if session == nil {
 		return errDatabaseSessionNotInitialized
+	}
+
+	// Establish basic connectivity before running initialization SQL. Without
+	// this preflight, an unreachable target can consume both initdb timeouts and
+	// a pool-warmup timeout before startup advances to the next database.
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	err := session.PingContext(pingCtx)
+	pingCancel()
+	if err != nil {
+		return err
 	}
 
 	var connections []*sql.Conn
@@ -149,6 +153,7 @@ func (d *Database) reconnect(logger *slog.Logger, backoff time.Duration) error {
 		d.Up = 0
 		d.invalidateLocked(backoff)
 		d.reconnectMU.Unlock()
+		d.suspendActivity(err)
 		return err
 	}
 	if err := d.warmupSession(logger, session); err != nil {
@@ -160,6 +165,7 @@ func (d *Database) reconnect(logger *slog.Logger, backoff time.Duration) error {
 		d.Up = 0
 		d.invalidateLocked(backoff)
 		d.reconnectMU.Unlock()
+		d.suspendActivity(err)
 		return err
 	}
 
@@ -173,6 +179,7 @@ func (d *Database) reconnect(logger *slog.Logger, backoff time.Duration) error {
 		_ = oldSession.Close()
 	}
 	d.reconnectMU.Unlock()
+	d.resumeActivity()
 	return nil
 }
 
@@ -188,19 +195,47 @@ func (d *Database) ping(logger *slog.Logger, backoff time.Duration) error {
 	}
 	if err != nil {
 		d.setUp(0)
-		if isInvalidCredentialsError(err) || isTemporaryConnectionError(err) {
-			d.invalidate(backoff)
-			return err
-		}
 		// If database is closed, rebuild the handle and rerun init/warmup.
 		if isClosedDatabaseError(err) {
 			return d.reconnect(logger, backoff)
 		}
+		// Ping failures are connectivity failures even when the driver returns a
+		// network error, context deadline, or ORA code outside the known list.
+		// Back off every failed target so one unavailable database cannot be
+		// retried by every collector cycle.
+		d.invalidate(backoff)
+		d.suspendActivity(err)
 		return err
 	}
 	d.setUp(1)
 	d.clearInvalid()
+	d.resumeActivity()
 	return nil
+}
+
+func (d *Database) suspendActivity(err error) {
+	d.activityMU.Lock()
+	defer d.activityMU.Unlock()
+	if err == nil {
+		d.activityError = "database connection is unavailable"
+		return
+	}
+	d.activityError = err.Error()
+}
+
+func (d *Database) resumeActivity() {
+	d.activityMU.Lock()
+	d.activityError = ""
+	d.activityMU.Unlock()
+}
+
+func (d *Database) activityUnavailable() error {
+	d.activityMU.RLock()
+	defer d.activityMU.RUnlock()
+	if d.activityError == "" {
+		return nil
+	}
+	return fmt.Errorf("activity collection suspended until connectivity recovers: %s", d.activityError)
 }
 
 func (d *Database) IsValid() *time.Duration {

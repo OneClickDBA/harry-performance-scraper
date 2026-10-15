@@ -24,7 +24,7 @@
       "datasource": {"type": "postgres", "uid": "PostgreSQL"},
       "description": "Current physical size of the PostgreSQL database containing Harry, including indexes and TOAST.",
       "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}, "unit": "bytes"}, "overrides": []},
-      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "gridPos": {"h": 4, "w": 3, "x": 0, "y": 0},
       "id": 1,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "9.5.0",
@@ -36,7 +36,7 @@
       "datasource": {"type": "postgres", "uid": "PostgreSQL"},
       "description": "Planner row estimates from Harry partition leaves and non-partitioned repository tables. No retained sample table is scanned.",
       "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}, "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "gridPos": {"h": 4, "w": 3, "x": 3, "y": 0},
       "id": 2,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "9.5.0",
@@ -48,7 +48,7 @@
       "datasource": {"type": "postgres", "uid": "PostgreSQL"},
       "description": "Number of physical daily partition leaves currently retained by Harry tables.",
       "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}, "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "gridPos": {"h": 4, "w": 3, "x": 6, "y": 0},
       "id": 3,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "9.5.0",
@@ -60,7 +60,7 @@
       "datasource": {"type": "postgres", "uid": "PostgreSQL"},
       "description": "Age of the oldest dated Harry partition. This reflects physical retention, not only the configured value.",
       "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 31}, {"color": "red", "value": 60}]}, "unit": "d"}, "overrides": []},
-      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "gridPos": {"h": 4, "w": 3, "x": 9, "y": 0},
       "id": 4,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "9.5.0",
@@ -72,7 +72,7 @@
       "datasource": {"type": "postgres", "uid": "PostgreSQL"},
       "description": "Current PostgreSQL backends connected to the Harry repository database.",
       "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 50}, {"color": "red", "value": 100}]}, "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "gridPos": {"h": 4, "w": 3, "x": 12, "y": 0},
       "id": 5,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "9.5.0",
@@ -84,13 +84,25 @@
       "datasource": {"type": "postgres", "uid": "PostgreSQL"},
       "description": "PostgreSQL shared-buffer hit ratio since database statistics were reset.",
       "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "decimals": 2, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 95}, {"color": "green", "value": 99}]}, "unit": "percent"}, "overrides": []},
-      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+      "gridPos": {"h": 4, "w": 3, "x": 15, "y": 0},
       "id": 6,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "9.5.0",
       "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "editorMode": "code", "format": "table", "rawQuery": true, "rawSql": "select case when blks_hit + blks_read = 0 then 100 else blks_hit * 100.0 / (blks_hit + blks_read) end::double precision as value from pg_stat_database where datname = current_database();", "refId": "A"}],
       "title": "Buffer Cache Hit",
       "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "description": "Latest Harry instance writing scheduled-cycle telemetry for each HA scope, plus the PostgreSQL endpoint queried by Grafana. Advisory locks are server-local and cannot be observed from a Patroni replica; this persisted heartbeat remains useful there, while CURRENT/STALE and replay delay expose replica freshness.",
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "displayMode": "auto", "inspect": false}}, "overrides": [{"matcher": {"id": "byName", "options": "state"}, "properties": [{"id": "custom.width", "value": 75}, {"id": "mappings", "value": [{"options": {"CURRENT": {"color": "green", "index": 0}, "STALE": {"color": "red", "index": 1}}, "type": "value"}]}]}, {"matcher": {"id": "byName", "options": "heartbeat_age_seconds"}, "properties": [{"id": "unit", "value": "s"}, {"id": "decimals", "value": 0}, {"id": "custom.width", "value": 90}]}, {"matcher": {"id": "byName", "options": "replay_delay_seconds"}, "properties": [{"id": "unit", "value": "s"}, {"id": "decimals", "value": 0}, {"id": "custom.width", "value": 90}]}]},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 34,
+      "options": {"footer": {"enablePagination": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true},
+      "pluginVersion": "9.5.0",
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "editorMode": "code", "format": "table", "rawQuery": true, "rawSql": "with latest as (\n  select distinct on (ha_scope)\n    ha_scope, scraper_instance, observed_at, configured_interval_seconds\n  from harry_latest_runtime_status\n  where scheduler = 'scheduled'\n  order by ha_scope, observed_at desc\n)\nselect\n  ha_scope as scope,\n  scraper_instance as active_scraper,\n  case\n    when extract(epoch from now() - observed_at) <= greatest(configured_interval_seconds * 3, 60) then 'CURRENT'\n    else 'STALE'\n  end as state,\n  extract(epoch from now() - observed_at)::double precision as heartbeat_age_seconds,\n  coalesce(inet_server_addr()::text, 'local') as repository_node,\n  case when pg_is_in_recovery() then 'REPLICA' else 'PRIMARY' end as repository_role,\n  case\n    when pg_is_in_recovery() and pg_last_xact_replay_timestamp() is not null\n    then extract(epoch from now() - pg_last_xact_replay_timestamp())::double precision\n  end as replay_delay_seconds\nfrom latest\norder by ha_scope;", "refId": "A"}],
+      "title": "Active Scraper and Repository Endpoint",
+      "type": "table"
     },
     {
       "datasource": {"type": "postgres", "uid": "PostgreSQL"},
@@ -178,14 +190,14 @@
     },
     {
       "datasource": {"type": "postgres", "uid": "PostgreSQL"},
-      "description": "Daily rows written by Harry, grouped by native repository dataset. This exposes which collectors and datasets are responsible for repository growth.",
-      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "Recorded rows", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 20, "gradientMode": "none", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "linear", "lineWidth": 2, "pointSize": 4, "scaleDistribution": {"type": "linear"}, "showPoints": "always", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}, "thresholdsStyle": {"mode": "off"}}, "unit": "short"}, "overrides": []},
+      "description": "Daily rows written by Harry, grouped by native repository dataset. Independent lines on a logarithmic scale expose collector-level changes without repeating the stacked total shown by the source-database panel.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "Recorded rows (log scale)", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 5, "gradientMode": "none", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "linear", "lineWidth": 2, "pointSize": 4, "scaleDistribution": {"log": 10, "type": "log"}, "showPoints": "auto", "spanNulls": false, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}}, "unit": "short"}, "overrides": []},
       "gridPos": {"h": 10, "w": 16, "x": 0, "y": 35},
       "id": 24,
       "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "9.5.0",
       "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "editorMode": "code", "format": "time_series", "rawQuery": true, "rawSql": "select greatest(i.sample_day, $__timeFrom()) as time, values.dataset as metric, sum(values.rows)::double precision as value\nfrom harry_repository_daily_ingest i\ncross join lateral (values\n  ('Additional metrics', i.additional_metric_rows),\n  ('SQL samples', i.sql_sample_rows),\n  ('SQL text writes', i.sql_text_writes),\n  ('SQL cursor metadata', i.sql_cursor_metadata_writes),\n  ('SQL plan operations', i.sql_plan_operation_writes),\n  ('Session samples', i.session_sample_rows),\n  ('Blocking sessions', i.blocking_session_sample_rows),\n  ('Database activity', i.database_activity_sample_rows),\n  ('Database status', i.database_status_sample_rows),\n  ('Instance samples', i.instance_sample_rows),\n  ('Resource limits', i.resource_limit_sample_rows),\n  ('Tablespaces', i.tablespace_sample_rows),\n  ('ASM diskgroups', i.asm_diskgroup_sample_rows),\n  ('System counters', i.system_counter_sample_rows),\n  ('Wait classes', i.wait_class_sample_rows),\n  ('System metrics', i.system_metric_sample_rows),\n  ('Scrape status', i.scrape_status_rows)\n) values(dataset, rows)\nwhere i.sample_day between\n    (date_trunc('day', ($__timeFrom()) at time zone 'UTC') at time zone 'UTC')\n    and (date_trunc('day', ($__timeTo()) at time zone 'UTC') at time zone 'UTC')\n  and i.source_database in (${source_database:sqlstring})\ngroup by i.sample_day, values.dataset\nhaving sum(values.rows) > 0\norder by time, metric;", "refId": "A"}],
-      "title": "Daily Recorded Rows by Dataset",
+      "title": "Daily Recorded Rows by Dataset (Log Scale)",
       "type": "timeseries"
     },
     {
@@ -310,14 +322,14 @@
     },
     {
       "collapsed": true,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 114},
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 124},
       "id": 23,
       "panels": [
         {
           "datasource": {"type": "postgres", "uid": "PostgreSQL"},
           "description": "Latest persisted collector result for selected Oracle databases. Failed and stale rows remain visible even when no performance samples were produced.",
           "fieldConfig": {"defaults": {"custom": {"align": "auto", "displayMode": "auto", "inspect": false}}, "overrides": [{"matcher": {"id": "byName", "options": "data_age_seconds"}, "properties": [{"id": "unit", "value": "s"}, {"id": "decimals", "value": 0}]}, {"matcher": {"id": "byName", "options": "duration_seconds"}, "properties": [{"id": "unit", "value": "s"}, {"id": "decimals", "value": 3}]}, {"matcher": {"id": "byName", "options": "success"}, "properties": [{"id": "mappings", "value": [{"options": {"false": {"color": "red", "text": "FAILED"}, "true": {"color": "green", "text": "OK"}}, "type": "value"}]}]}]},
-          "gridPos": {"h": 10, "w": 15, "x": 0, "y": 115},
+          "gridPos": {"h": 10, "w": 15, "x": 0, "y": 125},
           "id": 12,
           "options": {"footer": {"enablePagination": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true, "sortBy": [{"desc": true, "displayName": "data_age_seconds"}]},
           "pluginVersion": "9.5.0",
@@ -329,7 +341,7 @@
           "datasource": {"type": "postgres", "uid": "PostgreSQL"},
           "description": "Latest sample counts summed across selected source databases. Unexpected zeros or large changes indicate collector, privilege, connection, or workload changes.",
           "fieldConfig": {"defaults": {"color": {"mode": "continuous-BlYlRd"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}, "unit": "short"}, "overrides": []},
-          "gridPos": {"h": 10, "w": 9, "x": 15, "y": 115},
+          "gridPos": {"h": 10, "w": 9, "x": 15, "y": 125},
           "id": 13,
           "options": {"displayMode": "gradient", "minVizHeight": 10, "minVizWidth": 0, "namePlacement": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": true}, "showUnfilled": true, "valueMode": "color"},
           "pluginVersion": "9.5.0",
@@ -424,6 +436,28 @@
       "targets": [{"datasource": {"type": "postgres","uid": "PostgreSQL"},"editorMode": "code","format": "time_series","rawQuery": true,"rawSql": "select\n  date_bin(greatest('${__interval}'::interval, interval '10 seconds'), r.observed_at, '1970-01-01'::timestamptz) as time,\n  r.scheduler || ' - ' || results.series as metric,\n  max(results.value)::double precision as value\nfrom harry_runtime_samples r\ncross join lateral (values\n  ('missed intervals', r.missed_intervals),\n  ('errors', r.error_count),\n  ('databases incomplete', greatest(r.databases_attempted - r.databases_succeeded, 0))\n) results(series, value)\nwhere $__timeFilter(r.observed_at)\ngroup by 1, 2\norder by 1, 2;","refId": "A"}],
       "title": "Scheduler Cycle Results",
       "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "postgres","uid": "PostgreSQL"},
+      "description": "Per-database activity collector reliability for the selected time range, bounded to the latest six hours to protect the high-frequency status table. This identifies the databases responsible for aggregate activity-cycle errors and missed intervals without requiring per-database dashboard inspection.",
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto","displayMode": "auto","inspect": false}},
+        "overrides": [
+          {"matcher": {"id": "byName","options": "state"},"properties": [{"id": "mappings","value": [{"options": {"DEGRADED": {"color": "orange","text": "DEGRADED"},"FAILING": {"color": "red","text": "FAILING"},"NO ATTEMPTS": {"color": "red","text": "NO ATTEMPTS"},"OK": {"color": "green","text": "OK"}},"type": "value"}]},{"id": "custom.displayMode","value": "color-background"}]},
+          {"matcher": {"id": "byName","options": "failure_percent"},"properties": [{"id": "unit","value": "percent"},{"id": "decimals","value": 1}]},
+          {"matcher": {"id": "byName","options": "p95_duration_seconds"},"properties": [{"id": "unit","value": "s"},{"id": "decimals","value": 3}]},
+          {"matcher": {"id": "byName","options": "maximum_duration_seconds"},"properties": [{"id": "unit","value": "s"},{"id": "decimals","value": 3}]},
+          {"matcher": {"id": "byName","options": "source_database"},"properties": [{"id": "displayName","value": "Database"},{"id": "custom.width","value": 150}]},
+          {"matcher": {"id": "byName","options": "latest_error"},"properties": [{"id": "custom.width","value": 420}]}
+        ]
+      },
+      "gridPos": {"h": 10,"w": 24,"x": 0,"y": 114},
+      "id": 33,
+      "options": {"footer": {"enablePagination": false,"fields": "","reducer": ["sum"],"show": false},"showHeader": true},
+      "pluginVersion": "9.5.15",
+      "targets": [{"datasource": {"type": "postgres","uid": "PostgreSQL"},"editorMode": "code","format": "table","rawQuery": true,"rawSql": "with inventory as (\n  select source_database\n  from oracle_latest_scrape_status\n  where collector = 'scheduled'\n    and source_database in (${source_database:sqlstring})\n), activity as (\n  select\n    source_database,\n    count(*) as attempts,\n    count(*) filter (where success) as successes,\n    count(*) filter (where not success) as failures,\n    count(*) filter (where not success and error_message ilike '%timed out%') as timeouts,\n    percentile_cont(0.95) within group (order by duration_seconds) as p95_duration_seconds,\n    max(duration_seconds) as maximum_duration_seconds,\n    max(sample_count) filter (where success) as maximum_samples,\n    max(collected_at) as latest_attempt,\n    max(collected_at) filter (where success) as latest_success,\n    max(collected_at) filter (where not success) as latest_failure,\n    (array_agg(error_message order by collected_at desc) filter (where not success))[1] as latest_error\n  from oracle_scrape_status\n  where collector = 'activity'\n    and collected_at >= greatest($__timeFrom(), now() - interval '6 hours')\n    and collected_at <= $__timeTo()\n    and source_database in (${source_database:sqlstring})\n  group by source_database\n), current_state as (\n  select source_database, success\n  from oracle_latest_scrape_status\n  where collector = 'activity'\n)\nselect\n  i.source_database,\n  case\n    when coalesce(a.attempts, 0) = 0 then 'NO ATTEMPTS'\n    when not coalesce(c.success, false) then 'FAILING'\n    when a.failures > 0 then 'DEGRADED'\n    else 'OK'\n  end as state,\n  coalesce(a.attempts, 0) as attempts,\n  coalesce(a.successes, 0) as successes,\n  coalesce(a.failures, 0) as failures,\n  coalesce(a.timeouts, 0) as timeouts,\n  case when a.attempts > 0 then a.failures * 100.0 / a.attempts end as failure_percent,\n  a.p95_duration_seconds,\n  a.maximum_duration_seconds,\n  a.maximum_samples,\n  a.latest_attempt,\n  a.latest_success,\n  a.latest_failure,\n  a.latest_error\nfrom inventory i\nleft join activity a using (source_database)\nleft join current_state c using (source_database)\norder by\n  case\n    when coalesce(a.attempts, 0) = 0 then 0\n    when not coalesce(c.success, false) then 1\n    when a.failures > 0 then 2\n    else 3\n  end,\n  coalesce(a.failures, 0) desc,\n  i.source_database;","refId": "A"}],
+      "title": "Activity Collection Reliability by Database",
+      "type": "table"
     }
   ],
   "refresh": "5m",
@@ -457,6 +491,6 @@
   "timezone": "",
   "title": "Harry PostgreSQL Repository Health",
   "uid": "harry-postgresql-repository-health",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }

@@ -388,7 +388,7 @@
         "type": "postgres",
         "uid": "PostgreSQL"
       },
-      "description": "Tablespaces, Oracle resource limits, and ASM diskgroups at watch or alert thresholds.",
+      "description": "Maximum tablespace and ASM pressure remain capacity risks. Current tablespace allocation pressure is a watch signal because configured autoextend may still provide headroom.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -540,7 +540,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with asm_capacity as (\n  select\n    string_agg(source_database, ', ' order by source_database) as source_database,\n    'ASM diskgroup'::text as category,\n    diskgroup_name as object_name,\n    inst_id::text as inst_id,\n    used_percent,\n    90.0::double precision as alert_threshold\n  from oracle_latest_asm_diskgroup_samples\n  where used_percent >= 80\n  group by\n    diskgroup_name,\n    inst_id,\n    total_bytes,\n    free_bytes,\n    usable_bytes,\n    used_percent\n),\ncapacity as (\n  select\n    source_database,\n    'Tablespace'::text as category,\n    tablespace_name as object_name,\n    null::text as inst_id,\n    used_percent,\n    90.0::double precision as alert_threshold\n  from oracle_latest_tablespace_samples\n  where used_percent >= 80\n  union all\n  select\n    source_database,\n    'Resource limit',\n    resource_name,\n    inst_id::text,\n    used_percent,\n    85.0::double precision\n  from oracle_latest_resource_limit_samples\n  where not limit_unlimited\n    and limit_value > 0\n    and used_percent >= 75\n  union all\n  select * from asm_capacity\n)\nselect\n  source_database,\n  category,\n  object_name,\n  inst_id,\n  used_percent,\n  alert_threshold,\n  case\n    when used_percent > alert_threshold then 'ALERT THRESHOLD'\n    else 'WATCH'\n  end as state\nfrom capacity\norder by (used_percent / alert_threshold) desc, source_database, category, object_name;",
+          "rawSql": "with asm_capacity as (\n  select\n    string_agg(source_database, ', ' order by source_database) as source_database,\n    'ASM diskgroup'::text as category,\n    diskgroup_name as object_name,\n    inst_id::text as inst_id,\n    used_percent,\n    90.0::double precision as alert_threshold\n  from oracle_latest_asm_diskgroup_samples\n  where used_percent >= 80\n  group by diskgroup_name, inst_id, total_bytes, free_bytes, usable_bytes, used_percent\n), capacity as (\n  select source_database, 'Tablespace maximum'::text as category, tablespace_name as object_name,\n    null::text as inst_id, used_percent, 90.0::double precision as alert_threshold\n  from oracle_latest_tablespace_samples\n  where used_percent >= 80\n  union all\n  select source_database, 'Tablespace allocation', tablespace_name, null::text,\n    used_bytes * 100.0 / nullif(allocated_bytes, 0), 95.0::double precision\n  from oracle_latest_tablespace_samples\n  where allocated_bytes > 0 and used_bytes * 100.0 / allocated_bytes >= 85\n  union all\n  select source_database, 'Resource limit', resource_name, inst_id::text,\n    used_percent, 85.0::double precision\n  from oracle_latest_resource_limit_samples\n  where not limit_unlimited and limit_value > 0 and used_percent >= 75\n  union all\n  select * from asm_capacity\n)\nselect source_database, category, object_name, inst_id,\n  round(used_percent::numeric, 2) as used_percent, alert_threshold,\n  case when used_percent > alert_threshold then 'ALERT THRESHOLD' else 'WATCH' end as state\nfrom capacity\norder by (used_percent / alert_threshold) desc, source_database, category, object_name;",
           "refId": "A"
         }
       ],
@@ -738,11 +738,263 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select distinct on (source_database, inst_id)\n  source_database,\n  inst_id,\n  instance_name,\n  instance_status,\n  database_status,\n  open_mode,\n  database_role,\n  con_name,\n  startup_time,\n  collected_at as last_observation\nfrom oracle_database_status_samples\norder by source_database, inst_id, collected_at desc;",
+          "rawSql": "select\n  s.source_database,\n  s.db_unique_name,\n  s.dbid,\n  s.database_version_full,\n  s.database_role,\n  s.protection_mode,\n  s.protection_level,\n  s.inst_id,\n  s.instance_name,\n  s.instance_status,\n  s.database_status,\n  s.open_mode,\n  s.startup_time,\n  s.collected_at as last_observation\nfrom oracle_database_status_samples s\njoin oracle_latest_scrape_status st\n  on st.source_database = s.source_database\n and st.collector = 'operational.database_status'\n and st.collected_at = s.collected_at\norder by s.source_database, s.inst_id;",
           "refId": "A"
         }
       ],
       "title": "Database and Instance State",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "description": "Current fleet-wide CPU demand and PGA allocation. These are visibility signals only; no default alert rule is provisioned until representative workload thresholds are validated.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cpu_used_percent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CPU Used %"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 75
+                    },
+                    {
+                      "color": "red",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_current_percent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Current %"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 75
+                    },
+                    {
+                      "color": "red",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_peak_percent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Peak %"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 80
+                    },
+                    {
+                      "color": "red",
+                      "value": 95
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_allocated_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Allocated"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_peak_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Peak"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_limit_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Limit"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 7,
+      "options": {
+        "footer": {
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with instances as (\n  select\n    s.source_database,\n    sum(s.cpu_count)::double precision as cpu_capacity,\n    sum(s.pga_allocated_bytes)::double precision as pga_allocated_bytes,\n    sum(s.pga_max_allocated_bytes)::double precision as pga_peak_bytes,\n    sum(s.pga_aggregate_limit)::double precision as pga_limit_bytes\n  from oracle_instance_samples s\n  join oracle_latest_scrape_status st\n    on st.source_database = s.source_database\n   and st.collector = 'operational.instance'\n   and st.collected_at = s.collected_at\n  group by s.source_database\n), cpu as (\n  select\n    r.source_database,\n    sum(r.value_per_second) / 1000000.0 as db_cpu_cores\n  from oracle_system_counter_rates r\n  join oracle_latest_scrape_status st\n    on st.source_database = r.source_database\n   and st.collector = 'operational.cpu_io_counters'\n   and st.collected_at = r.collected_at\n  where r.con_id = 0 and r.stat_name = 'DB CPU' and r.value_per_second is not null\n  group by r.source_database\n)\nselect\n  i.source_database,\n  round(c.db_cpu_cores::numeric, 2) as db_cpu_cores,\n  i.cpu_capacity,\n  round((c.db_cpu_cores * 100.0 / nullif(i.cpu_capacity, 0))::numeric, 1) as cpu_used_percent,\n  i.pga_allocated_bytes,\n  i.pga_peak_bytes,\n  i.pga_limit_bytes,\n  round((i.pga_allocated_bytes * 100.0 / nullif(i.pga_limit_bytes, 0))::numeric, 1) as pga_current_percent,\n  round((i.pga_peak_bytes * 100.0 / nullif(i.pga_limit_bytes, 0))::numeric, 1) as pga_peak_percent\nfrom instances i\nleft join cpu c using (source_database)\norder by greatest(\n  coalesce(c.db_cpu_cores / nullif(i.cpu_capacity, 0), 0),\n  coalesce(i.pga_allocated_bytes / nullif(i.pga_limit_bytes, 0), 0)\n) desc, i.source_database;",
+          "refId": "A"
+        }
+      ],
+      "title": "Current CPU and PGA Pressure",
       "type": "table"
     },
     {
@@ -756,7 +1008,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 52
       },
       "id": 6,
       "options": {
@@ -806,6 +1058,6 @@
   "timezone": "",
   "title": "Oracle Alerting Overview",
   "uid": "oracle-alerting-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

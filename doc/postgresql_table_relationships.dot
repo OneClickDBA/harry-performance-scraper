@@ -55,11 +55,11 @@ digraph postgresql_table_relationships {
   ];
 
   oracle_database_status_samples [
-    label="oracle_database_status_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\linstance_name\linstance_status\ldatabase_status\lstartup_time\lopen_mode\ldatabase_role\lcdb\lcon_id\lcon_name\lplatform_name\l\lIndexes\lsource_database, collected_at desc\l"
+    label="oracle_database_status_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\linstance_name\linstance_status\ldatabase_status\lstartup_time\lopen_mode\ldatabase_role\lcdb\lcon_id\lcon_name\lplatform_name\ldbid\ldb_unique_name\ldatabase_product\ldatabase_edition\ldatabase_version\ldatabase_version_full\lprotection_mode\lprotection_level\l\lIndexes\lsource_database, collected_at desc\l"
   ];
 
   oracle_instance_samples [
-    label="oracle_instance_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\luser_sessions\lactive_user_sessions\lbackground_sessions\lprocess_count\lcpu_count\lsga_max_bytes\lpga_aggregate_limit\l\lIndexes\lsource_database, inst_id, collected_at desc\l"
+    label="oracle_instance_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\luser_sessions\lactive_user_sessions\lbackground_sessions\lprocess_count\lcpu_count\lsga_max_bytes\lpga_aggregate_limit\lsga_allocated_bytes\lpga_allocated_bytes\lpga_max_allocated_bytes\l\lIndexes\lsource_database, inst_id, collected_at desc\l"
   ];
 
   oracle_resource_limit_samples [
@@ -67,7 +67,7 @@ digraph postgresql_table_relationships {
   ];
 
   oracle_tablespace_samples [
-    label="oracle_tablespace_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\ltablespace_name\lcontents\lused_bytes\lfree_bytes\lmax_bytes\lused_percent\l\lIndexes\lsource_database, tablespace_name, collected_at desc\l"
+    label="oracle_tablespace_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\ltablespace_name\lcontents\lused_bytes\lfree_bytes\lmax_bytes\lused_percent\lallocated_bytes\l\lIndexes\lsource_database, tablespace_name, collected_at desc\l"
   ];
 
   oracle_asm_diskgroup_samples [

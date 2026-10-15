@@ -7,10 +7,8 @@ package collector
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	_ "github.com/sijms/go-ora/v2"
-	"github.com/sijms/go-ora/v2/network"
 	"log/slog"
 	"net/url"
 )
@@ -76,34 +74,5 @@ func setConnectionPool(logger *slog.Logger, dbname string, dbconfig DatabaseConf
 		db.SetMaxIdleConns(dbconfig.GetPoolMinConnections())
 	} else {
 		db.SetMaxIdleConns(dbconfig.GetMaxIdleConns())
-	}
-}
-
-func isInvalidCredentialsError(err error) bool {
-	if err == nil {
-		return false
-	}
-	var oraErr *network.OracleError
-	ok := errors.As(err, &oraErr)
-	if !ok {
-		return false
-	}
-	return oraErr.ErrCode == ora01017code || oraErr.ErrCode == ora28000code
-}
-
-func isTemporaryConnectionError(err error) bool {
-	if err == nil {
-		return false
-	}
-	var oraErr *network.OracleError
-	ok := errors.As(err, &oraErr)
-	if !ok {
-		return false
-	}
-	switch oraErr.ErrCode {
-	case ora01033code, ora03113code, ora03114code, ora12537code:
-		return true
-	default:
-		return false
 	}
 }
