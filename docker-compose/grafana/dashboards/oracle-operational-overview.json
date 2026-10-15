@@ -48,96 +48,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "success"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "options": {
-                      "false": {
-                        "color": "red",
-                        "text": "Failed"
-                      },
-                      "true": {
-                        "color": "green",
-                        "text": "OK"
-                      }
-                    },
-                    "type": "value"
-                  }
-                ]
-              },
-              {
-                "id": "custom.displayMode",
-                "value": "color-background"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
-      "id": 1,
-      "options": {
-        "footer": {
-          "enablePagination": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "9.5.15",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "PostgreSQL"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "select\n  collector,\n  success,\n  collected_at as last_collection,\n  round(duration_seconds::numeric, 3) as duration_seconds,\n  sample_count,\n  error_message\nfrom oracle_latest_scrape_status\nwhere source_database = ${source_database:sqlstring}\norder by success, collector;",
-          "refId": "A"
-        }
-      ],
-      "title": "Collector Status",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "PostgreSQL"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
               "options": "db_unique_name"
             },
             "properties": [
@@ -170,13 +80,157 @@
                 "value": "Version"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "db_unique_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "DB Unique Name"
+              },
+              {
+                "id": "custom.width",
+                "value": 125
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "dbid"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "DBID"
+              },
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "database_product"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Product"
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "database_edition"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Edition"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "database_version_full"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Version"
+              },
+              {
+                "id": "custom.width",
+                "value": 125
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "database_role"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Role"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "protection_mode"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Protection"
+              },
+              {
+                "id": "custom.width",
+                "value": 115
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "protection_level"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Protection Level"
+              },
+              {
+                "id": "custom.width",
+                "value": 115
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "platform_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Platform"
+              },
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
           }
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
+        "h": 6,
+        "w": 8,
+        "x": 0,
         "y": 0
       },
       "id": 2,
@@ -189,7 +243,8 @@
           ],
           "show": false
         },
-        "showHeader": true
+        "showHeader": true,
+        "cellHeight": "sm"
       },
       "pluginVersion": "9.5.15",
       "targets": [
@@ -247,14 +302,110 @@
                 "value": 60
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Instance"
+              },
+              {
+                "id": "custom.width",
+                "value": 115
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance_status"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Status"
+              },
+              {
+                "id": "custom.width",
+                "value": 75
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "database_status"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "DB Status"
+              },
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "open_mode"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Open Mode"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "con_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Container"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "startup_time"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Startup"
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
           }
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 0
       },
       "id": 12,
       "options": {
@@ -266,7 +417,8 @@
           ],
           "show": false
         },
-        "showHeader": true
+        "showHeader": true,
+        "cellHeight": "sm"
       },
       "pluginVersion": "9.5.15",
       "targets": [
@@ -512,14 +664,142 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cpu_count"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CPU"
+              },
+              {
+                "id": "custom.width",
+                "value": 55
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sga_allocated_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SGA"
+              },
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sga_max_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SGA Max"
+              },
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_allocated_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA"
+              },
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_max_allocated_bytes"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Peak"
+              },
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_aggregate_limit"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA Limit"
+              },
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_current_percent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PGA %"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pga_peak_percent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Peak %"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
           }
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 0
       },
       "id": 13,
       "options": {
@@ -531,7 +811,8 @@
           ],
           "show": false
         },
-        "showHeader": true
+        "showHeader": true,
+        "cellHeight": "sm"
       },
       "pluginVersion": "9.5.15",
       "targets": [
@@ -592,7 +873,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 16
+        "y": 6
       },
       "id": 3,
       "options": {
@@ -852,7 +1133,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 16
+        "y": 6
       },
       "id": 4,
       "options": {
@@ -971,7 +1252,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 25
+        "y": 15
       },
       "id": 14,
       "options": {
@@ -1048,7 +1329,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 25
+        "y": 15
       },
       "id": 6,
       "options": {
@@ -1124,7 +1405,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 34
+        "y": 24
       },
       "id": 5,
       "options": {
@@ -1201,7 +1482,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 34
+        "y": 24
       },
       "id": 15,
       "options": {
@@ -1309,7 +1590,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 43
+        "y": 33
       },
       "id": 16,
       "options": {
@@ -1417,7 +1698,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 43
+        "y": 33
       },
       "id": 17,
       "options": {
@@ -1510,7 +1791,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 52
+        "y": 42
       },
       "id": 18,
       "options": {
@@ -1589,7 +1870,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 52
+        "y": 42
       },
       "id": 9,
       "options": {
@@ -1693,7 +1974,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 61
+        "y": 51
       },
       "id": 7,
       "options": {
@@ -1793,7 +2074,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 61
+        "y": 51
       },
       "id": 8,
       "options": {
@@ -1822,6 +2103,110 @@
         }
       ],
       "title": "ASM Diskgroup Capacity",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 59
+      },
+      "id": 19,
+      "panels": [],
+      "title": "Harry Performance Scraper Collection Information",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "success"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "false": {
+                        "color": "red",
+                        "text": "Failed"
+                      },
+                      "true": {
+                        "color": "green",
+                        "text": "OK"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "id": 1,
+      "options": {
+        "footer": {
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  collector,\n  success,\n  collected_at as last_collection,\n  round(duration_seconds::numeric, 3) as duration_seconds,\n  sample_count,\n  error_message\nfrom oracle_latest_scrape_status\nwhere source_database = ${source_database:sqlstring}\norder by success, collector;",
+          "refId": "A"
+        }
+      ],
+      "title": "Collector Status",
       "type": "table"
     },
     {
@@ -1856,7 +2241,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 69
+        "y": 68
       },
       "id": 10,
       "options": {
@@ -1942,7 +2327,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 69
+        "y": 68
       },
       "id": 11,
       "options": {
@@ -2023,6 +2408,6 @@
   "timezone": "",
   "title": "Oracle Operational Overview",
   "uid": "oracle-operational-overview",
-  "version": 3,
+  "version": 5,
   "weekStart": ""
 }
