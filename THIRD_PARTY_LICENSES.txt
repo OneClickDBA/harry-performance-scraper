@@ -66,8 +66,8 @@ are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
 
 Generator: github.com/google/go-licenses/v2@v2.0.1
-go.mod SHA-256: 70d9343b1f7cbffb8e502d526aacb630d146bb7fa597a9cfe4dc6052b3732e9a
-go.sum SHA-256: 6ce051022ce3eec7ea80244a99de1752de5a5b2b6e8c5effd182972136330946
+go.mod SHA-256: 83b418da5f45f678661542188c00b375f5b3f319499d4a32a59217517cea0d96
+go.sum SHA-256: 35272a4c3c1f298f99973d236b73cbdc6ba496c48d3b41acd10318544ccc6a69
 
 ===============================================================================
 DEPENDENCY INVENTORY: ALL RELEASE VARIANTS
@@ -6451,9 +6451,9 @@ THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/oracle/oci-go-sdk/v65
-Version: v65.125.0
+Version: v65.126.2
 License: Apache-2.0
-Source: https://github.com/oracle/oci-go-sdk/blob/v65.125.0/LICENSE.txt
+Source: https://github.com/oracle/oci-go-sdk/blob/v65.126.2/LICENSE.txt
 -------------------------------------------------------------------------------
 Copyright (c) 2016, 2026, Oracle and/or its affiliates.  All rights reserved.
 This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
@@ -6561,9 +6561,9 @@ END OF TERMS AND CONDITIONS
 
 -------------------------------------------------------------------------------
 Dependency: github.com/oracle/oci-go-sdk/v65
-Version: v65.125.0
+Version: v65.126.2
 License: UPL-1.0
-Source: https://github.com/oracle/oci-go-sdk/blob/v65.125.0/LICENSE.txt
+Source: https://github.com/oracle/oci-go-sdk/blob/v65.126.2/LICENSE.txt
 -------------------------------------------------------------------------------
 Copyright (c) 2016, 2026, Oracle and/or its affiliates.  All rights reserved.
 This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
