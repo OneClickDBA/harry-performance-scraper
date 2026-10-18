@@ -462,6 +462,16 @@
               {
                 "id": "custom.width",
                 "value": 130
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Investigate in Top Consumers",
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_rank_by=elapsed&var-sql_id=${__value.raw}"
+                  }
+                ]
               }
             ]
           },
@@ -718,6 +728,16 @@
               {
                 "id": "custom.width",
                 "value": 130
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Investigate in Top Consumers",
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_rank_by=elapsed&var-sql_id=${__value.raw}"
+                  }
+                ]
               }
             ]
           },
@@ -957,7 +977,26 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^[0-9a-z]{13}$/"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Investigate in Top Consumers",
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_rank_by=elapsed&var-sql_id=${__series.name}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -1132,6 +1171,16 @@
               {
                 "id": "custom.width",
                 "value": 130
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Investigate in Top Consumers",
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_rank_by=elapsed&var-sql_id=${__value.raw}"
+                  }
+                ]
               }
             ]
           },
@@ -1404,6 +1453,16 @@
               {
                 "id": "custom.width",
                 "value": 130
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Investigate in Top Consumers",
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_rank_by=elapsed&var-sql_id=${__value.raw}"
+                  }
+                ]
               }
             ]
           },
@@ -1754,6 +1813,6 @@
   "timezone": "",
   "title": "Oracle Database Activity History (DAH)",
   "uid": "database-activity-history-dah",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }
