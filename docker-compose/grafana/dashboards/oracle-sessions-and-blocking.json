@@ -172,7 +172,7 @@
         "type": "postgres",
         "uid": "PostgreSQL"
       },
-      "description": "Sampled blocker-to-waiter relationships observed during scheduled collections in the selected time range. A green status band means successful collections found no blocking; a grey band means no successful collection was available. This is not an exact Oracle lock audit: locks shorter than the scheduled scrape interval may be missed, start and end boundaries are approximate, failed or missing collections appear as gaps, and the source is GV$SESSION blocking information rather than the complete GV$LOCK inventory. Shows the 20 most-observed relationships.",
+      "description": "Sampled blocker-to-waiter relationships observed during scheduled collections in the selected time range. A green No Locks detected band means successful collections found no blocking; a grey No successful collection data band means no successful collection was available. This is not an exact Oracle lock audit: locks shorter than the scheduled scrape interval may be missed, start and end boundaries are approximate, failed or missing collections appear as gaps, and the source is GV$SESSION blocking information rather than the complete GV$LOCK inventory. Shows the 20 most-observed relationships, paginated eight at a time for readability.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -214,7 +214,7 @@
                 "0": {
                   "color": "#299C46",
                   "index": 5,
-                  "text": "No blocking observed"
+                  "text": "No Locks detected"
                 },
                 "6": {
                   "color": "#6E6E6E",
@@ -229,8 +229,32 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#8E8E8E",
+                "color": "#299C46",
                 "value": null
+              },
+              {
+                "color": "#E02F44",
+                "value": 1
+              },
+              {
+                "color": "#FF9830",
+                "value": 2
+              },
+              {
+                "color": "#8F5FD7",
+                "value": 3
+              },
+              {
+                "color": "#F2CC0C",
+                "value": 4
+              },
+              {
+                "color": "#8E8E8E",
+                "value": 5
+              },
+              {
+                "color": "#6E6E6E",
+                "value": 6
               }
             ]
           }
@@ -257,7 +281,8 @@
         "tooltip": {
           "mode": "single",
           "sort": "none"
-        }
+        },
+        "pageSize": 8
       },
       "pluginVersion": "11.4.0",
       "targets": [
@@ -269,7 +294,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "with snapshot_sequence as (\n  select collected_at,\n         success,\n         lag(collected_at) over (order by collected_at) as previous_snapshot_at,\n         lead(collected_at) over (order by collected_at) as next_snapshot_at\n  from oracle_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n), cadence as (\n  select coalesce(\n           percentile_cont(0.5) within group (\n             order by extract(epoch from collected_at - previous_snapshot_at)\n           ) filter (\n             where previous_snapshot_at is not null\n               and collected_at - previous_snapshot_at between interval '1 second' and interval '5 minutes'\n           ),\n           15.0\n         ) as seconds\n  from snapshot_sequence\n), observations as (\n  select b.collected_at,\n         s.previous_snapshot_at,\n         cadence.seconds as expected_interval_seconds,\n         least(\n           coalesce(s.next_snapshot_at, $__timeTo()),\n           b.collected_at + cadence.seconds * interval '1 second'\n         ) as observed_until,\n         concat(\n           coalesce(nullif(b.blocking_username, ''), '(unknown)'), ' [',\n           coalesce(b.blocking_instance::text, '?'), ':',\n           coalesce(b.blocking_session::text, '?'), '] -> ',\n           coalesce(nullif(b.username, ''), '(unknown)'), ' [', b.inst_id, ':', b.sid, ',',\n           coalesce(b.serial_number::text, '?'), '] | ',\n           coalesce(nullif(b.event, ''), nullif(b.wait_class, ''), 'Blocked')\n         ) as relationship,\n         case\n           when b.wait_class = 'Application' then 1\n           when b.wait_class = 'Concurrency' then 2\n           when b.wait_class = 'Cluster' then 3\n           when b.wait_class in ('Configuration', 'Administrative') then 4\n           else 5\n         end as state\n  from oracle_blocking_session_samples b\n  join snapshot_sequence s on s.collected_at = b.collected_at\n  cross join cadence\n  where b.source_database = ${source_database:sqlstring}\n    and $__timeFilter(b.collected_at)\n    and b.blocking_instance is not null\n    and b.blocking_session is not null\n), continuity as (\n  select observations.*,\n         lag(collected_at) over (\n           partition by relationship, state order by collected_at\n         ) as previous_observation_at\n  from observations\n), marked as (\n  select continuity.*,\n         sum(case\n               when previous_observation_at is null\n                 or previous_observation_at is distinct from previous_snapshot_at\n                 or collected_at - previous_snapshot_at > expected_interval_seconds * 1.5 * interval '1 second'\n               then 1 else 0\n             end) over (\n               partition by relationship, state order by collected_at\n             ) as episode_id\n  from continuity\n), episodes as (\n  select relationship, state, episode_id,\n         min(collected_at) as episode_start,\n         max(observed_until) as episode_end,\n         count(*) as observations\n  from marked\n  group by relationship, state, episode_id\n), selected_relationships as (\n  select relationship\n  from episodes\n  group by relationship\n  order by sum(observations) desc,\n           sum(extract(epoch from episode_end - episode_start)) desc,\n           relationship\n  limit 20\n), fallback as (\n  select ($__timeFrom())::timestamptz as time, 'Blocking status' as metric,\n         case when exists (select 1 from snapshot_sequence where success) then 0::double precision else 6::double precision end as value\n  where not exists (select 1 from episodes)\n  union all\n  select ($__timeTo())::timestamptz as time, 'Blocking status' as metric, null::double precision as value\n  where not exists (select 1 from episodes)\n), timeline as (\n  select episode_start as time, relationship as metric, state::double precision as value\n  from episodes\n  join selected_relationships using (relationship)\n  union all\n  select episode_end as time, relationship as metric, null::double precision as value\n  from episodes\n  join selected_relationships using (relationship)\n  union all\n  select time, metric, value\n  from fallback\n)\nselect time, metric, value\nfrom timeline\norder by time, metric;\n",
+          "rawSql": "with snapshot_sequence as (\n  select collected_at,\n         success,\n         lag(collected_at) over (order by collected_at) as previous_snapshot_at,\n         lead(collected_at) over (order by collected_at) as next_snapshot_at\n  from oracle_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n), cadence as (\n  select coalesce(\n           percentile_cont(0.5) within group (\n             order by extract(epoch from collected_at - previous_snapshot_at)\n           ) filter (\n             where previous_snapshot_at is not null\n               and collected_at - previous_snapshot_at between interval '1 second' and interval '5 minutes'\n           ),\n           15.0\n         ) as seconds\n  from snapshot_sequence\n), observations as (\n  select b.collected_at,\n         s.previous_snapshot_at,\n         cadence.seconds as expected_interval_seconds,\n         least(\n           coalesce(s.next_snapshot_at, $__timeTo()),\n           b.collected_at + cadence.seconds * interval '1 second'\n         ) as observed_until,\n         concat(\n           coalesce(nullif(b.blocking_username, ''), '(unknown)'), ' [',\n           coalesce(b.blocking_instance::text, '?'), ':',\n           coalesce(b.blocking_session::text, '?'), '] -> ',\n           coalesce(nullif(b.username, ''), '(unknown)'), ' [', b.inst_id, ':', b.sid, ',',\n           coalesce(b.serial_number::text, '?'), '] | ',\n           coalesce(nullif(b.event, ''), nullif(b.wait_class, ''), 'Blocked')\n         ) as relationship,\n         case\n           when b.wait_class = 'Application' then 1\n           when b.wait_class = 'Concurrency' then 2\n           when b.wait_class = 'Cluster' then 3\n           when b.wait_class in ('Configuration', 'Administrative') then 4\n           else 5\n         end as state\n  from oracle_blocking_session_samples b\n  join snapshot_sequence s on s.collected_at = b.collected_at\n  cross join cadence\n  where b.source_database = ${source_database:sqlstring}\n    and $__timeFilter(b.collected_at)\n    and b.blocking_instance is not null\n    and b.blocking_session is not null\n), continuity as (\n  select observations.*,\n         lag(collected_at) over (\n           partition by relationship, state order by collected_at\n         ) as previous_observation_at\n  from observations\n), marked as (\n  select continuity.*,\n         sum(case\n               when previous_observation_at is null\n                 or previous_observation_at is distinct from previous_snapshot_at\n                 or collected_at - previous_snapshot_at > expected_interval_seconds * 1.5 * interval '1 second'\n               then 1 else 0\n             end) over (\n               partition by relationship, state order by collected_at\n             ) as episode_id\n  from continuity\n), episodes as (\n  select relationship, state, episode_id,\n         min(collected_at) as episode_start,\n         max(observed_until) as episode_end,\n         count(*) as observations\n  from marked\n  group by relationship, state, episode_id\n), selected_relationships as (\n  select relationship\n  from episodes\n  group by relationship\n  order by sum(observations) desc,\n           sum(extract(epoch from episode_end - episode_start)) desc,\n           relationship\n  limit 20\n), fallback as (\n  select ($__timeFrom())::timestamptz as time, case when exists (select 1 from snapshot_sequence where success) then 'No Locks detected' else 'No successful collection data' end as metric,\n         case when exists (select 1 from snapshot_sequence where success) then 0::double precision else 6::double precision end as value\n  where not exists (select 1 from episodes)\n  union all\n  select ($__timeTo())::timestamptz as time, case when exists (select 1 from snapshot_sequence where success) then 'No Locks detected' else 'No successful collection data' end as metric, null::double precision as value\n  where not exists (select 1 from episodes)\n), timeline as (\n  select episode_start as time, relationship as metric, state::double precision as value\n  from episodes\n  join selected_relationships using (relationship)\n  union all\n  select episode_end as time, relationship as metric, null::double precision as value\n  from episodes\n  join selected_relationships using (relationship)\n  union all\n  select time, metric, value\n  from fallback\n)\nselect time, metric, value\nfrom timeline\norder by time, metric;\n",
           "refId": "A"
         }
       ],
@@ -1695,6 +1720,6 @@
   "timezone": "",
   "title": "Oracle Current Sessions and Blocking",
   "uid": "oracle-db-performance",
-  "version": 5,
+  "version": 6,
   "weekStart": ""
 }
