@@ -306,13 +306,13 @@
         "type": "postgres",
         "uid": "PostgreSQL"
       },
-      "description": "Current RAC-aware blocking relationships. Red nodes are root blockers, orange nodes both wait and block, and yellow nodes are blocked sessions. Edge labels show the wait event and current wait duration.",
+      "description": "Current RAC-aware blocking relationships. Red nodes are root blockers, orange nodes both wait and block, and yellow nodes are blocked sessions. Edge labels show the wait event and current wait duration. Nodes use an enlarged fixed radius for readability; use the panel zoom controls for large blocking chains.",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
       },
       "gridPos": {
-        "h": 12,
+        "h": 8,
         "w": 24,
         "x": 0,
         "y": 14
@@ -338,7 +338,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n), relationships as (\n  select b.*\n  from snapshot x\n  join oracle_blocking_session_samples b\n    on b.source_database = ${source_database:sqlstring}\n   and b.collected_at = x.collected_at\n), node_ids as (\n  select inst_id, sid from relationships\n  union\n  select blocking_instance, blocking_session\n  from relationships\n  where blocking_instance is not null and blocking_session is not null\n), classified as (\n  select n.inst_id, n.sid,\n    exists (\n      select 1 from relationships r\n      where r.inst_id = n.inst_id and r.sid = n.sid\n    ) as is_waiter,\n    exists (\n      select 1 from relationships r\n      where r.blocking_instance = n.inst_id and r.blocking_session = n.sid\n    ) as is_blocker,\n    (\n      select count(*) from relationships r\n      where r.blocking_instance = n.inst_id and r.blocking_session = n.sid\n    ) as blocked_count\n  from node_ids n\n), enriched as (\n  select c.*,\n    coalesce(\n      s.username,\n      (select max(r.blocking_username) from relationships r\n       where r.blocking_instance = c.inst_id and r.blocking_session = c.sid),\n      '(unknown)'\n    ) as username,\n    coalesce(\n      s.sql_id,\n      (select max(r.blocking_sql_id) from relationships r\n       where r.blocking_instance = c.inst_id and r.blocking_session = c.sid)\n    ) as sql_id,\n    coalesce(\n      s.event,\n      (select max(r.blocking_event) from relationships r\n       where r.blocking_instance = c.inst_id and r.blocking_session = c.sid)\n    ) as event,\n    s.module,\n    s.program,\n    s.machine,\n    s.seconds_in_wait\n  from classified c\n  left join snapshot x on true\n  left join oracle_session_samples s\n    on s.source_database = ${source_database:sqlstring}\n   and s.collected_at = x.collected_at\n   and s.inst_id = c.inst_id\n   and s.sid = c.sid\n)\nselect\n  concat(inst_id, ':', sid) as id,\n  concat(username, ' [', inst_id, ':', sid, ']') as title,\n  coalesce(module, program, machine, 'No application context') as \"subTitle\",\n  case\n    when is_blocker and not is_waiter then 'ROOT BLOCKER'\n    when is_blocker and is_waiter then 'INTERMEDIATE BLOCKER'\n    else 'BLOCKED SESSION'\n  end as \"mainStat\",\n  case\n    when is_blocker then concat(blocked_count, ' session', case when blocked_count = 1 then '' else 's' end, ' blocked')\n    else coalesce(event, 'Waiting')\n  end as \"secondaryStat\",\n  case\n    when is_blocker and not is_waiter then '#E02F44'\n    when is_blocker and is_waiter then '#FF9830'\n    else '#F2CC0C'\n  end as color,\n  sql_id as \"detail__SQL ID\",\n  event as \"detail__Wait event\",\n  module as \"detail__Module\",\n  program as \"detail__Program\",\n  machine as \"detail__Machine\",\n  seconds_in_wait as \"detail__Wait seconds\"\nfrom enriched\norder by is_blocker desc, blocked_count desc, inst_id, sid;\n",
+          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n), relationships as (\n  select b.*\n  from snapshot x\n  join oracle_blocking_session_samples b\n    on b.source_database = ${source_database:sqlstring}\n   and b.collected_at = x.collected_at\n), node_ids as (\n  select inst_id, sid from relationships\n  union\n  select blocking_instance, blocking_session\n  from relationships\n  where blocking_instance is not null and blocking_session is not null\n), classified as (\n  select n.inst_id, n.sid,\n    exists (\n      select 1 from relationships r\n      where r.inst_id = n.inst_id and r.sid = n.sid\n    ) as is_waiter,\n    exists (\n      select 1 from relationships r\n      where r.blocking_instance = n.inst_id and r.blocking_session = n.sid\n    ) as is_blocker,\n    (\n      select count(*) from relationships r\n      where r.blocking_instance = n.inst_id and r.blocking_session = n.sid\n    ) as blocked_count\n  from node_ids n\n), enriched as (\n  select c.*,\n    coalesce(\n      s.username,\n      (select max(r.blocking_username) from relationships r\n       where r.blocking_instance = c.inst_id and r.blocking_session = c.sid),\n      '(unknown)'\n    ) as username,\n    coalesce(\n      s.sql_id,\n      (select max(r.blocking_sql_id) from relationships r\n       where r.blocking_instance = c.inst_id and r.blocking_session = c.sid)\n    ) as sql_id,\n    coalesce(\n      s.event,\n      (select max(r.blocking_event) from relationships r\n       where r.blocking_instance = c.inst_id and r.blocking_session = c.sid)\n    ) as event,\n    s.module,\n    s.program,\n    s.machine,\n    s.seconds_in_wait\n  from classified c\n  left join snapshot x on true\n  left join oracle_session_samples s\n    on s.source_database = ${source_database:sqlstring}\n   and s.collected_at = x.collected_at\n   and s.inst_id = c.inst_id\n   and s.sid = c.sid\n)\nselect\n  concat(inst_id, ':', sid) as id,\n  concat(username, ' [', inst_id, ':', sid, ']') as title,\n  coalesce(module, program, machine, 'No application context') as \"subTitle\",\n  case\n    when is_blocker and not is_waiter then 'ROOT BLOCKER'\n    when is_blocker and is_waiter then 'INTERMEDIATE BLOCKER'\n    else 'BLOCKED SESSION'\n  end as \"mainStat\",\n  case\n    when is_blocker then concat(blocked_count, ' session', case when blocked_count = 1 then '' else 's' end, ' blocked')\n    else coalesce(event, 'Waiting')\n  end as \"secondaryStat\",\n  case\n    when is_blocker and not is_waiter then '#E02F44'\n    when is_blocker and is_waiter then '#FF9830'\n    else '#F2CC0C'\n  end as color,\n  60::double precision as \"nodeRadius\",\n  sql_id as \"detail__SQL ID\",\n  event as \"detail__Wait event\",\n  module as \"detail__Module\",\n  program as \"detail__Program\",\n  machine as \"detail__Machine\",\n  seconds_in_wait as \"detail__Wait seconds\"\nfrom enriched\norder by is_blocker desc, blocked_count desc, inst_id, sid;\n",
           "refId": "A"
         },
         {
@@ -628,7 +628,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 22
       },
       "id": 4,
       "options": {
@@ -950,7 +950,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 34
+        "y": 30
       },
       "id": 1,
       "options": {
@@ -1040,7 +1040,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 42
+        "y": 38
       },
       "id": 2,
       "options": {
@@ -1398,7 +1398,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 42
+        "y": 38
       },
       "id": 3,
       "options": {
@@ -1624,7 +1624,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 46
       },
       "id": 5,
       "options": {
@@ -1720,6 +1720,6 @@
   "timezone": "",
   "title": "Oracle Current Sessions and Blocking",
   "uid": "oracle-db-performance",
-  "version": 6,
+  "version": 7,
   "weekStart": ""
 }
