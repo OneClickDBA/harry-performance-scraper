@@ -1573,16 +1573,16 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "machine_count"
+              "options": "machine"
             },
             "properties": [
               {
                 "id": "displayName",
-                "value": "Machines"
+                "value": "Machine"
               },
               {
                 "id": "custom.width",
-                "value": 85
+                "value": 180
               }
             ]
           },
@@ -1649,7 +1649,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n)\nselect\n  coalesce(s.status, 'UNKNOWN') as status,\n  coalesce(s.username, '(background)') as username,\n  coalesce(s.module, '(unknown)') as module,\n  coalesce(s.program, '(unknown)') as program,\n  count(*) as sessions,\n  count(*) filter (where s.sql_id is not null) as sql_sessions,\n  count(distinct s.machine) filter (where s.machine is not null) as machine_count,\n  max(s.wait_class) as example_wait_class,\n  max(s.event) as example_event\nfrom snapshot x\njoin oracle_session_samples s\n  on s.source_database = ${source_database:sqlstring}\n and s.collected_at = x.collected_at\ngroup by coalesce(s.status, 'UNKNOWN'), coalesce(s.username, '(background)'),\n  coalesce(s.module, '(unknown)'), coalesce(s.program, '(unknown)')\norder by sessions desc\nlimit 100;\n",
+          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n)\nselect\n  coalesce(s.status, 'UNKNOWN') as status,\n  coalesce(s.username, '(background)') as username,\n  coalesce(s.module, '(unknown)') as module,\n  coalesce(s.program, '(unknown)') as program,\n  coalesce(s.machine, '(unknown)') as machine,\n  count(*) as sessions,\n  count(*) filter (where s.sql_id is not null) as sql_sessions,\n  max(s.wait_class) as example_wait_class,\n  max(s.event) as example_event\nfrom snapshot x\njoin oracle_session_samples s\n  on s.source_database = ${source_database:sqlstring}\n and s.collected_at = x.collected_at\ngroup by coalesce(s.status, 'UNKNOWN'), coalesce(s.username, '(background)'),\n  coalesce(s.module, '(unknown)'), coalesce(s.program, '(unknown)'),\n  coalesce(s.machine, '(unknown)')\norder by sessions desc\nlimit 100;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1670,9 +1670,9 @@
           }
         }
       ],
-      "title": "Session Inventory by User, Module, Program",
+      "title": "Session Inventory by User, Module, Program, Machine",
       "type": "table",
-      "description": "Current session inventory from the latest scheduled collection."
+      "description": "Current session inventory from the latest scheduled collection, grouped by application identity and origin machine."
     }
   ],
   "refresh": "15s",
@@ -1720,6 +1720,6 @@
   "timezone": "",
   "title": "Oracle Current Sessions and Blocking",
   "uid": "oracle-db-performance",
-  "version": 7,
+  "version": 8,
   "weekStart": ""
 }
