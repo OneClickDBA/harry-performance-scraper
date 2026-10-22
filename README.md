@@ -33,6 +33,10 @@ directly to PostgreSQL and exposes only small health and readiness endpoints.
   `GV$SQL_PLAN`.
 - PostgreSQL range-partitioned storage with automatic retention.
 - Native scheduler, Oracle collection, and PostgreSQL write-pressure telemetry.
+- Serialized Dead Connection Detection that quarantines unavailable targets and
+  restores them without delaying normal collectors.
+- Automatic Data Guard detection, destination health, standby lag, and managed
+  recovery monitoring for configured and reachable database services.
 - PostgreSQL-backed active/standby operation using advisory-lock leader election.
 - Grafana dashboards and PostgreSQL-backed operational alerts.
 - Optional user-defined additional metrics from TOML or YAML definitions.

@@ -141,10 +141,37 @@ type HashiCorpVault struct {
 }
 
 type MetricsConfig struct {
-	DatabaseLabel     string         `yaml:"databaseLabel"`
-	Definitions       []string       `yaml:"definitions"`
-	ScrapeInterval    *time.Duration `yaml:"scrapeInterval"`
-	ConnectionBackoff *time.Duration `yaml:"connectionBackoff"`
+	DatabaseLabel           string                        `yaml:"databaseLabel"`
+	Definitions             []string                      `yaml:"definitions"`
+	ScrapeInterval          *time.Duration                `yaml:"scrapeInterval"`
+	DeadConnectionDetection DeadConnectionDetectionConfig `yaml:"deadConnectionDetection"`
+}
+
+type DeadConnectionDetectionConfig struct {
+	Enabled      *bool          `yaml:"enabled"`
+	Interval     *time.Duration `yaml:"interval"`
+	ProbeTimeout *time.Duration `yaml:"probeTimeout"`
+}
+
+func (c DeadConnectionDetectionConfig) GetEnabled() bool {
+	if c.Enabled == nil {
+		return true
+	}
+	return *c.Enabled
+}
+
+func (c DeadConnectionDetectionConfig) GetInterval() time.Duration {
+	if c.Interval == nil {
+		return 5 * time.Minute
+	}
+	return *c.Interval
+}
+
+func (c DeadConnectionDetectionConfig) GetProbeTimeout() time.Duration {
+	if c.ProbeTimeout == nil {
+		return 5 * time.Second
+	}
+	return *c.ProbeTimeout
 }
 
 type PerformanceConfig struct {
@@ -603,6 +630,22 @@ func (m *MetricsConfiguration) validate(logger *slog.Logger) error {
 	if err := m.validatePerformanceConfig(); err != nil {
 		return err
 	}
+	if err := m.validateDeadConnectionDetectionConfig(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *MetricsConfiguration) validateDeadConnectionDetectionConfig() error {
+	if !m.Metrics.DeadConnectionDetection.GetEnabled() {
+		return nil
+	}
+	if m.Metrics.DeadConnectionDetection.GetInterval() <= 0 {
+		return fmt.Errorf("metrics.deadConnectionDetection.interval must be greater than zero")
+	}
+	if m.Metrics.DeadConnectionDetection.GetProbeTimeout() <= 0 {
+		return fmt.Errorf("metrics.deadConnectionDetection.probeTimeout must be greater than zero")
+	}
 	return nil
 }
 
@@ -717,11 +760,4 @@ func (m *MetricsConfiguration) checkDuplicatedDatabases(logger *slog.Logger) {
 			logger.Warn("duplicated database connections", "database connections", strings.Join(v, ", "), "count", len(v))
 		}
 	}
-}
-
-func (m *MetricsConfiguration) ConnectionBackoff() time.Duration {
-	if m.Metrics.ConnectionBackoff == nil {
-		return 5 * time.Minute
-	}
-	return *m.Metrics.ConnectionBackoff
 }

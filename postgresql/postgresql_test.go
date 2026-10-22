@@ -19,20 +19,23 @@ import (
 func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
 	sqlSamples := pgx.Identifier{"monitoring", "oracle_sql_samples"}
 	sink := &Sink{
-		databaseStatusTable:      siblingIdentifier(sqlSamples, "oracle_database_status_samples"),
-		instanceTable:            siblingIdentifier(sqlSamples, "oracle_instance_samples"),
-		resourceLimitTable:       siblingIdentifier(sqlSamples, "oracle_resource_limit_samples"),
-		tablespaceTable:          siblingIdentifier(sqlSamples, "oracle_tablespace_samples"),
-		asmDiskgroupTable:        siblingIdentifier(sqlSamples, "oracle_asm_diskgroup_samples"),
-		systemCounterTable:       siblingIdentifier(sqlSamples, "oracle_system_counter_samples"),
-		waitClassTable:           siblingIdentifier(sqlSamples, "oracle_wait_class_samples"),
-		systemMetricTable:        siblingIdentifier(sqlSamples, "oracle_system_metric_samples"),
-		scrapeStatusTable:        siblingIdentifier(sqlSamples, "oracle_scrape_status"),
-		latestScrapeStatusTable:  siblingIdentifier(sqlSamples, "oracle_latest_scrape_status"),
-		runtimeSamplesTable:      siblingIdentifier(sqlSamples, "harry_runtime_samples"),
-		latestRuntimeStatusTable: siblingIdentifier(sqlSamples, "harry_latest_runtime_status"),
+		databaseStatusTable:       siblingIdentifier(sqlSamples, "oracle_database_status_samples"),
+		instanceTable:             siblingIdentifier(sqlSamples, "oracle_instance_samples"),
+		resourceLimitTable:        siblingIdentifier(sqlSamples, "oracle_resource_limit_samples"),
+		tablespaceTable:           siblingIdentifier(sqlSamples, "oracle_tablespace_samples"),
+		asmDiskgroupTable:         siblingIdentifier(sqlSamples, "oracle_asm_diskgroup_samples"),
+		systemCounterTable:        siblingIdentifier(sqlSamples, "oracle_system_counter_samples"),
+		waitClassTable:            siblingIdentifier(sqlSamples, "oracle_wait_class_samples"),
+		systemMetricTable:         siblingIdentifier(sqlSamples, "oracle_system_metric_samples"),
+		dataGuardDestinationTable: siblingIdentifier(sqlSamples, "oracle_dataguard_destination_samples"),
+		dataGuardLagTable:         siblingIdentifier(sqlSamples, "oracle_dataguard_lag_samples"),
+		dataGuardProcessTable:     siblingIdentifier(sqlSamples, "oracle_dataguard_process_samples"),
+		scrapeStatusTable:         siblingIdentifier(sqlSamples, "oracle_scrape_status"),
+		latestScrapeStatusTable:   siblingIdentifier(sqlSamples, "oracle_latest_scrape_status"),
+		runtimeSamplesTable:       siblingIdentifier(sqlSamples, "harry_runtime_samples"),
+		latestRuntimeStatusTable:  siblingIdentifier(sqlSamples, "harry_latest_runtime_status"),
 	}
-	ddl := sink.operationalSchemaDDL()
+	ddl := sink.operationalSchemaDDL() + sink.dataGuardSchemaDDL()
 	if strings.Contains(ddl, "%!") {
 		t.Fatalf("operational DDL contains an unresolved format directive: %s", ddl)
 	}
@@ -45,6 +48,9 @@ func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
 		"oracle_system_counter_samples",
 		"oracle_wait_class_samples",
 		"oracle_system_metric_samples",
+		"oracle_dataguard_destination_samples",
+		"oracle_dataguard_lag_samples",
+		"oracle_dataguard_process_samples",
 		"oracle_scrape_status",
 		"oracle_latest_scrape_status",
 	} {
@@ -66,15 +72,16 @@ func TestOperationalSchemaDDLFormatsAllIdentifiers(t *testing.T) {
 		"operational.tablespaces",
 		"operational.resource_limits",
 		"operational.asm_diskgroups",
+		"operational.dataguard",
 	} {
 		if !strings.Contains(ddl, "status.collector = '"+collector+"'") {
 			t.Fatalf("latest operational view does not use current status for %s", collector)
 		}
 	}
-	if strings.Count(ddl, "join "+latestTable+" status") != 3 {
+	if strings.Count(ddl, "join "+latestTable+" status") != 6 {
 		t.Fatalf("latest operational views do not all join the latest scrape status table")
 	}
-	if strings.Count(ddl, "where samples.collected_at >= current_timestamp - interval '1 day'") != 3 {
+	if strings.Count(ddl, "where samples.collected_at >= current_timestamp - interval '1 day'") != 6 {
 		t.Fatalf("latest operational views do not all bound partition history")
 	}
 	for _, column := range []string{
@@ -116,6 +123,24 @@ func TestRuntimeSchemaDDL(t *testing.T) {
 	} {
 		if !strings.Contains(ddl, expected) {
 			t.Fatalf("runtime DDL does not contain %q", expected)
+		}
+	}
+}
+
+func TestConnectionStateSchemaDDL(t *testing.T) {
+	sink := &Sink{
+		connectionStateTable: pgx.Identifier{"monitoring", "harry_database_connection_state"},
+	}
+	ddl := sink.connectionStateSchemaDDL()
+	for _, expected := range []string{
+		"create table if not exists \"monitoring\".\"harry_database_connection_state\"",
+		"source_database text primary key",
+		"last_probe_duration_seconds double precision",
+		"probe_attempts bigint not null",
+		"scraper_instance text not null",
+	} {
+		if !strings.Contains(ddl, expected) {
+			t.Fatalf("connection state DDL does not contain %q", expected)
 		}
 	}
 }
@@ -248,6 +273,9 @@ func TestRepositoryIngestSchemaDDL(t *testing.T) {
 		"primary key (sample_day, source_database)",
 		"database_activity_sample_rows bigint not null default 0",
 		"sql_cursor_metadata_writes bigint not null default 0",
+		"dataguard_destination_rows bigint not null default 0",
+		"dataguard_lag_rows bigint not null default 0",
+		"dataguard_process_rows bigint not null default 0",
 		"last_flushed_at timestamptz not null",
 	} {
 		if !strings.Contains(ddl, expected) {
@@ -271,14 +299,17 @@ func TestCollectRepositoryIngest(t *testing.T) {
 			DatabaseActivity: []collector.DatabaseActivitySample{{SampleTime: nextDay, Database: "DB2"}},
 		},
 		Operational: collector.OperationalSamples{
-			DatabaseStatus: []collector.DatabaseStatusSample{{CollectedAt: nextDay, Database: "DB1"}},
-			Instances:      []collector.InstanceSample{{CollectedAt: nextDay, Database: "DB1"}},
-			ResourceLimits: []collector.ResourceLimitSample{{CollectedAt: nextDay, Database: "DB1"}},
-			Tablespaces:    []collector.TablespaceSample{{CollectedAt: nextDay, Database: "DB1"}},
-			ASMDiskgroups:  []collector.ASMDiskgroupSample{{CollectedAt: nextDay, Database: "DB1"}},
-			SystemCounters: []collector.SystemCounterSample{{CollectedAt: nextDay, Database: "DB1"}},
-			WaitClasses:    []collector.WaitClassSample{{CollectedAt: nextDay, Database: "DB1"}},
-			SystemMetrics:  []collector.SystemMetricSample{{CollectedAt: nextDay, Database: "DB1"}},
+			DatabaseStatus:        []collector.DatabaseStatusSample{{CollectedAt: nextDay, Database: "DB1"}},
+			Instances:             []collector.InstanceSample{{CollectedAt: nextDay, Database: "DB1"}},
+			ResourceLimits:        []collector.ResourceLimitSample{{CollectedAt: nextDay, Database: "DB1"}},
+			Tablespaces:           []collector.TablespaceSample{{CollectedAt: nextDay, Database: "DB1"}},
+			ASMDiskgroups:         []collector.ASMDiskgroupSample{{CollectedAt: nextDay, Database: "DB1"}},
+			SystemCounters:        []collector.SystemCounterSample{{CollectedAt: nextDay, Database: "DB1"}},
+			WaitClasses:           []collector.WaitClassSample{{CollectedAt: nextDay, Database: "DB1"}},
+			SystemMetrics:         []collector.SystemMetricSample{{CollectedAt: nextDay, Database: "DB1"}},
+			DataGuardDestinations: []collector.DataGuardDestinationSample{{CollectedAt: nextDay, Database: "DB1"}},
+			DataGuardLag:          []collector.DataGuardLagSample{{CollectedAt: nextDay, Database: "DB1"}},
+			DataGuardProcesses:    []collector.DataGuardProcessSample{{CollectedAt: nextDay, Database: "DB1"}},
 		},
 		ScrapeStatuses: []collector.ScrapeStatusSample{{CollectedAt: nextDay, Database: "DB1"}},
 	})
@@ -302,6 +333,8 @@ func TestCollectRepositoryIngest(t *testing.T) {
 		secondEntry.resourceLimitSampleRows != 1 || secondEntry.tablespaceSampleRows != 1 ||
 		secondEntry.asmDiskgroupSampleRows != 1 || secondEntry.systemCounterSampleRows != 1 ||
 		secondEntry.waitClassSampleRows != 1 || secondEntry.systemMetricSampleRows != 1 ||
+		secondEntry.dataGuardDestinationRows != 1 || secondEntry.dataGuardLagRows != 1 ||
+		secondEntry.dataGuardProcessRows != 1 ||
 		secondEntry.scrapeStatusRows != 1 {
 		t.Fatalf("unexpected second-day counters: %+v", secondEntry)
 	}

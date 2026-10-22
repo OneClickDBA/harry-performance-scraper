@@ -181,6 +181,10 @@ func run() int {
 		"enabled", m.Operational.GetEnabled(),
 		"interval", m.Operational.GetInterval(),
 		"query_timeout", m.Operational.GetQueryTimeout())
+	logger.Info("Dead connection detection configuration",
+		"enabled", m.Metrics.DeadConnectionDetection.GetEnabled(),
+		"interval", m.Metrics.DeadConnectionDetection.GetInterval(),
+		"probe_timeout", m.Metrics.DeadConnectionDetection.GetProbeTimeout())
 	if m.Performance.Activity.GetSource() == "ash" {
 		logger.Warn("Oracle ASH collection is enabled; the operator is responsible for verifying Oracle Diagnostics Pack licensing")
 	}
@@ -370,6 +374,7 @@ func run() int {
 	go scraper.InitializeDatabases()
 	go scraper.RunScheduledScrapes(workCtx, sink)
 	go scraper.RunActivitySampling(workCtx, sink)
+	go scraper.RunDeadConnectionDetection(workCtx, sink)
 	ready.Store(true)
 
 	select {

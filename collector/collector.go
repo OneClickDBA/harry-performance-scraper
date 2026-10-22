@@ -87,7 +87,7 @@ func NewScraper(logger *slog.Logger, m *MetricsConfiguration) *Scraper {
 func (e *Scraper) InitializeDatabases() {
 	for _, database := range e.databases {
 		e.logger.Info("Starting database connection warmup", "database", database.Name)
-		if err := database.WarmupConnectionPool(e.logger, e.MetricsConfiguration.ConnectionBackoff()); err != nil {
+		if err := database.WarmupConnectionPool(e.logger, e.Metrics.DeadConnectionDetection.GetProbeTimeout()); err != nil {
 			e.logger.Error("Database startup warmup failed", "error", err, "database", database.Name)
 		}
 		e.requestScheduledScrape()
@@ -229,10 +229,12 @@ func (e *Scraper) scrapeSamples(tick *time.Time) (SampleBatch, ScrapeSummary) {
 
 	finished := time.Now()
 	return SampleBatch{
-		AdditionalMetrics: samples,
-		Performance:       performance,
-		Operational:       operational,
-		ScrapeStatuses:    statuses,
+		AdditionalMetrics:        samples,
+		Performance:              performance,
+		Operational:              operational,
+		ScrapeStatuses:           statuses,
+		ConnectionStates:         e.connectionStateSamples(finished),
+		ConnectionStatesComplete: true,
 	}, ScrapeSummary{
 		StartedAt:       begun,
 		FinishedAt:      finished,
@@ -267,20 +269,20 @@ func (e *Scraper) scrapeDatabaseSamples(
 		e.logger.Debug("Finished database scrape", "database", d.Name, "duration", time.Since(dbScrapeStart))
 	}()
 
-	if retryAfter := d.IsValid(); retryAfter != nil {
-		e.logger.Warn("Invalid database configuration", "database", d.Name, "retry_after", retryAfter)
-		err := fmt.Errorf("database %s is invalid, will not be scraped", d.Name)
-		sendFailureStatuses(err)
-		errChan <- err
-		return
-	}
 	if !d.StartupReady() {
 		e.logger.Info("Database connection in progress", "database", d.Name)
 		sendFailureStatuses(errors.New("database connection startup is still in progress"))
 		errChan <- nil
 		return
 	}
-	if err := d.ping(e.logger, e.MetricsConfiguration.ConnectionBackoff()); err != nil {
+	if state := d.connectionState(); state != DatabaseConnectionActive {
+		e.logger.Debug("Database is not active", "database", d.Name, "state", state)
+		err := fmt.Errorf("database %s is %s and will not be scraped", d.Name, state)
+		sendFailureStatuses(err)
+		errChan <- err
+		return
+	}
+	if err := d.ping(e.Metrics.DeadConnectionDetection.GetProbeTimeout()); err != nil {
 		e.logger.Error("Error pinging database", "error", err, "database", d.Name)
 		sendFailureStatuses(err)
 		errChan <- err
@@ -305,6 +307,7 @@ func (e *Scraper) scrapeDatabaseSamples(
 		errChan <- scrapeError
 		if scrapeError != nil {
 			additionalErrors = errors.Join(additionalErrors, scrapeError)
+			connectionFailed := d.quarantineConnectionFailure(scrapeError)
 			if shouldLogScrapeError(scrapeError, metric.IgnoreZeroResult) {
 				e.logger.Error("Error scraping metric",
 					"Context", metric.Context,
@@ -312,6 +315,9 @@ func (e *Scraper) scrapeDatabaseSamples(
 					"duration", time.Since(scrapeStart),
 					"error", scrapeError,
 					"database", d.Name)
+			}
+			if connectionFailed {
+				break
 			}
 			continue
 		}
@@ -329,13 +335,20 @@ func (e *Scraper) scrapeDatabaseSamples(
 		statusCh <- []ScrapeStatusSample{
 			newScrapeStatus(collectedAt, d.Name, "additional_metrics", additionalStarted, additionalCount, additionalErrors),
 		}
-		databaseErrors = errors.Join(databaseErrors, additionalErrors)
+	}
+	databaseErrors = errors.Join(databaseErrors, additionalErrors)
+	if !d.isActive() {
+		statusCh <- []ScrapeStatusSample{
+			newScrapeStatus(collectedAt, d.Name, "scheduled", dbScrapeStart, additionalCount, databaseErrors),
+		}
+		return
 	}
 
 	performanceStarted := time.Now()
 	performanceSamples, err := e.ScrapePerformanceSamples(d, tick)
 	errChan <- err
 	if err != nil {
+		d.quarantineConnectionFailure(err)
 		e.logger.Error("Error scraping performance samples", "error", err, "database", d.Name)
 	}
 	if performanceSamples.Count() > 0 {
@@ -345,6 +358,13 @@ func (e *Scraper) scrapeDatabaseSamples(
 		newScrapeStatus(collectedAt, d.Name, "performance", performanceStarted, performanceSamples.Count(), err),
 	}
 	databaseErrors = errors.Join(databaseErrors, err)
+	totalCount := additionalCount + performanceSamples.Count()
+	if !d.isActive() {
+		statusCh <- []ScrapeStatusSample{
+			newScrapeStatus(collectedAt, d.Name, "scheduled", dbScrapeStart, totalCount, databaseErrors),
+		}
+		return
+	}
 	e.logger.Debug("Successfully scraped performance samples",
 		"sql_samples", len(performanceSamples.SQL),
 		"sql_plan_operations", len(performanceSamples.SQLPlans),
@@ -353,7 +373,6 @@ func (e *Scraper) scrapeDatabaseSamples(
 		"database_activity_samples", len(performanceSamples.DatabaseActivity),
 		"database", d.Name)
 
-	totalCount := additionalCount + performanceSamples.Count()
 	if e.shouldCollectOperational(d.Name, collectedAt) {
 		operational, statuses, operationalErr := e.ScrapeOperationalSamples(d, collectedAt)
 		if operational.Count() > 0 {
@@ -362,6 +381,7 @@ func (e *Scraper) scrapeDatabaseSamples(
 		statusCh <- statuses
 		errChan <- operationalErr
 		databaseErrors = errors.Join(databaseErrors, operationalErr)
+		d.quarantineConnectionFailure(operationalErr)
 		totalCount += operational.Count()
 		if operationalErr != nil {
 			e.logger.Error("Error scraping operational samples", "error", operationalErr, "database", d.Name)
@@ -371,6 +391,14 @@ func (e *Scraper) scrapeDatabaseSamples(
 	statusCh <- []ScrapeStatusSample{
 		newScrapeStatus(collectedAt, d.Name, "scheduled", dbScrapeStart, totalCount, databaseErrors),
 	}
+}
+
+func (e *Scraper) connectionStateSamples(observedAt time.Time) []DatabaseConnectionStateSample {
+	samples := make([]DatabaseConnectionStateSample, 0, len(e.databases))
+	for _, database := range e.databases {
+		samples = append(samples, database.connectionStateSample(observedAt, e.instanceName))
+	}
+	return samples
 }
 
 func appendPerformanceSamples(performance *PerformanceSamples, databasePerformance PerformanceSamples) {
@@ -392,6 +420,9 @@ func appendOperationalSamples(operational *OperationalSamples, databaseOperation
 	operational.SystemCounters = append(operational.SystemCounters, databaseOperational.SystemCounters...)
 	operational.WaitClasses = append(operational.WaitClasses, databaseOperational.WaitClasses...)
 	operational.SystemMetrics = append(operational.SystemMetrics, databaseOperational.SystemMetrics...)
+	operational.DataGuardDestinations = append(operational.DataGuardDestinations, databaseOperational.DataGuardDestinations...)
+	operational.DataGuardLag = append(operational.DataGuardLag, databaseOperational.DataGuardLag...)
+	operational.DataGuardProcesses = append(operational.DataGuardProcesses, databaseOperational.DataGuardProcesses...)
 }
 
 // GetDBs is used by the log scraper to share the database connection

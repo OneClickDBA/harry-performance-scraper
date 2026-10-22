@@ -132,8 +132,8 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 			results <- result{database: database.Name, err: errors.New("database connection startup is still in progress"), skipped: true}
 			continue
 		}
-		if retryAfter := database.IsValid(); retryAfter != nil {
-			results <- result{database: database.Name, err: fmt.Errorf("database connection backoff active; retry in %s", retryAfter.Round(time.Second)), skipped: true}
+		if state := database.connectionState(); state != DatabaseConnectionActive {
+			results <- result{database: database.Name, err: fmt.Errorf("database connection state is %s", state), skipped: true}
 			continue
 		}
 		if err := database.activityUnavailable(); err != nil {
@@ -146,7 +146,9 @@ func (e *Scraper) sampleActivity(ctx context.Context, sink SampleSink, sampledAt
 			started := time.Now()
 			samples, err := e.scrapeActivitySamples(database, sampledAt)
 			if err != nil {
-				database.suspendActivity(err)
+				if !database.quarantineConnectionFailure(err) {
+					database.suspendActivity(err)
+				}
 			}
 			results <- result{database: database.Name, duration: time.Since(started), samples: samples, err: err}
 		}()

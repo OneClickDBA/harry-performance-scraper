@@ -163,6 +163,59 @@ type SystemMetricSample struct {
 	Unit        *string
 }
 
+type DataGuardDestinationSample struct {
+	CollectedAt           time.Time
+	Database              string
+	InstID                int64
+	DestID                int64
+	DestinationName       *string
+	Target                *string
+	Destination           *string
+	Status                *string
+	TransmitMode          *string
+	Affirm                *string
+	ValidNow              *string
+	DBUniqueName          *string
+	DestinationType       *string
+	DatabaseMode          *string
+	RecoveryMode          *string
+	ProtectionMode        *string
+	Synchronized          *string
+	SynchronizationStatus *string
+	GapStatus             *string
+	ArchivedThread        *int64
+	ArchivedSequence      *int64
+	AppliedThread         *int64
+	AppliedSequence       *int64
+	AppliedSCN            *int64
+	Error                 *string
+}
+
+type DataGuardLagSample struct {
+	CollectedAt             time.Time
+	Database                string
+	DatabaseRole            string
+	TransportLagSeconds     *float64
+	ApplyLagSeconds         *float64
+	ApplyFinishTimeSeconds  *float64
+	EstimatedStartupSeconds *float64
+	TimeComputed            *string
+	DatumTime               *string
+	DatumAgeSeconds         *float64
+}
+
+type DataGuardProcessSample struct {
+	CollectedAt        time.Time
+	Database           string
+	InstID             int64
+	DatabaseRole       string
+	ApplyProcesses     int64
+	TransportProcesses int64
+	ApplyStatus        *string
+	ThreadNumber       *int64
+	SequenceNumber     *int64
+}
+
 type ScrapeStatusSample struct {
 	CollectedAt     time.Time
 	Database        string
@@ -173,21 +226,40 @@ type ScrapeStatusSample struct {
 	ErrorMessage    *string
 }
 
+type DatabaseConnectionStateSample struct {
+	ObservedAt               time.Time
+	Database                 string
+	State                    string
+	QueuedAt                 *time.Time
+	LastFailureAt            *time.Time
+	LastFailure              *string
+	LastProbeAt              *time.Time
+	LastProbeDurationSeconds *float64
+	LastProbeError           *string
+	ProbeAttempts            int64
+	RecoveredAt              *time.Time
+	ScraperInstance          string
+}
+
 type OperationalSamples struct {
-	DatabaseStatus []DatabaseStatusSample
-	Instances      []InstanceSample
-	ResourceLimits []ResourceLimitSample
-	Tablespaces    []TablespaceSample
-	ASMDiskgroups  []ASMDiskgroupSample
-	SystemCounters []SystemCounterSample
-	WaitClasses    []WaitClassSample
-	SystemMetrics  []SystemMetricSample
+	DatabaseStatus        []DatabaseStatusSample
+	Instances             []InstanceSample
+	ResourceLimits        []ResourceLimitSample
+	Tablespaces           []TablespaceSample
+	ASMDiskgroups         []ASMDiskgroupSample
+	SystemCounters        []SystemCounterSample
+	WaitClasses           []WaitClassSample
+	SystemMetrics         []SystemMetricSample
+	DataGuardDestinations []DataGuardDestinationSample
+	DataGuardLag          []DataGuardLagSample
+	DataGuardProcesses    []DataGuardProcessSample
 }
 
 func (o OperationalSamples) Count() int {
 	return len(o.DatabaseStatus) + len(o.Instances) + len(o.ResourceLimits) +
 		len(o.Tablespaces) + len(o.ASMDiskgroups) + len(o.SystemCounters) +
-		len(o.WaitClasses) + len(o.SystemMetrics)
+		len(o.WaitClasses) + len(o.SystemMetrics) + len(o.DataGuardDestinations) +
+		len(o.DataGuardLag) + len(o.DataGuardProcesses)
 }
 
 type SQLSample struct {
@@ -354,15 +426,18 @@ type PerformanceSamples struct {
 }
 
 type SampleBatch struct {
-	AdditionalMetrics []MetricSample
-	Performance       PerformanceSamples
-	Operational       OperationalSamples
-	ScrapeStatuses    []ScrapeStatusSample
-	Runtime           *RuntimeSample
+	AdditionalMetrics        []MetricSample
+	Performance              PerformanceSamples
+	Operational              OperationalSamples
+	ScrapeStatuses           []ScrapeStatusSample
+	ConnectionStates         []DatabaseConnectionStateSample
+	ConnectionStatesComplete bool
+	Runtime                  *RuntimeSample
 }
 
 func (b SampleBatch) Count() int {
-	return len(b.AdditionalMetrics) + b.Performance.Count() + b.Operational.Count() + len(b.ScrapeStatuses)
+	return len(b.AdditionalMetrics) + b.Performance.Count() + b.Operational.Count() +
+		len(b.ScrapeStatuses) + len(b.ConnectionStates)
 }
 
 func (p PerformanceSamples) Count() int {

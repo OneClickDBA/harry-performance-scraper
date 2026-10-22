@@ -2113,6 +2113,265 @@
         "x": 0,
         "y": 59
       },
+      "id": 20,
+      "panels": [],
+      "title": "Oracle Data Guard Monitoring",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "VALID": {
+                        "color": "green",
+                        "text": "VALID"
+                      },
+                      "ERROR": {
+                        "color": "red",
+                        "text": "ERROR"
+                      },
+                      "DISABLED": {
+                        "color": "red",
+                        "text": "DISABLED"
+                      },
+                      "BAD PARAM": {
+                        "color": "red",
+                        "text": "BAD PARAM"
+                      },
+                      "FULL": {
+                        "color": "red",
+                        "text": "FULL"
+                      },
+                      "DEFERRED": {
+                        "color": "yellow",
+                        "text": "DEFERRED"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "id": 21,
+      "options": {
+        "footer": {
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  inst_id,\n  dest_id,\n  destination_name,\n  db_unique_name as remote_database,\n  status,\n  destination_type as type,\n  transmit_mode,\n  database_mode,\n  recovery_mode,\n  protection_mode,\n  synchronized,\n  synchronization_status,\n  gap_status,\n  archived_sequence,\n  applied_sequence,\n  error_message\nfrom oracle_latest_dataguard_destination_samples\nwhere source_database = ${source_database:sqlstring}\norder by inst_id, dest_id;",
+          "refId": "A"
+        }
+      ],
+      "title": "Data Guard Destinations and Configuration",
+      "type": "table",
+      "description": "Automatically populated when the selected reachable Oracle database is a Data Guard member. Primary databases expose configured standby destinations; a mounted standby must permit Harry's configured connection before standby-side telemetry can be collected."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 3,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 69
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "select\n  collected_at as \"time\",\n  transport_lag_seconds as \"Transport lag\",\n  apply_lag_seconds as \"Apply lag\",\n  datum_age_seconds as \"Telemetry age\"\nfrom oracle_dataguard_lag_samples\nwhere $__timeFilter(collected_at)\n  and source_database = ${source_database:sqlstring}\norder by collected_at;",
+          "refId": "A"
+        }
+      ],
+      "title": "Data Guard Transport and Apply Lag",
+      "type": "timeseries",
+      "description": "Standby-side transport lag, apply lag, and source telemetry age. A growing telemetry age can indicate that the standby is no longer receiving fresh data even when the last numeric lag is unchanged."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 69
+      },
+      "id": 23,
+      "options": {
+        "footer": {
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "pluginVersion": "9.5.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  inst_id,\n  database_role,\n  apply_processes,\n  transport_processes,\n  apply_status,\n  thread_number,\n  sequence_number\nfrom oracle_latest_dataguard_process_samples\nwhere source_database = ${source_database:sqlstring}\norder by inst_id;",
+          "refId": "A"
+        }
+      ],
+      "title": "Data Guard Managed Recovery Processes",
+      "type": "table",
+      "description": "Current physical standby managed recovery and redo transport process state. No rows are expected for primary-only or non-physical-standby databases."
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 78
+      },
       "id": 19,
       "panels": [],
       "title": "Harry Performance Scraper Collection Information",
@@ -2177,7 +2436,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 79
       },
       "id": 1,
       "options": {
@@ -2241,7 +2500,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 68
+        "y": 87
       },
       "id": 10,
       "options": {
@@ -2327,7 +2586,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 68
+        "y": 87
       },
       "id": 11,
       "options": {
@@ -2360,6 +2619,37 @@
         }
       ],
       "title": "Activity Query Timeout Utilization",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "description": "Current Harry connection state for the selected Oracle target. QUARANTINED targets are excluded from normal collection and retried serially by Dead Connection Detection.",
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto", "displayMode": "auto", "inspect": false}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "state"}, "properties": [{"id": "custom.displayMode", "value": "color-background"}, {"id": "mappings", "value": [{"options": {"ACTIVE": {"color": "green", "text": "ACTIVE"}, "PROBING": {"color": "yellow", "text": "PROBING"}, "QUARANTINED": {"color": "red", "text": "QUARANTINED"}, "STARTING": {"color": "blue", "text": "STARTING"}}, "type": "value"}]}]},
+          {"matcher": {"id": "byName", "options": "last_probe_duration_seconds"}, "properties": [{"id": "unit", "value": "s"}, {"id": "decimals", "value": 3}]},
+          {"matcher": {"id": "byName", "options": "last_failure"}, "properties": [{"id": "custom.width", "value": 420}]}
+        ]
+      },
+      "gridPos": {"h": 8, "w": 14, "x": 0, "y": 96},
+      "id": 24,
+      "options": {"footer": {"enablePagination": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true, "cellHeight": "sm"},
+      "pluginVersion": "9.5.15",
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "editorMode": "code", "format": "table", "rawQuery": true, "rawSql": "select\n  source_database, state, observed_at, queued_at,\n  extract(epoch from now() - queued_at)::double precision as queued_seconds,\n  last_failure_at, last_failure, last_probe_at,\n  last_probe_duration_seconds, last_probe_error, probe_attempts, recovered_at\nfrom harry_database_connection_state\nwhere source_database = ${source_database:sqlstring};", "refId": "A"}],
+      "title": "Database Connection and DCD State",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "PostgreSQL"},
+      "description": "Duration and result of serialized Dead Connection Detection cycles. A cycle can exceed its configured interval when many targets are unreachable; Harry never overlaps DCD cycles.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "showPoints": "auto", "spanNulls": false, "stacking": {"group": "A", "mode": "none"}}, "min": 0}, "overrides": []},
+      "gridPos": {"h": 8, "w": 10, "x": 14, "y": 96},
+      "id": 25,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "pluginVersion": "9.5.15",
+      "targets": [{"datasource": {"type": "postgres", "uid": "PostgreSQL"}, "editorMode": "code", "format": "time_series", "rawQuery": true, "rawSql": "select\n  observed_at as time,\n  values.metric,\n  values.value::double precision as value\nfrom harry_runtime_samples r\ncross join lateral (values\n  ('cycle duration seconds', r.collection_duration_seconds),\n  ('databases attempted', r.databases_attempted::double precision),\n  ('databases recovered', r.databases_succeeded::double precision),\n  ('probe failures', r.error_count::double precision)\n) values(metric, value)\nwhere r.scheduler = 'dead_connection_detection'\n  and $__timeFilter(r.observed_at)\norder by 1, 2;", "refId": "A"}],
+      "title": "Dead Connection Detection Cycles",
       "type": "timeseries"
     }
   ],
@@ -2408,6 +2698,6 @@
   "timezone": "",
   "title": "Oracle Operational Overview",
   "uid": "oracle-operational-overview",
-  "version": 5,
+  "version": 7,
   "weekStart": ""
 }
