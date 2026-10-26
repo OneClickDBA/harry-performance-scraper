@@ -32,6 +32,7 @@ type Scraper struct {
 	operationalMu           sync.Mutex
 	lastOperationalScrape   map[string]time.Time
 	operationalCounters     map[operationalCounterKey]operationalCounterSnapshot
+	reconnectDatabase       func(*Database, time.Duration) error
 }
 
 type Database struct {
@@ -44,14 +45,35 @@ type Database struct {
 	// Given a metric's scrape configuration, it may not be computed on the same interval as other metrics.
 	MetricsCache *MetricsCache
 
-	invalidUntil  *time.Time
 	DatabaseLabel string
 	startupReady  atomic.Bool
 	activityError string
+	connection    DatabaseConnectionStatus
 
 	reconnectMU        sync.RWMutex
 	reconnectAttemptMU sync.Mutex
 	activityMU         sync.RWMutex
+}
+
+type DatabaseConnectionState string
+
+const (
+	DatabaseConnectionStarting    DatabaseConnectionState = "STARTING"
+	DatabaseConnectionActive      DatabaseConnectionState = "ACTIVE"
+	DatabaseConnectionQuarantined DatabaseConnectionState = "QUARANTINED"
+	DatabaseConnectionProbing     DatabaseConnectionState = "PROBING"
+)
+
+type DatabaseConnectionStatus struct {
+	State             DatabaseConnectionState
+	QueuedAt          *time.Time
+	LastFailureAt     *time.Time
+	LastFailure       string
+	LastProbeAt       *time.Time
+	LastProbeDuration *time.Duration
+	LastProbeError    string
+	ProbeAttempts     int64
+	RecoveredAt       *time.Time
 }
 
 type MetricsCache struct {

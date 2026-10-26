@@ -6,9 +6,11 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +41,9 @@ func NewDatabase(logger *slog.Logger, dblabel, dbname string, dbconfig DatabaseC
 		connectErr:    err,
 		DatabaseLabel: dblabel,
 		reconnectMU:   sync.RWMutex{},
+		connection: DatabaseConnectionStatus{
+			State: DatabaseConnectionStarting,
+		},
 	}
 }
 
@@ -54,7 +59,7 @@ func (d *Database) initCache(metrics map[string]*Metric) {
 // WarmupConnectionPool serially acquires connections to warm the pool. The
 // godror connector also gates physical OCI connection creation process-wide so
 // runtime pool recycling cannot create connections concurrently across pools.
-func (d *Database) WarmupConnectionPool(logger *slog.Logger, backoff time.Duration) error {
+func (d *Database) WarmupConnectionPool(logger *slog.Logger, probeTimeout time.Duration) error {
 	defer d.startupReady.Store(true)
 
 	d.reconnectMU.RLock()
@@ -64,7 +69,7 @@ func (d *Database) WarmupConnectionPool(logger *slog.Logger, backoff time.Durati
 
 	if session == nil {
 		d.setUp(0)
-		d.invalidate(backoff)
+		d.quarantine(connectErr)
 		d.suspendActivity(connectErr)
 		if connectErr != nil {
 			return connectErr
@@ -72,20 +77,20 @@ func (d *Database) WarmupConnectionPool(logger *slog.Logger, backoff time.Durati
 		return errDatabaseSessionNotInitialized
 	}
 
-	if err := d.warmupSession(logger, session); err != nil {
+	if err := d.warmupSession(logger, session, probeTimeout); err != nil {
 		d.setUp(0)
-		d.invalidate(backoff)
+		d.quarantine(err)
 		d.suspendActivity(err)
 		return err
 	}
 
 	d.setUp(1)
-	d.clearInvalid()
+	d.activate(time.Now())
 	d.resumeActivity()
 	return nil
 }
 
-func (d *Database) warmupSession(logger *slog.Logger, session *sql.DB) error {
+func (d *Database) warmupSession(logger *slog.Logger, session *sql.DB, probeTimeout time.Duration) error {
 	if session == nil {
 		return errDatabaseSessionNotInitialized
 	}
@@ -93,7 +98,7 @@ func (d *Database) warmupSession(logger *slog.Logger, session *sql.DB) error {
 	// Establish basic connectivity before running initialization SQL. Without
 	// this preflight, an unreachable target can consume both initdb timeouts and
 	// a pool-warmup timeout before startup advances to the next database.
-	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), probeTimeout)
 	err := session.PingContext(pingCtx)
 	pingCancel()
 	if err != nil {
@@ -110,7 +115,7 @@ func (d *Database) warmupSession(logger *slog.Logger, session *sql.DB) error {
 	}
 	warmup := func(i int) error {
 		time.Sleep(100 * time.Millisecond)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
 		defer cancel()
 
 		conn, err := session.Conn(ctx)
@@ -140,7 +145,7 @@ func (d *Database) warmupSession(logger *slog.Logger, session *sql.DB) error {
 	return nil
 }
 
-func (d *Database) reconnect(logger *slog.Logger, backoff time.Duration) error {
+func (d *Database) reconnect(logger *slog.Logger, probeTimeout time.Duration) error {
 	d.reconnectAttemptMU.Lock()
 	defer d.reconnectAttemptMU.Unlock()
 
@@ -151,19 +156,17 @@ func (d *Database) reconnect(logger *slog.Logger, backoff time.Duration) error {
 		d.reconnectMU.Lock()
 		d.connectErr = err
 		d.Up = 0
-		d.invalidateLocked(backoff)
 		d.reconnectMU.Unlock()
 		d.suspendActivity(err)
 		return err
 	}
-	if err := d.warmupSession(logger, session); err != nil {
+	if err := d.warmupSession(logger, session, probeTimeout); err != nil {
 		if session != nil {
 			_ = session.Close()
 		}
 		d.reconnectMU.Lock()
 		d.connectErr = err
 		d.Up = 0
-		d.invalidateLocked(backoff)
 		d.reconnectMU.Unlock()
 		d.suspendActivity(err)
 		return err
@@ -174,7 +177,6 @@ func (d *Database) reconnect(logger *slog.Logger, backoff time.Duration) error {
 	d.Session = session
 	d.connectErr = nil
 	d.Up = 1
-	d.clearInvalidLocked()
 	if oldSession != nil && oldSession != session {
 		_ = oldSession.Close()
 	}
@@ -183,32 +185,20 @@ func (d *Database) reconnect(logger *slog.Logger, backoff time.Duration) error {
 	return nil
 }
 
-// ping the database. If the database is disconnected, try to reconnect.
-// If the database type is unknown, try to reload it.
-func (d *Database) ping(logger *slog.Logger, backoff time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// ping verifies an active target. It never reconnects; DCD exclusively owns
+// pool reconstruction for quarantined databases.
+func (d *Database) ping(probeTimeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
 	defer cancel()
 
 	err := d.PingContext(ctx)
-	if errors.Is(err, errDatabaseSessionNotInitialized) {
-		return d.reconnect(logger, backoff)
-	}
 	if err != nil {
 		d.setUp(0)
-		// If database is closed, rebuild the handle and rerun init/warmup.
-		if isClosedDatabaseError(err) {
-			return d.reconnect(logger, backoff)
-		}
-		// Ping failures are connectivity failures even when the driver returns a
-		// network error, context deadline, or ORA code outside the known list.
-		// Back off every failed target so one unavailable database cannot be
-		// retried by every collector cycle.
-		d.invalidate(backoff)
+		d.quarantine(err)
 		d.suspendActivity(err)
 		return err
 	}
 	d.setUp(1)
-	d.clearInvalid()
 	d.resumeActivity()
 	return nil
 }
@@ -238,39 +228,159 @@ func (d *Database) activityUnavailable() error {
 	return fmt.Errorf("activity collection suspended until connectivity recovers: %s", d.activityError)
 }
 
-func (d *Database) IsValid() *time.Duration {
+func (d *Database) connectionState() DatabaseConnectionState {
 	d.reconnectMU.RLock()
 	defer d.reconnectMU.RUnlock()
-
-	if d.invalidUntil == nil {
-		return nil
-	}
-	retryAfter := time.Until(*d.invalidUntil)
-	if retryAfter <= 0 {
-		return nil
-	}
-	return &retryAfter
+	return d.connection.State
 }
 
-func (d *Database) invalidate(backoff time.Duration) {
+func (d *Database) isActive() bool {
+	return d.connectionState() == DatabaseConnectionActive
+}
+
+// IsActive reports whether normal collectors may use the database.
+func (d *Database) IsActive() bool {
+	return d.isActive()
+}
+
+func (d *Database) quarantine(err error) {
 	d.reconnectMU.Lock()
 	defer d.reconnectMU.Unlock()
-	d.invalidateLocked(backoff)
+	d.quarantineLocked(err, time.Now())
 }
 
-func (d *Database) invalidateLocked(backoff time.Duration) {
-	until := time.Now().Add(backoff)
-	d.invalidUntil = &until
+func (d *Database) quarantineConnectionFailure(err error) bool {
+	if !isConnectionFailure(err) {
+		return false
+	}
+	d.setUp(0)
+	d.quarantine(err)
+	d.suspendActivity(err)
+	return true
 }
 
-func (d *Database) clearInvalid() {
+func isConnectionFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, sql.ErrConnDone) ||
+		errors.Is(err, errDatabaseSessionNotInitialized) {
+		return true
+	}
+	var networkError net.Error
+	if errors.As(err, &networkError) && !errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	message := strings.ToUpper(err.Error())
+	for _, marker := range []string{
+		"ORA-01033", "ORA-01034", "ORA-01089",
+		"ORA-03113", "ORA-03114", "ORA-03135",
+		"ORA-12154", "ORA-12170", "ORA-125",
+		"DPI-1010", "DPI-1080",
+		"BROKEN PIPE", "CONNECTION REFUSED", "CONNECTION RESET",
+		"DATABASE IS CLOSED", "NETWORK IS UNREACHABLE", "NO ROUTE TO HOST",
+	} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *Database) quarantineLocked(err error, now time.Time) {
+	if d.connection.QueuedAt == nil ||
+		(d.connection.State != DatabaseConnectionQuarantined && d.connection.State != DatabaseConnectionProbing) {
+		queuedAt := now
+		d.connection.QueuedAt = &queuedAt
+	}
+	d.connection.State = DatabaseConnectionQuarantined
+	d.connection.LastFailureAt = timePointer(now)
+	if err == nil {
+		d.connection.LastFailure = "database connection is unavailable"
+	} else {
+		d.connection.LastFailure = err.Error()
+	}
+}
+
+func (d *Database) beginProbe(now time.Time) bool {
 	d.reconnectMU.Lock()
 	defer d.reconnectMU.Unlock()
-	d.clearInvalidLocked()
+	if d.connection.State != DatabaseConnectionQuarantined {
+		return false
+	}
+	d.connection.State = DatabaseConnectionProbing
+	d.connection.LastProbeAt = timePointer(now)
+	d.connection.LastProbeDuration = nil
+	d.connection.LastProbeError = ""
+	d.connection.ProbeAttempts++
+	return true
 }
 
-func (d *Database) clearInvalidLocked() {
-	d.invalidUntil = nil
+func (d *Database) finishProbe(started time.Time, err error) {
+	now := time.Now()
+	d.reconnectMU.Lock()
+	defer d.reconnectMU.Unlock()
+	duration := now.Sub(started)
+	d.connection.LastProbeDuration = &duration
+	if err != nil {
+		d.connection.LastProbeError = err.Error()
+		d.quarantineLocked(err, now)
+		return
+	}
+	d.connection.State = DatabaseConnectionActive
+	d.connection.QueuedAt = nil
+	d.connection.LastProbeError = ""
+	d.connection.RecoveredAt = timePointer(now)
+}
+
+func (d *Database) activate(now time.Time) {
+	d.reconnectMU.Lock()
+	defer d.reconnectMU.Unlock()
+	d.connection.State = DatabaseConnectionActive
+	d.connection.QueuedAt = nil
+	d.connection.LastProbeError = ""
+}
+
+func (d *Database) connectionStateSample(observedAt time.Time, scraperInstance string) DatabaseConnectionStateSample {
+	d.reconnectMU.RLock()
+	defer d.reconnectMU.RUnlock()
+	status := d.connection
+	sample := DatabaseConnectionStateSample{
+		ObservedAt:      observedAt,
+		Database:        d.Name,
+		State:           string(status.State),
+		QueuedAt:        cloneTimePointer(status.QueuedAt),
+		LastFailureAt:   cloneTimePointer(status.LastFailureAt),
+		LastProbeAt:     cloneTimePointer(status.LastProbeAt),
+		ProbeAttempts:   status.ProbeAttempts,
+		RecoveredAt:     cloneTimePointer(status.RecoveredAt),
+		ScraperInstance: scraperInstance,
+	}
+	if status.LastFailure != "" {
+		value := status.LastFailure
+		sample.LastFailure = &value
+	}
+	if status.LastProbeError != "" {
+		value := status.LastProbeError
+		sample.LastProbeError = &value
+	}
+	if status.LastProbeDuration != nil {
+		seconds := status.LastProbeDuration.Seconds()
+		sample.LastProbeDurationSeconds = &seconds
+	}
+	return sample
+}
+
+func timePointer(value time.Time) *time.Time {
+	return &value
+}
+
+func cloneTimePointer(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }
 
 func (d *Database) getUp() float64 {
@@ -330,10 +440,6 @@ func (d *Database) PingContext(ctx context.Context) error {
 		return errDatabaseSessionNotInitialized
 	}
 	return d.Session.PingContext(ctx)
-}
-
-func isClosedDatabaseError(err error) bool {
-	return errors.Is(err, sql.ErrConnDone) || strings.Contains(err.Error(), "sql: database is closed")
 }
 
 func initdb(logger *slog.Logger, dbname string, dbconfig DatabaseConfig, db *sql.DB) {
