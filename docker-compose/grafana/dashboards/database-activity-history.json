@@ -990,7 +990,7 @@
                   {
                     "targetBlank": false,
                     "title": "Investigate in Top Consumers",
-                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_rank_by=elapsed&var-sql_id=${__series.name}"
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_rank_by=elapsed&var-sql_id=${__field.name}"
                   }
                 ]
               }
@@ -1813,6 +1813,6 @@
   "timezone": "",
   "title": "Oracle Database Activity History (DAH)",
   "uid": "database-activity-history-dah",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }

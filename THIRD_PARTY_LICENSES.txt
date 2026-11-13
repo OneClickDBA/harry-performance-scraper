@@ -66,8 +66,8 @@ are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
 
 Generator: github.com/google/go-licenses/v2@v2.0.1
-go.mod SHA-256: 83b418da5f45f678661542188c00b375f5b3f319499d4a32a59217517cea0d96
-go.sum SHA-256: 35272a4c3c1f298f99973d236b73cbdc6ba496c48d3b41acd10318544ccc6a69
+go.mod SHA-256: a77876bd70e5e97df77382ce776bcf9fbd068f3ed8282d4de7d86911bca2e97d
+go.sum SHA-256: d99d622ac30b7f6cbb8c95021e9bfee82b7aee2dcade6263017dbb54caa3255f
 
 ===============================================================================
 DEPENDENCY INVENTORY: ALL RELEASE VARIANTS
@@ -6451,9 +6451,9 @@ THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/oracle/oci-go-sdk/v65
-Version: v65.126.2
+Version: v65.129.0
 License: Apache-2.0
-Source: https://github.com/oracle/oci-go-sdk/blob/v65.126.2/LICENSE.txt
+Source: https://github.com/oracle/oci-go-sdk/blob/v65.129.0/LICENSE.txt
 -------------------------------------------------------------------------------
 Copyright (c) 2016, 2026, Oracle and/or its affiliates.  All rights reserved.
 This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
@@ -6561,9 +6561,9 @@ END OF TERMS AND CONDITIONS
 
 -------------------------------------------------------------------------------
 Dependency: github.com/oracle/oci-go-sdk/v65
-Version: v65.126.2
+Version: v65.129.0
 License: UPL-1.0
-Source: https://github.com/oracle/oci-go-sdk/blob/v65.126.2/LICENSE.txt
+Source: https://github.com/oracle/oci-go-sdk/blob/v65.129.0/LICENSE.txt
 -------------------------------------------------------------------------------
 Copyright (c) 2016, 2026, Oracle and/or its affiliates.  All rights reserved.
 This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
@@ -6997,9 +6997,9 @@ Source: https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/crypto
-Version: v0.55.0
+Version: v0.56.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/crypto/+/v0.55.0:LICENSE
+Source: https://cs.opensource.google/go/x/crypto/+/v0.56.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
