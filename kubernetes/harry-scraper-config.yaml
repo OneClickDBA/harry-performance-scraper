@@ -43,8 +43,11 @@ databases:
 metrics:
   ## How often to collect samples.
   scrapeInterval: 15s
-  ## How long to wait before attempting to reconnect to an invalid database (login or locked user)
-  # connectionBackoff: 5m
+  ## Retry unavailable databases serially outside the normal collectors.
+  deadConnectionDetection:
+    enabled: true
+    interval: 5m
+    probeTimeout: 5s
   ## Optional SQL-derived metric definition files.
   # definitions:
   #   - /oracle/scraper/txeventq-metrics.toml

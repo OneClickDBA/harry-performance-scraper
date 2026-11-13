@@ -350,6 +350,9 @@ func (e *Scraper) ScrapeOperationalSamples(d *Database, collectedAt time.Time) (
 		{name: "system_metrics", collect: func(ctx context.Context) (int, error) {
 			return e.scrapeSystemMetrics(ctx, d, collectedAt, &samples)
 		}},
+		{name: "dataguard", collect: func(ctx context.Context) (int, error) {
+			return e.scrapeDataGuard(ctx, d, collectedAt, &samples)
+		}},
 	}
 
 	statuses := make([]ScrapeStatusSample, 0, len(collections)+1)

@@ -49,6 +49,19 @@ func TestActivityConfigDefaultsToSessionSampling(t *testing.T) {
 	}
 }
 
+func TestDeadConnectionDetectionDefaults(t *testing.T) {
+	config := DeadConnectionDetectionConfig{}
+	if !config.GetEnabled() {
+		t.Fatal("expected dead connection detection to be enabled by default")
+	}
+	if got := config.GetInterval(); got != 5*time.Minute {
+		t.Fatalf("dead connection detection interval = %s, want 5m", got)
+	}
+	if got := config.GetProbeTimeout(); got != 5*time.Second {
+		t.Fatalf("dead connection detection probe timeout = %s, want 5s", got)
+	}
+}
+
 func TestMetricsConfigurationRejectsInvalidActivitySource(t *testing.T) {
 	configPath := writeScraperConfig(t, `
 databases:

@@ -27,6 +27,662 @@
         "type": "postgres",
         "uid": "PostgreSQL"
       },
+      "description": "Current blocking impact from the latest scheduled collection. Any non-zero result deserves review; an empty or stale collection does not reuse older blocking rows.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blocked_sessions"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Blocked sessions"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "root_blockers"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Root blockers"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "longest_blocked_wait_seconds"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Longest wait"
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 30
+                    },
+                    {
+                      "color": "red",
+                      "value": 60
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "affected_users_modules"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Affected identities"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "vertical",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": false,
+        "text": {
+          "titleSize": 16,
+          "valueSize": 30
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n), blocked as (\n  select b.*,\n    s.seconds_in_wait,\n    s.module as waiter_module\n  from snapshot x\n  join oracle_blocking_session_samples b\n    on b.source_database = ${source_database:sqlstring}\n   and b.collected_at = x.collected_at\n  left join oracle_session_samples s\n    on s.source_database = b.source_database\n   and s.collected_at = b.collected_at\n   and s.inst_id = b.inst_id\n   and s.sid = b.sid\n)\nselect\n  count(*)::bigint as blocked_sessions,\n  count(distinct concat(blocking_instance, ':', blocking_session)) filter (\n    where blocking_instance is not null\n      and blocking_session is not null\n      and not exists (\n        select 1\n        from blocked waiter\n        where waiter.inst_id = blocked.blocking_instance\n          and waiter.sid = blocked.blocking_session\n      )\n  )::bigint as root_blockers,\n  coalesce(max(seconds_in_wait), 0)::bigint as longest_blocked_wait_seconds,\n  count(distinct concat_ws('|', username, waiter_module))::bigint as affected_users_modules\nfrom blocked;\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Current Blocking Impact",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "description": "Sampled blocker-to-waiter relationships observed during scheduled collections in the selected time range. A green No Locks detected band means successful collections found no blocking; a grey No successful collection data band means no successful collection was available. This is not an exact Oracle lock audit: locks shorter than the scheduled scrape interval may be missed, start and end boundaries are approximate, failed or missing collections appear as gaps, and the source is GV$SESSION blocking information rather than the complete GV$LOCK inventory. Shows the 20 most-observed relationships, paginated eight at a time for readability.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "1": {
+                  "color": "#E02F44",
+                  "index": 0,
+                  "text": "Application"
+                },
+                "2": {
+                  "color": "#FF9830",
+                  "index": 1,
+                  "text": "Concurrency"
+                },
+                "3": {
+                  "color": "#8F5FD7",
+                  "index": 2,
+                  "text": "Cluster"
+                },
+                "4": {
+                  "color": "#F2CC0C",
+                  "index": 3,
+                  "text": "Configuration / Administrative"
+                },
+                "5": {
+                  "color": "#8E8E8E",
+                  "index": 4,
+                  "text": "Other"
+                },
+                "0": {
+                  "color": "#299C46",
+                  "index": 5,
+                  "text": "No Locks detected"
+                },
+                "6": {
+                  "color": "#6E6E6E",
+                  "index": 6,
+                  "text": "No successful collection data"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#299C46",
+                "value": null
+              },
+              {
+                "color": "#E02F44",
+                "value": 1
+              },
+              {
+                "color": "#FF9830",
+                "value": 2
+              },
+              {
+                "color": "#8F5FD7",
+                "value": 3
+              },
+              {
+                "color": "#F2CC0C",
+                "value": 4
+              },
+              {
+                "color": "#8E8E8E",
+                "value": 5
+              },
+              {
+                "color": "#6E6E6E",
+                "value": 6
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 8,
+      "options": {
+        "alignValue": "center",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "pageSize": 8
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "with snapshot_sequence as (\n  select collected_at,\n         success,\n         lag(collected_at) over (order by collected_at) as previous_snapshot_at,\n         lead(collected_at) over (order by collected_at) as next_snapshot_at\n  from oracle_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n), cadence as (\n  select coalesce(\n           percentile_cont(0.5) within group (\n             order by extract(epoch from collected_at - previous_snapshot_at)\n           ) filter (\n             where previous_snapshot_at is not null\n               and collected_at - previous_snapshot_at between interval '1 second' and interval '5 minutes'\n           ),\n           15.0\n         ) as seconds\n  from snapshot_sequence\n), observations as (\n  select b.collected_at,\n         s.previous_snapshot_at,\n         cadence.seconds as expected_interval_seconds,\n         least(\n           coalesce(s.next_snapshot_at, $__timeTo()),\n           b.collected_at + cadence.seconds * interval '1 second'\n         ) as observed_until,\n         concat(\n           coalesce(nullif(b.blocking_username, ''), '(unknown)'), ' [',\n           coalesce(b.blocking_instance::text, '?'), ':',\n           coalesce(b.blocking_session::text, '?'), '] -> ',\n           coalesce(nullif(b.username, ''), '(unknown)'), ' [', b.inst_id, ':', b.sid, ',',\n           coalesce(b.serial_number::text, '?'), '] | ',\n           coalesce(nullif(b.event, ''), nullif(b.wait_class, ''), 'Blocked')\n         ) as relationship,\n         case\n           when b.wait_class = 'Application' then 1\n           when b.wait_class = 'Concurrency' then 2\n           when b.wait_class = 'Cluster' then 3\n           when b.wait_class in ('Configuration', 'Administrative') then 4\n           else 5\n         end as state\n  from oracle_blocking_session_samples b\n  join snapshot_sequence s on s.collected_at = b.collected_at\n  cross join cadence\n  where b.source_database = ${source_database:sqlstring}\n    and $__timeFilter(b.collected_at)\n    and b.blocking_instance is not null\n    and b.blocking_session is not null\n), continuity as (\n  select observations.*,\n         lag(collected_at) over (\n           partition by relationship, state order by collected_at\n         ) as previous_observation_at\n  from observations\n), marked as (\n  select continuity.*,\n         sum(case\n               when previous_observation_at is null\n                 or previous_observation_at is distinct from previous_snapshot_at\n                 or collected_at - previous_snapshot_at > expected_interval_seconds * 1.5 * interval '1 second'\n               then 1 else 0\n             end) over (\n               partition by relationship, state order by collected_at\n             ) as episode_id\n  from continuity\n), episodes as (\n  select relationship, state, episode_id,\n         min(collected_at) as episode_start,\n         max(observed_until) as episode_end,\n         count(*) as observations\n  from marked\n  group by relationship, state, episode_id\n), selected_relationships as (\n  select relationship\n  from episodes\n  group by relationship\n  order by sum(observations) desc,\n           sum(extract(epoch from episode_end - episode_start)) desc,\n           relationship\n  limit 20\n), fallback as (\n  select ($__timeFrom())::timestamptz as time, case when exists (select 1 from snapshot_sequence where success) then 'No Locks detected' else 'No successful collection data' end as metric,\n         case when exists (select 1 from snapshot_sequence where success) then 0::double precision else 6::double precision end as value\n  where not exists (select 1 from episodes)\n  union all\n  select ($__timeTo())::timestamptz as time, case when exists (select 1 from snapshot_sequence where success) then 'No Locks detected' else 'No successful collection data' end as metric, null::double precision as value\n  where not exists (select 1 from episodes)\n), timeline as (\n  select episode_start as time, relationship as metric, state::double precision as value\n  from episodes\n  join selected_relationships using (relationship)\n  union all\n  select episode_end as time, relationship as metric, null::double precision as value\n  from episodes\n  join selected_relationships using (relationship)\n  union all\n  select time, metric, value\n  from fallback\n)\nselect time, metric, value\nfrom timeline\norder by time, metric;\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Blocking Relationships Over Time",
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "description": "Current RAC-aware blocking relationships. Red nodes are root blockers, orange nodes both wait and block, and yellow nodes are blocked sessions. Edge labels show the wait event and current wait duration. Nodes use an enlarged fixed radius for readability; use the panel zoom controls for large blocking chains.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 7,
+      "options": {
+        "edges": {
+          "mainStatUnit": "",
+          "secondaryStatUnit": ""
+        },
+        "nodes": {
+          "mainStatUnit": "",
+          "secondaryStatUnit": ""
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n), relationships as (\n  select b.*\n  from snapshot x\n  join oracle_blocking_session_samples b\n    on b.source_database = ${source_database:sqlstring}\n   and b.collected_at = x.collected_at\n), node_ids as (\n  select inst_id, sid from relationships\n  union\n  select blocking_instance, blocking_session\n  from relationships\n  where blocking_instance is not null and blocking_session is not null\n), classified as (\n  select n.inst_id, n.sid,\n    exists (\n      select 1 from relationships r\n      where r.inst_id = n.inst_id and r.sid = n.sid\n    ) as is_waiter,\n    exists (\n      select 1 from relationships r\n      where r.blocking_instance = n.inst_id and r.blocking_session = n.sid\n    ) as is_blocker,\n    (\n      select count(*) from relationships r\n      where r.blocking_instance = n.inst_id and r.blocking_session = n.sid\n    ) as blocked_count\n  from node_ids n\n), enriched as (\n  select c.*,\n    coalesce(\n      s.username,\n      (select max(r.blocking_username) from relationships r\n       where r.blocking_instance = c.inst_id and r.blocking_session = c.sid),\n      '(unknown)'\n    ) as username,\n    coalesce(\n      s.sql_id,\n      (select max(r.blocking_sql_id) from relationships r\n       where r.blocking_instance = c.inst_id and r.blocking_session = c.sid)\n    ) as sql_id,\n    coalesce(\n      s.event,\n      (select max(r.blocking_event) from relationships r\n       where r.blocking_instance = c.inst_id and r.blocking_session = c.sid)\n    ) as event,\n    s.module,\n    s.program,\n    s.machine,\n    s.seconds_in_wait\n  from classified c\n  left join snapshot x on true\n  left join oracle_session_samples s\n    on s.source_database = ${source_database:sqlstring}\n   and s.collected_at = x.collected_at\n   and s.inst_id = c.inst_id\n   and s.sid = c.sid\n)\nselect\n  concat(inst_id, ':', sid) as id,\n  concat(username, ' [', inst_id, ':', sid, ']') as title,\n  coalesce(module, program, machine, 'No application context') as \"subTitle\",\n  case\n    when is_blocker and not is_waiter then 'ROOT BLOCKER'\n    when is_blocker and is_waiter then 'INTERMEDIATE BLOCKER'\n    else 'BLOCKED SESSION'\n  end as \"mainStat\",\n  case\n    when is_blocker then concat(blocked_count, ' session', case when blocked_count = 1 then '' else 's' end, ' blocked')\n    else coalesce(event, 'Waiting')\n  end as \"secondaryStat\",\n  case\n    when is_blocker and not is_waiter then '#E02F44'\n    when is_blocker and is_waiter then '#FF9830'\n    else '#F2CC0C'\n  end as color,\n  60::double precision as \"nodeRadius\",\n  sql_id as \"detail__SQL ID\",\n  event as \"detail__Wait event\",\n  module as \"detail__Module\",\n  program as \"detail__Program\",\n  machine as \"detail__Machine\",\n  seconds_in_wait as \"detail__Wait seconds\"\nfrom enriched\norder by is_blocker desc, blocked_count desc, inst_id, sid;\n",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n)\nselect\n  concat(b.blocking_instance, ':', b.blocking_session, '->', b.inst_id, ':', b.sid) as id,\n  concat(b.blocking_instance, ':', b.blocking_session) as source,\n  concat(b.inst_id, ':', b.sid) as target,\n  coalesce(b.event, 'Blocked') as \"mainStat\",\n  case when s.seconds_in_wait is not null\n    then concat(s.seconds_in_wait, ' s')\n    else null\n  end as \"secondaryStat\",\n  case\n    when coalesce(s.seconds_in_wait, 0) >= 60 then '#E02F44'\n    when coalesce(s.seconds_in_wait, 0) >= 30 then '#FF9830'\n    else '#F2CC0C'\n  end as color,\n  greatest(1, least(10, ln(coalesce(s.seconds_in_wait, 0) + 1)))::double precision as thickness,\n  coalesce(s.seconds_in_wait, 0) >= 60 as highlighted\nfrom snapshot x\njoin oracle_blocking_session_samples b\n  on b.source_database = ${source_database:sqlstring}\n and b.collected_at = x.collected_at\nleft join oracle_session_samples s\n  on s.source_database = b.source_database\n and s.collected_at = b.collected_at\n and s.inst_id = b.inst_id\n and s.sid = b.sid\nwhere b.blocking_instance is not null\n  and b.blocking_session is not null\norder by coalesce(s.seconds_in_wait, 0) desc, source, target;\n",
+          "refId": "B"
+        }
+      ],
+      "title": "Current Blocking Chains",
+      "type": "nodeGraph"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inst_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sid"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SID"
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "serial_number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Serial #"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "username"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Username"
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "sql_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "SQL ID"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "event"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Event"
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "wait_class"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Wait class"
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blocking_instance"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Block inst"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blocking_session"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Block SID"
+              },
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blocking_username"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Block user"
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blocking_sql_id"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Block SQL ID"
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blocking_event"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Blocking event"
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "seconds_in_wait"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Wait s"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "module"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Module"
+              },
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "machine"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Machine"
+              },
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n)\nselect\n  b.inst_id,\n  b.sid,\n  b.serial_number,\n  b.username,\n  b.sql_id,\n  b.event,\n  b.wait_class,\n  s.seconds_in_wait,\n  s.module,\n  s.machine,\n  b.blocking_instance,\n  b.blocking_session,\n  b.blocking_username,\n  b.blocking_sql_id,\n  b.blocking_event\nfrom snapshot x\njoin oracle_blocking_session_samples b\n  on b.source_database = ${source_database:sqlstring}\n and b.collected_at = x.collected_at\nleft join oracle_session_samples s\n  on s.source_database = b.source_database\n and s.collected_at = b.collected_at\n and s.inst_id = b.inst_id\n and s.sid = b.sid\norder by s.seconds_in_wait desc nulls last, b.inst_id, b.sid;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Current Blocking Session Details",
+      "type": "table",
+      "description": "Blocking relationships from exactly the latest scheduled collection. Cleared blocking incidents are not retained as current state."
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "PostgreSQL"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -294,7 +950,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 30
       },
       "id": 1,
       "options": {
@@ -319,7 +975,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_session_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database\n)\nselect\n  s.inst_id,\n  s.sid,\n  s.serial_number,\n  s.username,\n  s.sql_id,\n  s.sql_child_number,\n  s.event,\n  s.wait_class,\n  s.state,\n  s.seconds_in_wait,\n  s.module,\n  s.action,\n  s.program,\n  s.machine,\n  s.service_name\nfrom oracle_session_samples s\njoin latest l on l.source_database = s.source_database and l.collected_at = s.collected_at\nwhere s.status = 'ACTIVE'\n  and s.sql_id is not null\norder by s.seconds_in_wait desc nulls last, s.inst_id, s.sid;",
+          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n)\nselect\n  s.inst_id,\n  s.sid,\n  s.serial_number,\n  s.username,\n  s.sql_id,\n  s.sql_child_number,\n  s.event,\n  s.wait_class,\n  s.state,\n  s.seconds_in_wait,\n  s.module,\n  s.action,\n  s.program,\n  s.machine,\n  s.service_name\nfrom snapshot x\njoin oracle_session_samples s\n  on s.source_database = ${source_database:sqlstring}\n and s.collected_at = x.collected_at\nwhere s.status = 'ACTIVE'\n  and s.sql_id is not null\norder by s.seconds_in_wait desc nulls last, s.inst_id, s.sid;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -341,7 +997,8 @@
         }
       ],
       "title": "Current Active SQL Sessions",
-      "type": "table"
+      "type": "table",
+      "description": "Active SQL sessions from the latest scheduled collection."
     },
     {
       "datasource": {
@@ -350,12 +1007,8 @@
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
+          "color": {
+            "mode": "continuous-GrYlRd"
           },
           "mappings": [],
           "thresholds": {
@@ -364,159 +1017,47 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 2
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 10
               }
             ]
-          }
+          },
+          "unit": "short"
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "wait_class"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Wait class"
-              },
-              {
-                "id": "custom.width",
-                "value": 120
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "event"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Event"
-              },
-              {
-                "id": "custom.width",
-                "value": 220
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "sessions"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Sessions"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "sql_sessions"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "SQL sessions"
-              },
-              {
-                "id": "custom.width",
-                "value": 100
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "max_seconds_in_wait"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Max wait s"
-              },
-              {
-                "id": "custom.width",
-                "value": 95
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "example_sql_id"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Example SQL ID"
-              },
-              {
-                "id": "custom.width",
-                "value": 130
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "example_module"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Example module"
-              },
-              {
-                "id": "custom.width",
-                "value": 180
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "example_machine"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Example machine"
-              },
-              {
-                "id": "custom.width",
-                "value": 180
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 38
       },
       "id": 2,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
+        "displayMode": "gradient",
+        "minVizHeight": 24,
+        "minVizWidth": 0,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
           ],
-          "show": false
+          "fields": "",
+          "values": true
         },
-        "showHeader": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
       "pluginVersion": "11.4.0",
       "targets": [
@@ -528,7 +1069,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_session_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database\n)\nselect\n  coalesce(s.wait_class, 'UNKNOWN') as wait_class,\n  coalesce(s.event, 'UNKNOWN') as event,\n  count(*) as sessions,\n  count(*) filter (where s.sql_id is not null) as sql_sessions,\n  max(s.seconds_in_wait) as max_seconds_in_wait,\n  max(s.sql_id) as example_sql_id,\n  max(s.module) as example_module,\n  max(s.machine) as example_machine\nfrom oracle_session_samples s\njoin latest l on l.source_database = s.source_database and l.collected_at = s.collected_at\nwhere s.status = 'ACTIVE'\n  and coalesce(s.wait_class, 'Idle') <> 'Idle'\ngroup by coalesce(s.wait_class, 'UNKNOWN'), coalesce(s.event, 'UNKNOWN')\norder by sessions desc, max_seconds_in_wait desc nulls last\nlimit 50;",
+          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n)\nselect\n  concat(coalesce(s.wait_class, 'UNKNOWN'), ' | ', coalesce(s.event, 'UNKNOWN')) as metric,\n  count(*)::double precision as value\nfrom snapshot x\njoin oracle_session_samples s\n  on s.source_database = ${source_database:sqlstring}\n and s.collected_at = x.collected_at\nwhere s.status = 'ACTIVE'\n  and coalesce(s.wait_class, 'Idle') <> 'Idle'\ngroup by coalesce(s.wait_class, 'UNKNOWN'), coalesce(s.event, 'UNKNOWN')\norder by value desc, metric\nlimit 20;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -549,8 +1090,9 @@
           }
         }
       ],
-      "title": "Current Waiters by Event",
-      "type": "table"
+      "title": "Current Non-Idle Waiters by Event",
+      "type": "bargauge",
+      "description": "Current active non-idle sessions grouped by wait class and event. Bar length represents the number of sessions in the latest scheduled collection."
     },
     {
       "datasource": {
@@ -856,7 +1398,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 8
+        "y": 38
       },
       "id": 3,
       "options": {
@@ -881,7 +1423,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_session_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database\n)\nselect\n  s.inst_id,\n  s.sid,\n  s.serial_number,\n  s.username,\n  s.status,\n  s.sql_id,\n  s.event,\n  s.wait_class,\n  s.state,\n  s.seconds_in_wait,\n  s.blocking_instance,\n  s.blocking_session,\n  s.module,\n  s.action,\n  s.program,\n  s.machine,\n  s.logon_time\nfrom oracle_session_samples s\njoin latest l on l.source_database = s.source_database and l.collected_at = s.collected_at\nwhere s.status = 'ACTIVE'\norder by s.seconds_in_wait desc nulls last, s.logon_time asc nulls last\nlimit 100;",
+          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n)\nselect\n  s.inst_id,\n  s.sid,\n  s.serial_number,\n  s.username,\n  s.status,\n  s.sql_id,\n  s.event,\n  s.wait_class,\n  s.state,\n  s.seconds_in_wait,\n  s.blocking_instance,\n  s.blocking_session,\n  s.module,\n  s.action,\n  s.program,\n  s.machine,\n  s.logon_time\nfrom snapshot x\njoin oracle_session_samples s\n  on s.source_database = ${source_database:sqlstring}\n and s.collected_at = x.collected_at\nwhere s.status = 'ACTIVE'\norder by s.seconds_in_wait desc nulls last, s.logon_time asc nulls last\nlimit 100;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -902,281 +1444,9 @@
           }
         }
       ],
-      "title": "Long Running Active Sessions",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "PostgreSQL"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "inst_id"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Inst"
-              },
-              {
-                "id": "custom.width",
-                "value": 60
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "sid"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "SID"
-              },
-              {
-                "id": "custom.width",
-                "value": 70
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "serial_number"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Serial #"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "username"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Username"
-              },
-              {
-                "id": "custom.width",
-                "value": 120
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "sql_id"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "SQL ID"
-              },
-              {
-                "id": "custom.width",
-                "value": 130
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "event"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Event"
-              },
-              {
-                "id": "custom.width",
-                "value": 200
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "wait_class"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Wait class"
-              },
-              {
-                "id": "custom.width",
-                "value": 120
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "blocking_instance"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Block inst"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "blocking_session"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Block SID"
-              },
-              {
-                "id": "custom.width",
-                "value": 85
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "blocking_username"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Block user"
-              },
-              {
-                "id": "custom.width",
-                "value": 120
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "blocking_sql_id"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Block SQL ID"
-              },
-              {
-                "id": "custom.width",
-                "value": 130
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "blocking_event"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Blocking event"
-              },
-              {
-                "id": "custom.width",
-                "value": 200
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      },
-      "id": 4,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "11.4.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "PostgreSQL"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_blocking_session_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database\n)\nselect\n  b.inst_id,\n  b.sid,\n  b.serial_number,\n  b.username,\n  b.sql_id,\n  b.event,\n  b.wait_class,\n  b.blocking_instance,\n  b.blocking_session,\n  b.blocking_username,\n  b.blocking_sql_id,\n  b.blocking_event\nfrom oracle_blocking_session_samples b\njoin latest l on l.source_database = b.source_database and l.collected_at = b.collected_at\norder by b.inst_id, b.sid;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Blocking Sessions",
-      "type": "table"
+      "title": "Active Sessions by Current Wait Duration",
+      "type": "table",
+      "description": "Active sessions ordered by the duration of their current wait. This is not SQL execution elapsed time."
     },
     {
       "datasource": {
@@ -1303,16 +1573,16 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "machine_count"
+              "options": "machine"
             },
             "properties": [
               {
                 "id": "displayName",
-                "value": "Machines"
+                "value": "Machine"
               },
               {
                 "id": "custom.width",
-                "value": 85
+                "value": 180
               }
             ]
           },
@@ -1354,7 +1624,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 46
       },
       "id": 5,
       "options": {
@@ -1379,7 +1649,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with latest as (\n  select source_database, max(collected_at) as collected_at\n  from oracle_session_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by source_database\n)\nselect\n  coalesce(s.status, 'UNKNOWN') as status,\n  coalesce(s.username, '(background)') as username,\n  coalesce(s.module, '(unknown)') as module,\n  coalesce(s.program, '(unknown)') as program,\n  count(*) as sessions,\n  count(*) filter (where s.sql_id is not null) as sql_sessions,\n  count(distinct s.machine) filter (where s.machine is not null) as machine_count,\n  max(s.wait_class) as example_wait_class,\n  max(s.event) as example_event\nfrom oracle_session_samples s\njoin latest l on l.source_database = s.source_database and l.collected_at = s.collected_at\ngroup by coalesce(s.status, 'UNKNOWN'), coalesce(s.username, '(background)'), coalesce(s.module, '(unknown)'), coalesce(s.program, '(unknown)')\norder by sessions desc\nlimit 100;",
+          "rawSql": "with snapshot as (\n  select collected_at\n  from oracle_latest_scrape_status\n  where source_database = ${source_database:sqlstring}\n    and collector = 'scheduled'\n    and $__timeFilter(collected_at)\n  order by collected_at desc\n  limit 1\n)\nselect\n  coalesce(s.status, 'UNKNOWN') as status,\n  coalesce(s.username, '(background)') as username,\n  coalesce(s.module, '(unknown)') as module,\n  coalesce(s.program, '(unknown)') as program,\n  coalesce(s.machine, '(unknown)') as machine,\n  count(*) as sessions,\n  count(*) filter (where s.sql_id is not null) as sql_sessions,\n  max(s.wait_class) as example_wait_class,\n  max(s.event) as example_event\nfrom snapshot x\njoin oracle_session_samples s\n  on s.source_database = ${source_database:sqlstring}\n and s.collected_at = x.collected_at\ngroup by coalesce(s.status, 'UNKNOWN'), coalesce(s.username, '(background)'),\n  coalesce(s.module, '(unknown)'), coalesce(s.program, '(unknown)'),\n  coalesce(s.machine, '(unknown)')\norder by sessions desc\nlimit 100;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1400,8 +1670,9 @@
           }
         }
       ],
-      "title": "Session Inventory by User, Module, Program",
-      "type": "table"
+      "title": "Session Inventory by User, Module, Program, Machine",
+      "type": "table",
+      "description": "Current session inventory from the latest scheduled collection, grouped by application identity and origin machine."
     }
   ],
   "refresh": "15s",
@@ -1449,6 +1720,6 @@
   "timezone": "",
   "title": "Oracle Current Sessions and Blocking",
   "uid": "oracle-db-performance",
-  "version": 1,
+  "version": 8,
   "weekStart": ""
 }

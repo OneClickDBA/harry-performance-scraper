@@ -1085,3 +1085,253 @@ groups:
           severity: warning
           service: harry-performance-scraper
         isPaused: false
+
+  - orgId: 1
+    name: Oracle Data Guard alerts
+    folder: Harry - Performance Scraper for Oracle Database
+    interval: 1m
+    rules:
+      - uid: oracle_dataguard_destination_unhealthy
+        title: Oracle Data Guard destination is unhealthy
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: postgres
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  source_database,
+                  inst_id::text as inst_id,
+                  dest_id::text as dest_id,
+                  coalesce(db_unique_name, destination_name, 'unknown') as remote_database,
+                  case
+                    when upper(coalesce(status, '')) in ('ERROR', 'DISABLED', 'BAD PARAM', 'FULL')
+                      or coalesce(error_message, '') <> ''
+                      or upper(coalesce(gap_status, 'NO GAP')) <> 'NO GAP'
+                    then 1.0 else 0.0
+                  end as value
+                from oracle_latest_dataguard_destination_samples
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "$B > 0"
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: math
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          __dashboardUid__: oracle-operational-overview
+          __panelId__: "21"
+          summary: >-
+            Data Guard destination {{ $labels.remote_database }} is unhealthy
+            on {{ $labels.source_database }}
+          description: >-
+            Review the archive destination status, destination error, transport
+            connectivity, and reported archive gap.
+        labels:
+          severity: critical
+          service: harry-performance-scraper
+        isPaused: false
+
+      - uid: oracle_dataguard_lag_high
+        title: Oracle Data Guard lag or telemetry age is high
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: postgres
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  source_database,
+                  greatest(
+                    coalesce(transport_lag_seconds, 0),
+                    coalesce(apply_lag_seconds, 0),
+                    coalesce(datum_age_seconds, 0)
+                  )::double precision as value
+                from oracle_latest_dataguard_lag_samples
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [900]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "$B > 900"
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: math
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: oracle-operational-overview
+          __panelId__: "22"
+          summary: >-
+            Data Guard lag exceeds 15 minutes on
+            {{ $labels.source_database }}
+          description: >-
+            Transport lag, apply lag, or the age of the source datum is above
+            the default threshold. Check redo transport, archive gaps, managed
+            recovery, network throughput, and standby I/O.
+        labels:
+          severity: warning
+          service: harry-performance-scraper
+        isPaused: false
+
+      - uid: oracle_dataguard_apply_stopped
+        title: Oracle Data Guard managed recovery is stopped
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PostgreSQL
+            model:
+              datasource:
+                type: postgres
+                uid: PostgreSQL
+              editorMode: code
+              format: time_series
+              intervalMs: 60000
+              maxDataPoints: 600
+              rawQuery: true
+              rawSql: |
+                select
+                  now() as "time",
+                  source_database,
+                  case when sum(apply_processes) > 0 then 0.0 else 1.0 end as value
+                from oracle_latest_dataguard_process_samples
+                group by source_database
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 60000
+              maxDataPoints: 600
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "$B > 0"
+              intervalMs: 60000
+              maxDataPoints: 600
+              refId: C
+              type: math
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          __dashboardUid__: oracle-operational-overview
+          __panelId__: "23"
+          summary: >-
+            Data Guard managed recovery is stopped on
+            {{ $labels.source_database }}
+          description: >-
+            No physical standby MRP process was observed. Confirm whether apply
+            was intentionally stopped before restarting managed recovery.
+        labels:
+          severity: critical
+          service: harry-performance-scraper
+        isPaused: false

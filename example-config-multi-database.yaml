@@ -102,6 +102,11 @@ databases:
 metrics:
   ## How often to collect samples.
   # scrapeInterval: 15s
+  ## Retry unavailable databases serially outside the normal collectors.
+  deadConnectionDetection:
+    enabled: true
+    interval: 5m
+    probeTimeout: 5s
   ## Optional SQL-derived metric definition files. Order matters: later files
   ## override metrics with the same generated identifier from earlier files.
   definitions:

@@ -86,12 +86,28 @@ digraph postgresql_table_relationships {
     label="oracle_system_metric_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\lcon_id\lmetric_name\lvalue\lunit\l\lIndexes\lsource_database, metric_name, inst_id, con_id, collected_at desc\l"
   ];
 
+  oracle_dataguard_destination_samples [
+    label="oracle_dataguard_destination_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\ldest_id\ldestination_name\ltarget\ldestination\lstatus\ltransmit_mode\laffirm\lvalid_now\ldb_unique_name\ldestination_type\ldatabase_mode\lrecovery_mode\lprotection_mode\lsynchronized\lsynchronization_status\lgap_status\larchived_thread\larchived_sequence\lapplied_thread\lapplied_sequence\lapplied_scn\lerror_message\l\lIndexes\lsource_database, inst_id, dest_id, collected_at desc\l"
+  ];
+
+  oracle_dataguard_lag_samples [
+    label="oracle_dataguard_lag_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\ldatabase_role\ltransport_lag_seconds\lapply_lag_seconds\lapply_finish_time_seconds\lestimated_startup_seconds\ltime_computed\ldatum_time\ldatum_age_seconds\l\lIndexes\lsource_database, collected_at desc\l"
+  ];
+
+  oracle_dataguard_process_samples [
+    label="oracle_dataguard_process_samples\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\linst_id\ldatabase_role\lapply_processes\ltransport_processes\lapply_status\lthread_number\lsequence_number\l\lIndexes\lsource_database, inst_id, collected_at desc\l"
+  ];
+
   oracle_scrape_status [
     label="oracle_scrape_status\l\lPartitioned by RANGE (collected_at)\lcollected_at\lsource_database\lcollector\lsuccess\lduration_seconds\lsample_count\lerror_message\l\lIndexes\lsource_database, collector, collected_at desc\l"
   ];
 
   oracle_latest_scrape_status [
     label="oracle_latest_scrape_status\l\lCurrent state (non-partitioned)\lcollected_at\lsource_database PK\lcollector PK\lsuccess\lduration_seconds\lsample_count\lerror_message\l"
+  ];
+
+  harry_database_connection_state [
+    label="harry_database_connection_state\l\lCurrent state (non-partitioned)\lsource_database PK\lobserved_at\lstate\lqueued_at\llast_failure_at\llast_failure\llast_probe_at\llast_probe_duration_seconds\llast_probe_error\lprobe_attempts\lrecovered_at\lscraper_instance\l\lIndexes\lstate, observed_at desc\l"
   ];
 
   harry_runtime_samples [
@@ -103,7 +119,7 @@ digraph postgresql_table_relationships {
   ];
 
   harry_repository_daily_ingest [
-    label="harry_repository_daily_ingest\l\lPartitioned by RANGE (sample_day)\lsample_day PK\lsource_database PK\ladditional_metric_rows\lsql_sample_rows\lsql_text_writes\lsql_cursor_metadata_writes\lsql_plan_operation_writes\lsession_sample_rows\lblocking_session_sample_rows\ldatabase_activity_sample_rows\ldatabase_status_sample_rows\linstance_sample_rows\lresource_limit_sample_rows\ltablespace_sample_rows\lasm_diskgroup_sample_rows\lsystem_counter_sample_rows\lwait_class_sample_rows\lsystem_metric_sample_rows\lscrape_status_rows\lfirst_sample_at\llast_sample_at\llast_sql_sample_at\llast_session_sample_at\llast_database_activity_sample_at\llast_flushed_at\l"
+    label="harry_repository_daily_ingest\l\lPartitioned by RANGE (sample_day)\lsample_day PK\lsource_database PK\ladditional_metric_rows\lsql_sample_rows\lsql_text_writes\lsql_cursor_metadata_writes\lsql_plan_operation_writes\lsession_sample_rows\lblocking_session_sample_rows\ldatabase_activity_sample_rows\ldatabase_status_sample_rows\linstance_sample_rows\lresource_limit_sample_rows\ltablespace_sample_rows\lasm_diskgroup_sample_rows\lsystem_counter_sample_rows\lwait_class_sample_rows\lsystem_metric_sample_rows\ldataguard_destination_rows\ldataguard_lag_rows\ldataguard_process_rows\lscrape_status_rows\lfirst_sample_at\llast_sample_at\llast_sql_sample_at\llast_session_sample_at\llast_database_activity_sample_at\llast_flushed_at\l"
   ];
 
   // Logical relationships used by dashboards and analysis queries.
@@ -221,6 +237,24 @@ digraph postgresql_table_relationships {
     color="#666666"
   ];
 
+  oracle_dataguard_destination_samples -> oracle_database_status_samples [
+    label="logical: source_database, inst_id",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_dataguard_lag_samples -> oracle_database_status_samples [
+    label="logical: source_database",
+    style=dashed,
+    color="#666666"
+  ];
+
+  oracle_dataguard_process_samples -> oracle_database_status_samples [
+    label="logical: source_database, inst_id",
+    style=dashed,
+    color="#666666"
+  ];
+
   oracle_scrape_status -> oracle_database_status_samples [
     label="logical: source_database",
     style=dashed,
@@ -241,6 +275,23 @@ digraph postgresql_table_relationships {
   harry_runtime_samples -> harry_latest_runtime_status [
     label="latest row upsert: ha_scope, scheduler",
     color="#2f6f44"
+  ];
+
+  dcd_state_sources [
+    shape=note,
+    fillcolor="#e4f2e4",
+    label="In-memory database connection state\land serialized DCD recovery probes\l"
+  ];
+
+  dcd_state_sources -> harry_database_connection_state [
+    label="latest state upsert: source_database",
+    color="#2f6f44"
+  ];
+
+  harry_database_connection_state -> oracle_scrape_status [
+    label="DCD probe outcomes",
+    style=dashed,
+    color="#666666"
   ];
 
   repository_ingest_sources [

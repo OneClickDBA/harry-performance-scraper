@@ -157,8 +157,8 @@ func UpdateLog(logDestination string, perDatabaseFiles bool, logger *slog.Logger
 	if !d.StartupReady() {
 		return
 	}
-	// Do not try to query the alert log if the database configuration is invalid.
-	if d.IsValid() != nil {
+	// DCD exclusively owns recovery for unavailable databases.
+	if !d.IsActive() {
 		return
 	}
 	now := time.Now()

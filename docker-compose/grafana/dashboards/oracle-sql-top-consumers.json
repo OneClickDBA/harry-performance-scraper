@@ -19,20 +19,7 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "links": [
-    {
-      "asDropdown": false,
-      "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "SQL Performance Overview",
-      "tooltip": "Open category rankings",
-      "type": "link",
-      "url": "/d/oracle-sql-performance/oracle-sql-performance"
-    }
-  ],
+  "links": [],
   "liveNow": false,
   "panels": [
     {
@@ -81,7 +68,7 @@
                   {
                     "targetBlank": false,
                     "title": "Select SQL_ID",
-                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_id=${__value.raw}"
+                    "url": "/d/oracle-sql-top-consumers/oracle-sql-top-consumers?${__url_time_range}&var-source_database=${source_database}&var-sql_rank_by=${sql_rank_by}&var-sql_id=${__value.raw}"
                   }
                 ]
               }
@@ -390,6 +377,54 @@
                 "value": 90
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rows_processed_delta"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Rows processed"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "buffer_gets_per_row"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Gets / row"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "disk_reads_per_exec"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Reads / exec"
+              },
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
           }
         ]
       },
@@ -422,7 +457,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "with samples as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    sum(coalesce(elapsed_time_micro, 0)) as elapsed_time_micro,\n    sum(coalesce(cpu_time_micro, 0)) as cpu_time_micro,\n    sum(coalesce(user_io_wait_micro, 0)) as user_io_wait_micro,\n    sum(coalesce(application_wait_micro, 0)) as application_wait_micro,\n    sum(coalesce(concurrency_wait_micro, 0)) as concurrency_wait_micro,\n    sum(coalesce(cluster_wait_micro, 0)) as cluster_wait_micro,\n    sum(coalesce(executions, 0)) as executions,\n    sum(coalesce(buffer_gets, 0)) as buffer_gets,\n    sum(coalesce(disk_reads, 0)) as disk_reads\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0)\n), ordered as (\n  select *,\n    lag(elapsed_time_micro) over w as prev_elapsed,\n    lag(cpu_time_micro) over w as prev_cpu,\n    lag(user_io_wait_micro) over w as prev_user_io,\n    lag(application_wait_micro) over w as prev_application,\n    lag(concurrency_wait_micro) over w as prev_concurrency,\n    lag(cluster_wait_micro) over w as prev_cluster,\n    lag(executions) over w as prev_executions,\n    lag(buffer_gets) over w as prev_buffer_gets,\n    lag(disk_reads) over w as prev_disk_reads\n  from samples\n  window w as (\n    partition by inst_id, sql_id, plan_hash_value\n    order by collected_at\n  )\n), deltas as (\n  select sql_id,\n    case when prev_elapsed is null or elapsed_time_micro < prev_elapsed then 0 else elapsed_time_micro - prev_elapsed end as elapsed_delta,\n    case when prev_cpu is null or cpu_time_micro < prev_cpu then 0 else cpu_time_micro - prev_cpu end as cpu_delta,\n    case when prev_user_io is null or user_io_wait_micro < prev_user_io then 0 else user_io_wait_micro - prev_user_io end as user_io_delta,\n    case when prev_application is null or application_wait_micro < prev_application then 0 else application_wait_micro - prev_application end as application_delta,\n    case when prev_concurrency is null or concurrency_wait_micro < prev_concurrency then 0 else concurrency_wait_micro - prev_concurrency end as concurrency_delta,\n    case when prev_cluster is null or cluster_wait_micro < prev_cluster then 0 else cluster_wait_micro - prev_cluster end as cluster_delta,\n    case when prev_executions is null or executions < prev_executions then 0 else executions - prev_executions end as executions_delta,\n    case when prev_buffer_gets is null or buffer_gets < prev_buffer_gets then 0 else buffer_gets - prev_buffer_gets end as buffer_gets_delta,\n    case when prev_disk_reads is null or disk_reads < prev_disk_reads then 0 else disk_reads - prev_disk_reads end as disk_reads_delta\n  from ordered\n), consumers as (\n  select sql_id,\n    sum(elapsed_delta) as elapsed_micro,\n    sum(cpu_delta) as cpu_micro,\n    sum(user_io_delta) as user_io_micro,\n    sum(application_delta) as application_micro,\n    sum(concurrency_delta) as concurrency_micro,\n    sum(cluster_delta) as cluster_micro,\n    sum(executions_delta) as executions_delta,\n    sum(buffer_gets_delta) as buffer_gets_delta,\n    sum(disk_reads_delta) as disk_reads_delta\n  from deltas\n  group by sql_id\n), ranked as (\n  select *,\n    rank() over (order by elapsed_micro desc) as elapsed_rank,\n    rank() over (order by cpu_micro desc) as cpu_rank,\n    rank() over (order by user_io_micro desc) as user_io_rank,\n    rank() over (order by executions_delta desc) as executions_rank\n  from consumers\n  where elapsed_micro > 0\n)\nselect r.sql_id, elapsed_rank, cpu_rank, user_io_rank, executions_rank,\n  coalesce(p.plan_count, 0) as collected_plans,\n  case when t.sql_id is null then 'Not collected or aged out' else 'Available' end as sql_text_status,\n  case\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) <= 0 then 'Other'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = cpu_micro then 'CPU'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = user_io_micro then 'User I/O'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = application_micro then 'Application'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = concurrency_micro then 'Concurrency'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = cluster_micro then 'Cluster'\n    else 'Other'\n  end as primary_pressure,\n  round(elapsed_micro / 1000000.0, 3) as elapsed_seconds,\n  round(cpu_micro / 1000000.0, 3) as cpu_seconds,\n  round(user_io_micro / 1000000.0, 3) as user_io_seconds,\n  round(application_micro / 1000000.0, 3) as application_seconds,\n  round(concurrency_micro / 1000000.0, 3) as concurrency_seconds,\n  round(cluster_micro / 1000000.0, 3) as cluster_seconds,\n  executions_delta,\n  round((elapsed_micro / 1000000.0) / nullif(executions_delta, 0), 6) as elapsed_seconds_per_exec,\n  buffer_gets_delta, disk_reads_delta,\n  left(t.sql_fulltext, 240) as sql_preview\nfrom ranked r\nleft join oracle_sql_texts t\n  on t.source_database = ${source_database:sqlstring} and t.sql_id = r.sql_id\nleft join lateral (\n  select count(distinct (inst_id, child_number, plan_hash_value)) as plan_count\n  from oracle_sql_plans p\n  where p.source_database = ${source_database:sqlstring} and p.sql_id = r.sql_id\n) p on true\norder by elapsed_rank\nlimit 20;",
+          "rawSql": "with samples as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    sum(coalesce(elapsed_time_micro, 0)) as elapsed_time_micro,\n    sum(coalesce(cpu_time_micro, 0)) as cpu_time_micro,\n    sum(coalesce(user_io_wait_micro, 0)) as user_io_wait_micro,\n    sum(coalesce(application_wait_micro, 0)) as application_wait_micro,\n    sum(coalesce(concurrency_wait_micro, 0)) as concurrency_wait_micro,\n    sum(coalesce(cluster_wait_micro, 0)) as cluster_wait_micro,\n    sum(coalesce(executions, 0)) as executions,\n    sum(coalesce(buffer_gets, 0)) as buffer_gets,\n    sum(coalesce(disk_reads, 0)) as disk_reads,\n    sum(coalesce(rows_processed, 0)) as rows_processed\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0)\n), ordered as (\n  select *,\n    lag(elapsed_time_micro) over w as prev_elapsed,\n    lag(cpu_time_micro) over w as prev_cpu,\n    lag(user_io_wait_micro) over w as prev_user_io,\n    lag(application_wait_micro) over w as prev_application,\n    lag(concurrency_wait_micro) over w as prev_concurrency,\n    lag(cluster_wait_micro) over w as prev_cluster,\n    lag(executions) over w as prev_executions,\n    lag(buffer_gets) over w as prev_buffer_gets,\n    lag(disk_reads) over w as prev_disk_reads,\n    lag(rows_processed) over w as prev_rows_processed\n  from samples\n  window w as (\n    partition by inst_id, sql_id, plan_hash_value\n    order by collected_at\n  )\n), deltas as (\n  select sql_id,\n    case when prev_elapsed is null or elapsed_time_micro < prev_elapsed then 0 else elapsed_time_micro - prev_elapsed end as elapsed_delta,\n    case when prev_cpu is null or cpu_time_micro < prev_cpu then 0 else cpu_time_micro - prev_cpu end as cpu_delta,\n    case when prev_user_io is null or user_io_wait_micro < prev_user_io then 0 else user_io_wait_micro - prev_user_io end as user_io_delta,\n    case when prev_application is null or application_wait_micro < prev_application then 0 else application_wait_micro - prev_application end as application_delta,\n    case when prev_concurrency is null or concurrency_wait_micro < prev_concurrency then 0 else concurrency_wait_micro - prev_concurrency end as concurrency_delta,\n    case when prev_cluster is null or cluster_wait_micro < prev_cluster then 0 else cluster_wait_micro - prev_cluster end as cluster_delta,\n    case when prev_executions is null or executions < prev_executions then 0 else executions - prev_executions end as executions_delta,\n    case when prev_buffer_gets is null or buffer_gets < prev_buffer_gets then 0 else buffer_gets - prev_buffer_gets end as buffer_gets_delta,\n    case when prev_disk_reads is null or disk_reads < prev_disk_reads then 0 else disk_reads - prev_disk_reads end as disk_reads_delta,\n    case when prev_rows_processed is null or rows_processed < prev_rows_processed then 0 else rows_processed - prev_rows_processed end as rows_processed_delta\n  from ordered\n), consumers as (\n  select sql_id,\n    sum(elapsed_delta) as elapsed_micro,\n    sum(cpu_delta) as cpu_micro,\n    sum(user_io_delta) as user_io_micro,\n    sum(application_delta) as application_micro,\n    sum(concurrency_delta) as concurrency_micro,\n    sum(cluster_delta) as cluster_micro,\n    sum(executions_delta) as executions_delta,\n    sum(buffer_gets_delta) as buffer_gets_delta,\n    sum(disk_reads_delta) as disk_reads_delta,\n    sum(rows_processed_delta) as rows_processed_delta\n  from deltas\n  group by sql_id\n), eligible as (\n  select *,\n    case ${sql_rank_by:sqlstring}\n      when 'elapsed' then elapsed_micro::numeric\n      when 'cpu' then cpu_micro::numeric\n      when 'user_io' then user_io_micro::numeric\n      when 'executions' then executions_delta::numeric\n      when 'buffer_gets' then buffer_gets_delta::numeric\n      when 'disk_reads' then disk_reads_delta::numeric\n      when 'elapsed_per_execution' then elapsed_micro::numeric / nullif(executions_delta, 0)\n      else elapsed_micro::numeric\n    end as selected_rank_value\n  from consumers\n  where greatest(\n    elapsed_micro, cpu_micro, user_io_micro, executions_delta,\n    buffer_gets_delta, disk_reads_delta\n  ) > 0\n), ranked as (\n  select *,\n    rank() over (order by elapsed_micro desc) as elapsed_rank,\n    rank() over (order by cpu_micro desc) as cpu_rank,\n    rank() over (order by user_io_micro desc) as user_io_rank,\n    rank() over (order by executions_delta desc) as executions_rank\n  from eligible\n), selected as (\n  select *\n  from ranked\n  where selected_rank_value > 0\n  order by selected_rank_value desc nulls last, sql_id\n  limit 20\n)\nselect r.sql_id, elapsed_rank, cpu_rank, user_io_rank, executions_rank,\n  coalesce(p.plan_count, 0) as collected_plans,\n  case when t.sql_id is null then 'Not collected or aged out' else 'Available' end as sql_text_status,\n  case\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) <= 0 then 'Other'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = cpu_micro then 'CPU'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = user_io_micro then 'User I/O'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = application_micro then 'Application'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = concurrency_micro then 'Concurrency'\n    when greatest(cpu_micro, user_io_micro, application_micro, concurrency_micro, cluster_micro) = cluster_micro then 'Cluster'\n    else 'Other'\n  end as primary_pressure,\n  round(elapsed_micro / 1000000.0, 3) as elapsed_seconds,\n  round(cpu_micro / 1000000.0, 3) as cpu_seconds,\n  round(user_io_micro / 1000000.0, 3) as user_io_seconds,\n  round(application_micro / 1000000.0, 3) as application_seconds,\n  round(concurrency_micro / 1000000.0, 3) as concurrency_seconds,\n  round(cluster_micro / 1000000.0, 3) as cluster_seconds,\n  executions_delta,\n  rows_processed_delta,\n  round((elapsed_micro / 1000000.0) / nullif(executions_delta, 0), 6) as elapsed_seconds_per_exec,\n  buffer_gets_delta,\n  round(buffer_gets_delta::numeric / nullif(rows_processed_delta, 0), 3) as buffer_gets_per_row,\n  disk_reads_delta,\n  round(disk_reads_delta::numeric / nullif(executions_delta, 0), 3) as disk_reads_per_exec,\n  left(t.sql_fulltext, 240) as sql_preview\nfrom selected r\nleft join oracle_sql_texts t\n  on t.source_database = ${source_database:sqlstring} and t.sql_id = r.sql_id\nleft join lateral (\n  select count(distinct (inst_id, child_number, plan_hash_value)) as plan_count\n  from oracle_sql_plans p\n  where p.source_database = ${source_database:sqlstring} and p.sql_id = r.sql_id\n) p on true\norder by selected_rank_value desc nulls last, r.sql_id;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -443,7 +478,7 @@
           }
         }
       ],
-      "title": "Top 20 SQL Consumers by Elapsed Time",
+      "title": "Top 20 SQL Consumers by ${sql_rank_by:text}",
       "type": "table"
     },
     {
@@ -1816,6 +1851,59 @@
       },
       {
         "current": {
+          "selected": true,
+          "text": "Elapsed Time",
+          "value": "elapsed"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Rank SQL by",
+        "multi": false,
+        "name": "sql_rank_by",
+        "options": [
+          {
+            "selected": true,
+            "text": "Elapsed Time",
+            "value": "elapsed"
+          },
+          {
+            "selected": false,
+            "text": "CPU Time",
+            "value": "cpu"
+          },
+          {
+            "selected": false,
+            "text": "User I/O Wait",
+            "value": "user_io"
+          },
+          {
+            "selected": false,
+            "text": "Executions",
+            "value": "executions"
+          },
+          {
+            "selected": false,
+            "text": "Buffer Gets",
+            "value": "buffer_gets"
+          },
+          {
+            "selected": false,
+            "text": "Disk Reads",
+            "value": "disk_reads"
+          },
+          {
+            "selected": false,
+            "text": "Elapsed / Execution",
+            "value": "elapsed_per_execution"
+          }
+        ],
+        "query": "Elapsed Time : elapsed, CPU Time : cpu, User I/O Wait : user_io, Executions : executions, Buffer Gets : buffer_gets, Disk Reads : disk_reads, Elapsed / Execution : elapsed_per_execution",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "current": {
           "selected": false,
           "text": "",
           "value": ""
@@ -1824,14 +1912,14 @@
           "type": "postgres",
           "uid": "PostgreSQL"
         },
-        "definition": "with samples as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    sum(coalesce(elapsed_time_micro, 0)) as elapsed_time_micro,\n    sum(coalesce(cpu_time_micro, 0)) as cpu_time_micro,\n    sum(coalesce(user_io_wait_micro, 0)) as user_io_wait_micro,\n    sum(coalesce(application_wait_micro, 0)) as application_wait_micro,\n    sum(coalesce(concurrency_wait_micro, 0)) as concurrency_wait_micro,\n    sum(coalesce(cluster_wait_micro, 0)) as cluster_wait_micro,\n    sum(coalesce(executions, 0)) as executions,\n    sum(coalesce(buffer_gets, 0)) as buffer_gets,\n    sum(coalesce(disk_reads, 0)) as disk_reads\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0)\n), ordered as (\n  select *,\n    lag(elapsed_time_micro) over w as prev_elapsed,\n    lag(cpu_time_micro) over w as prev_cpu,\n    lag(user_io_wait_micro) over w as prev_user_io,\n    lag(application_wait_micro) over w as prev_application,\n    lag(concurrency_wait_micro) over w as prev_concurrency,\n    lag(cluster_wait_micro) over w as prev_cluster,\n    lag(executions) over w as prev_executions,\n    lag(buffer_gets) over w as prev_buffer_gets,\n    lag(disk_reads) over w as prev_disk_reads\n  from samples\n  window w as (\n    partition by inst_id, sql_id, plan_hash_value\n    order by collected_at\n  )\n), deltas as (\n  select sql_id,\n    case when prev_elapsed is null or elapsed_time_micro < prev_elapsed then 0 else elapsed_time_micro - prev_elapsed end as elapsed_delta,\n    case when prev_cpu is null or cpu_time_micro < prev_cpu then 0 else cpu_time_micro - prev_cpu end as cpu_delta,\n    case when prev_user_io is null or user_io_wait_micro < prev_user_io then 0 else user_io_wait_micro - prev_user_io end as user_io_delta,\n    case when prev_application is null or application_wait_micro < prev_application then 0 else application_wait_micro - prev_application end as application_delta,\n    case when prev_concurrency is null or concurrency_wait_micro < prev_concurrency then 0 else concurrency_wait_micro - prev_concurrency end as concurrency_delta,\n    case when prev_cluster is null or cluster_wait_micro < prev_cluster then 0 else cluster_wait_micro - prev_cluster end as cluster_delta,\n    case when prev_executions is null or executions < prev_executions then 0 else executions - prev_executions end as executions_delta,\n    case when prev_buffer_gets is null or buffer_gets < prev_buffer_gets then 0 else buffer_gets - prev_buffer_gets end as buffer_gets_delta,\n    case when prev_disk_reads is null or disk_reads < prev_disk_reads then 0 else disk_reads - prev_disk_reads end as disk_reads_delta\n  from ordered\n), consumers as (\n  select sql_id,\n    sum(elapsed_delta) as elapsed_micro,\n    sum(cpu_delta) as cpu_micro,\n    sum(user_io_delta) as user_io_micro,\n    sum(application_delta) as application_micro,\n    sum(concurrency_delta) as concurrency_micro,\n    sum(cluster_delta) as cluster_micro,\n    sum(executions_delta) as executions_delta,\n    sum(buffer_gets_delta) as buffer_gets_delta,\n    sum(disk_reads_delta) as disk_reads_delta\n  from deltas\n  group by sql_id\n)\nselect sql_id as __text, sql_id as __value\nfrom consumers\nwhere elapsed_micro > 0\norder by elapsed_micro desc, sql_id\nlimit 20;",
+        "definition": "with samples as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    sum(coalesce(elapsed_time_micro, 0)) as elapsed_time_micro,\n    sum(coalesce(cpu_time_micro, 0)) as cpu_time_micro,\n    sum(coalesce(user_io_wait_micro, 0)) as user_io_wait_micro,\n    sum(coalesce(executions, 0)) as executions,\n    sum(coalesce(buffer_gets, 0)) as buffer_gets,\n    sum(coalesce(disk_reads, 0)) as disk_reads\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0)\n), ordered as (\n  select *,\n    lag(elapsed_time_micro) over w as prev_elapsed,\n    lag(cpu_time_micro) over w as prev_cpu,\n    lag(user_io_wait_micro) over w as prev_user_io,\n    lag(executions) over w as prev_executions,\n    lag(buffer_gets) over w as prev_buffer_gets,\n    lag(disk_reads) over w as prev_disk_reads\n  from samples\n  window w as (\n    partition by inst_id, sql_id, plan_hash_value\n    order by collected_at\n  )\n), deltas as (\n  select sql_id,\n    case when prev_elapsed is null or elapsed_time_micro < prev_elapsed then 0 else elapsed_time_micro - prev_elapsed end as elapsed_delta,\n    case when prev_cpu is null or cpu_time_micro < prev_cpu then 0 else cpu_time_micro - prev_cpu end as cpu_delta,\n    case when prev_user_io is null or user_io_wait_micro < prev_user_io then 0 else user_io_wait_micro - prev_user_io end as user_io_delta,\n    case when prev_executions is null or executions < prev_executions then 0 else executions - prev_executions end as executions_delta,\n    case when prev_buffer_gets is null or buffer_gets < prev_buffer_gets then 0 else buffer_gets - prev_buffer_gets end as buffer_gets_delta,\n    case when prev_disk_reads is null or disk_reads < prev_disk_reads then 0 else disk_reads - prev_disk_reads end as disk_reads_delta\n  from ordered\n), consumers as (\n  select sql_id,\n    sum(elapsed_delta) as elapsed_micro,\n    sum(cpu_delta) as cpu_micro,\n    sum(user_io_delta) as user_io_micro,\n    sum(executions_delta) as executions_delta,\n    sum(buffer_gets_delta) as buffer_gets_delta,\n    sum(disk_reads_delta) as disk_reads_delta\n  from deltas\n  group by sql_id\n), scored as (\n  select *,\n    case ${sql_rank_by:sqlstring}\n      when 'elapsed' then elapsed_micro::numeric\n      when 'cpu' then cpu_micro::numeric\n      when 'user_io' then user_io_micro::numeric\n      when 'executions' then executions_delta::numeric\n      when 'buffer_gets' then buffer_gets_delta::numeric\n      when 'disk_reads' then disk_reads_delta::numeric\n      when 'elapsed_per_execution' then elapsed_micro::numeric / nullif(executions_delta, 0)\n      else elapsed_micro::numeric\n    end as selected_rank_value\n  from consumers\n)\nselect sql_id as __text, sql_id as __value\nfrom scored\nwhere selected_rank_value > 0\norder by selected_rank_value desc nulls last, sql_id\nlimit 20;\n",
         "hide": 0,
         "includeAll": false,
         "label": "SQL_ID",
         "multi": false,
         "name": "sql_id",
         "options": [],
-        "query": "with samples as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    sum(coalesce(elapsed_time_micro, 0)) as elapsed_time_micro,\n    sum(coalesce(cpu_time_micro, 0)) as cpu_time_micro,\n    sum(coalesce(user_io_wait_micro, 0)) as user_io_wait_micro,\n    sum(coalesce(application_wait_micro, 0)) as application_wait_micro,\n    sum(coalesce(concurrency_wait_micro, 0)) as concurrency_wait_micro,\n    sum(coalesce(cluster_wait_micro, 0)) as cluster_wait_micro,\n    sum(coalesce(executions, 0)) as executions,\n    sum(coalesce(buffer_gets, 0)) as buffer_gets,\n    sum(coalesce(disk_reads, 0)) as disk_reads\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0)\n), ordered as (\n  select *,\n    lag(elapsed_time_micro) over w as prev_elapsed,\n    lag(cpu_time_micro) over w as prev_cpu,\n    lag(user_io_wait_micro) over w as prev_user_io,\n    lag(application_wait_micro) over w as prev_application,\n    lag(concurrency_wait_micro) over w as prev_concurrency,\n    lag(cluster_wait_micro) over w as prev_cluster,\n    lag(executions) over w as prev_executions,\n    lag(buffer_gets) over w as prev_buffer_gets,\n    lag(disk_reads) over w as prev_disk_reads\n  from samples\n  window w as (\n    partition by inst_id, sql_id, plan_hash_value\n    order by collected_at\n  )\n), deltas as (\n  select sql_id,\n    case when prev_elapsed is null or elapsed_time_micro < prev_elapsed then 0 else elapsed_time_micro - prev_elapsed end as elapsed_delta,\n    case when prev_cpu is null or cpu_time_micro < prev_cpu then 0 else cpu_time_micro - prev_cpu end as cpu_delta,\n    case when prev_user_io is null or user_io_wait_micro < prev_user_io then 0 else user_io_wait_micro - prev_user_io end as user_io_delta,\n    case when prev_application is null or application_wait_micro < prev_application then 0 else application_wait_micro - prev_application end as application_delta,\n    case when prev_concurrency is null or concurrency_wait_micro < prev_concurrency then 0 else concurrency_wait_micro - prev_concurrency end as concurrency_delta,\n    case when prev_cluster is null or cluster_wait_micro < prev_cluster then 0 else cluster_wait_micro - prev_cluster end as cluster_delta,\n    case when prev_executions is null or executions < prev_executions then 0 else executions - prev_executions end as executions_delta,\n    case when prev_buffer_gets is null or buffer_gets < prev_buffer_gets then 0 else buffer_gets - prev_buffer_gets end as buffer_gets_delta,\n    case when prev_disk_reads is null or disk_reads < prev_disk_reads then 0 else disk_reads - prev_disk_reads end as disk_reads_delta\n  from ordered\n), consumers as (\n  select sql_id,\n    sum(elapsed_delta) as elapsed_micro,\n    sum(cpu_delta) as cpu_micro,\n    sum(user_io_delta) as user_io_micro,\n    sum(application_delta) as application_micro,\n    sum(concurrency_delta) as concurrency_micro,\n    sum(cluster_delta) as cluster_micro,\n    sum(executions_delta) as executions_delta,\n    sum(buffer_gets_delta) as buffer_gets_delta,\n    sum(disk_reads_delta) as disk_reads_delta\n  from deltas\n  group by sql_id\n)\nselect sql_id as __text, sql_id as __value\nfrom consumers\nwhere elapsed_micro > 0\norder by elapsed_micro desc, sql_id\nlimit 20;",
+        "query": "with samples as (\n  select collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0) as plan_hash_value,\n    sum(coalesce(elapsed_time_micro, 0)) as elapsed_time_micro,\n    sum(coalesce(cpu_time_micro, 0)) as cpu_time_micro,\n    sum(coalesce(user_io_wait_micro, 0)) as user_io_wait_micro,\n    sum(coalesce(executions, 0)) as executions,\n    sum(coalesce(buffer_gets, 0)) as buffer_gets,\n    sum(coalesce(disk_reads, 0)) as disk_reads\n  from oracle_sql_samples\n  where $__timeFilter(collected_at)\n    and source_database = ${source_database:sqlstring}\n  group by collected_at, inst_id, sql_id, coalesce(plan_hash_value, 0)\n), ordered as (\n  select *,\n    lag(elapsed_time_micro) over w as prev_elapsed,\n    lag(cpu_time_micro) over w as prev_cpu,\n    lag(user_io_wait_micro) over w as prev_user_io,\n    lag(executions) over w as prev_executions,\n    lag(buffer_gets) over w as prev_buffer_gets,\n    lag(disk_reads) over w as prev_disk_reads\n  from samples\n  window w as (\n    partition by inst_id, sql_id, plan_hash_value\n    order by collected_at\n  )\n), deltas as (\n  select sql_id,\n    case when prev_elapsed is null or elapsed_time_micro < prev_elapsed then 0 else elapsed_time_micro - prev_elapsed end as elapsed_delta,\n    case when prev_cpu is null or cpu_time_micro < prev_cpu then 0 else cpu_time_micro - prev_cpu end as cpu_delta,\n    case when prev_user_io is null or user_io_wait_micro < prev_user_io then 0 else user_io_wait_micro - prev_user_io end as user_io_delta,\n    case when prev_executions is null or executions < prev_executions then 0 else executions - prev_executions end as executions_delta,\n    case when prev_buffer_gets is null or buffer_gets < prev_buffer_gets then 0 else buffer_gets - prev_buffer_gets end as buffer_gets_delta,\n    case when prev_disk_reads is null or disk_reads < prev_disk_reads then 0 else disk_reads - prev_disk_reads end as disk_reads_delta\n  from ordered\n), consumers as (\n  select sql_id,\n    sum(elapsed_delta) as elapsed_micro,\n    sum(cpu_delta) as cpu_micro,\n    sum(user_io_delta) as user_io_micro,\n    sum(executions_delta) as executions_delta,\n    sum(buffer_gets_delta) as buffer_gets_delta,\n    sum(disk_reads_delta) as disk_reads_delta\n  from deltas\n  group by sql_id\n), scored as (\n  select *,\n    case ${sql_rank_by:sqlstring}\n      when 'elapsed' then elapsed_micro::numeric\n      when 'cpu' then cpu_micro::numeric\n      when 'user_io' then user_io_micro::numeric\n      when 'executions' then executions_delta::numeric\n      when 'buffer_gets' then buffer_gets_delta::numeric\n      when 'disk_reads' then disk_reads_delta::numeric\n      when 'elapsed_per_execution' then elapsed_micro::numeric / nullif(executions_delta, 0)\n      else elapsed_micro::numeric\n    end as selected_rank_value\n  from consumers\n)\nselect sql_id as __text, sql_id as __value\nfrom scored\nwhere selected_rank_value > 0\norder by selected_rank_value desc nulls last, sql_id\nlimit 20;\n",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -1872,6 +1960,6 @@
   "timezone": "",
   "title": "Oracle SQL Top Consumers",
   "uid": "oracle-sql-top-consumers",
-  "version": 4,
+  "version": 5,
   "weekStart": ""
 }

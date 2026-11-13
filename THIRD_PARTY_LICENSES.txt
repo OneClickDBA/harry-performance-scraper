@@ -66,8 +66,8 @@ are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
 
 Generator: github.com/google/go-licenses/v2@v2.0.1
-go.mod SHA-256: 83b418da5f45f678661542188c00b375f5b3f319499d4a32a59217517cea0d96
-go.sum SHA-256: 35272a4c3c1f298f99973d236b73cbdc6ba496c48d3b41acd10318544ccc6a69
+go.mod SHA-256: 89d64d2c2dae98c1aae71e61aecb46cedc5253441b7fe921769e769617689f61
+go.sum SHA-256: 66ad6abf5bea0b10151df0daf23a6dcee48ad87a2e52ffe475ed5de9af3c84aa
 
 ===============================================================================
 DEPENDENCY INVENTORY: ALL RELEASE VARIANTS
@@ -81,9 +81,9 @@ Covered builds:
 
 -------------------------------------------------------------------------------
 Dependency: github.com/Azure/azure-sdk-for-go/sdk/azcore
-Version: v1.23.1
+Version: v1.23.3
 License: MIT
-Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/azcore/v1.23.1/sdk/azcore/LICENSE.txt
+Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/azcore/v1.23.3/sdk/azcore/LICENSE.txt
 -------------------------------------------------------------------------------
 MIT License
 
@@ -110,9 +110,9 @@ SOFTWARE
 
 -------------------------------------------------------------------------------
 Dependency: github.com/Azure/azure-sdk-for-go/sdk/azidentity
-Version: v1.14.1
+Version: v1.15.0
 License: MIT
-Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/azidentity/v1.14.1/sdk/azidentity/LICENSE.txt
+Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/azidentity/v1.15.0/sdk/azidentity/LICENSE.txt
 -------------------------------------------------------------------------------
 MIT License
 
@@ -139,9 +139,9 @@ SOFTWARE
 
 -------------------------------------------------------------------------------
 Dependency: github.com/Azure/azure-sdk-for-go/sdk/internal
-Version: v1.12.0
+Version: v1.13.0
 License: MIT
-Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/internal/v1.12.0/sdk/internal/LICENSE.txt
+Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/internal/v1.13.0/sdk/internal/LICENSE.txt
 -------------------------------------------------------------------------------
 MIT License
 
@@ -224,9 +224,9 @@ Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/security/keyvault/int
 
 -------------------------------------------------------------------------------
 Dependency: github.com/AzureAD/microsoft-authentication-library-for-go/apps
-Version: v1.8.0
+Version: v1.10.1
 License: MIT
-Source: https://github.com/AzureAD/microsoft-authentication-library-for-go/blob/v1.8.0/LICENSE
+Source: https://github.com/AzureAD/microsoft-authentication-library-for-go/blob/v1.10.1/LICENSE
 -------------------------------------------------------------------------------
     MIT License
 

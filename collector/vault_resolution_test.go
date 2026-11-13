@@ -44,8 +44,8 @@ func TestWarmupConnectionPoolWithOCIVaultLookupErrorUsesBackoff(t *testing.T) {
 	if err.Error() != "vault unavailable" {
 		t.Fatalf("expected vault error to be preserved, got %v", err)
 	}
-	if db.invalidUntil == nil {
-		t.Fatal("expected invalidUntil to be set after vault lookup failure")
+	if state := db.connectionState(); state != DatabaseConnectionQuarantined {
+		t.Fatalf("expected vault lookup failure to quarantine database, got %s", state)
 	}
 }
 

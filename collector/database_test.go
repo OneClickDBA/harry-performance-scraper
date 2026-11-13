@@ -157,46 +157,34 @@ func openTestQueryDBWithRows(t *testing.T, rows driver.Rows) *sql.DB {
 	return db
 }
 
-func TestIsValid(t *testing.T) {
-	tests := []struct {
-		name         string
-		invalidUntil *time.Time
-		wantNil      bool
-	}{
-		{
-			name:         "Nil invalidUntil",
-			invalidUntil: nil,
-			wantNil:      true,
-		},
-		{
-			name:         "Future invalidUntil",
-			invalidUntil: func() *time.Time { t := time.Now().Add(time.Minute); return &t }(),
-			wantNil:      false,
-		},
-		{
-			name:         "Past invalidUntil",
-			invalidUntil: func() *time.Time { t := time.Now().Add(-time.Minute); return &t }(),
-			wantNil:      true,
-		},
+func TestDatabaseConnectionStateTransitions(t *testing.T) {
+	db := &Database{connection: DatabaseConnectionStatus{State: DatabaseConnectionActive}}
+	failure := errors.New("network is unreachable")
+	db.quarantine(failure)
+	first := db.connectionStateSample(time.Now(), "harry-1")
+	if first.State != string(DatabaseConnectionQuarantined) || first.QueuedAt == nil || first.LastFailure == nil {
+		t.Fatalf("unexpected quarantined state: %+v", first)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			db := &Database{invalidUntil: tt.invalidUntil}
-			result := db.IsValid()
-			if tt.wantNil {
-				if result != nil {
-					t.Fatalf("expected nil retryAfter, got %v", *result)
-				}
-				return
-			}
-			if result == nil {
-				t.Fatal("expected non-nil retryAfter")
-			}
-			if *result <= 0 {
-				t.Fatalf("expected positive retryAfter, got %v", *result)
-			}
-		})
+	// Repeated failures update diagnostics without duplicating or resetting the queue entry.
+	queuedAt := *first.QueuedAt
+	db.quarantine(errors.New("listener unavailable"))
+	second := db.connectionStateSample(time.Now(), "harry-1")
+	if second.QueuedAt == nil || !second.QueuedAt.Equal(queuedAt) {
+		t.Fatalf("expected queue timestamp to remain stable, got %+v", second.QueuedAt)
+	}
+
+	probeStarted := time.Now()
+	if !db.beginProbe(probeStarted) {
+		t.Fatal("expected quarantined database to enter probing state")
+	}
+	if db.beginProbe(probeStarted) {
+		t.Fatal("expected probing database not to be claimed twice")
+	}
+	db.finishProbe(probeStarted, nil)
+	recovered := db.connectionStateSample(time.Now(), "harry-1")
+	if recovered.State != string(DatabaseConnectionActive) || recovered.QueuedAt != nil || recovered.RecoveredAt == nil {
+		t.Fatalf("unexpected recovered state: %+v", recovered)
 	}
 }
 
@@ -214,79 +202,48 @@ func TestActivitySuspensionPersistsUntilConnectivityRecovers(t *testing.T) {
 	}
 }
 
-func TestPingFailureBacksOffUnknownNetworkErrors(t *testing.T) {
+func TestPingFailureQuarantinesUnknownNetworkErrors(t *testing.T) {
 	networkErr := errors.New("dial tcp: network is unreachable")
 	db := sql.OpenDB(failingConnector{err: networkErr})
 	t.Cleanup(func() { _ = db.Close() })
 	database := &Database{Session: db}
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-	err := database.ping(logger, time.Minute)
+	database.connection.State = DatabaseConnectionActive
+	err := database.ping(time.Minute)
 	if !errors.Is(err, networkErr) {
 		t.Fatalf("expected network failure, got %v", err)
 	}
-	if retryAfter := database.IsValid(); retryAfter == nil || *retryAfter <= 0 {
-		t.Fatalf("expected failed ping to open connection backoff, got %v", retryAfter)
+	if state := database.connectionState(); state != DatabaseConnectionQuarantined {
+		t.Fatalf("expected failed ping to quarantine database, got %s", state)
 	}
 	if err := database.activityUnavailable(); err == nil || !strings.Contains(err.Error(), networkErr.Error()) {
 		t.Fatalf("expected failed ping to suspend activity collection, got %v", err)
 	}
 }
 
-func TestInvalidate(t *testing.T) {
-	db := &Database{}
-	backoff := time.Minute
-	db.invalidate(backoff)
-	if db.invalidUntil == nil {
-		t.Fatal("Expected non-nil invalidUntil")
-	}
-	if time.Now().After(*db.invalidUntil) {
-		t.Error("Expected invalidUntil in the future")
-	}
-}
-
-func TestClearInvalid(t *testing.T) {
-	db := &Database{}
-	db.invalidate(time.Minute)
-	db.clearInvalid()
-	if db.invalidUntil != nil {
-		t.Fatal("Expected invalidUntil to be cleared")
-	}
-}
-
-func TestIsClosedDatabaseError(t *testing.T) {
+func TestConnectionFailureClassification(t *testing.T) {
 	tests := []struct {
 		name string
 		err  error
 		want bool
 	}{
-		{
-			name: "sql err conn done",
-			err:  sql.ErrConnDone,
-			want: true,
-		},
-		{
-			name: "closed database text",
-			err:  errors.New("sql: database is closed"),
-			want: true,
-		},
-		{
-			name: "other error",
-			err:  errors.New("other"),
-			want: false,
-		},
+		{name: "listener service unavailable", err: errors.New("ORA-12514: listener does not know service"), want: true},
+		{name: "standby not open", err: errors.New("ORA-01033: initialization or shutdown in progress"), want: true},
+		{name: "closed driver connection", err: driver.ErrBadConn, want: true},
+		{name: "network unreachable", err: errors.New("dial tcp: network is unreachable"), want: true},
+		{name: "query deadline", err: context.DeadlineExceeded, want: false},
+		{name: "missing grant", err: errors.New("ORA-00942: table or view does not exist"), want: false},
+		{name: "invalid SQL", err: errors.New("ORA-00900: invalid SQL statement"), want: false},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isClosedDatabaseError(tt.err); got != tt.want {
-				t.Fatalf("expected %v, got %v", tt.want, got)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isConnectionFailure(test.err); got != test.want {
+				t.Fatalf("isConnectionFailure(%v) = %t, want %t", test.err, got, test.want)
 			}
 		})
 	}
 }
 
-func TestWarmupConnectionPoolWithNilSessionSetsStartupReadyAndBackoff(t *testing.T) {
+func TestWarmupConnectionPoolWithNilSessionSetsStartupReadyAndQuarantine(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	db := &Database{}
 
@@ -297,8 +254,8 @@ func TestWarmupConnectionPoolWithNilSessionSetsStartupReadyAndBackoff(t *testing
 	if !db.StartupReady() {
 		t.Fatal("expected startupReady to be true after warmup attempt")
 	}
-	if db.IsValid() == nil {
-		t.Fatal("expected invalidUntil to be set after warmup failure")
+	if state := db.connectionState(); state != DatabaseConnectionQuarantined {
+		t.Fatalf("expected warmup failure to quarantine database, got %s", state)
 	}
 	if got := db.getUp(); got != 0 {
 		t.Fatalf("expected database up metric to remain 0, got %v", got)
@@ -317,9 +274,9 @@ func TestDatabaseStateAccessIsRaceSafe(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < 200; j++ {
 				if (i+j)%2 == 0 {
-					db.invalidate(time.Millisecond)
+					db.quarantine(errors.New("temporarily unavailable"))
 				} else {
-					db.clearInvalid()
+					db.activate(time.Now())
 				}
 				if (i+j)%3 == 0 {
 					db.suspendActivity(errors.New("temporarily unavailable"))
@@ -327,7 +284,7 @@ func TestDatabaseStateAccessIsRaceSafe(t *testing.T) {
 					db.resumeActivity()
 				}
 				db.setUp(float64((i + j) % 2))
-				_ = db.IsValid()
+				_ = db.connectionState()
 				_ = db.activityUnavailable()
 				_ = db.getUp()
 			}
@@ -433,6 +390,7 @@ func TestScrapeDatabaseRunsAdditionalMetricsSerially(t *testing.T) {
 		DatabaseLabel: "database",
 	}
 	database.startupReady.Store(true)
+	database.activate(time.Now())
 	database.initCache(metrics)
 	operationalEnabled := false
 	scraper := &Scraper{
@@ -471,6 +429,7 @@ func TestRunScheduledScrapesRunsWhenDatabaseBecomesReady(t *testing.T) {
 
 	database.startupReady.Store(true)
 	database.setUp(1)
+	database.activate(time.Now())
 	scraper.requestScheduledScrape()
 
 	samples := waitForSampleWrite(t, sink)

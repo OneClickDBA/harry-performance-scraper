@@ -20,41 +20,45 @@ import (
 )
 
 type Sink struct {
-	pool                     *pgxpool.Pool
-	logger                   *slog.Logger
-	retention                time.Duration
-	samplesTable             pgx.Identifier
-	sqlSamplesTable          pgx.Identifier
-	sqlTextsTable            pgx.Identifier
-	sqlCursorMetadataTable   pgx.Identifier
-	sqlPlansTable            pgx.Identifier
-	sessionSamplesTable      pgx.Identifier
-	blockingSessionsTable    pgx.Identifier
-	databaseActivityTable    pgx.Identifier
-	databaseStatusTable      pgx.Identifier
-	instanceTable            pgx.Identifier
-	resourceLimitTable       pgx.Identifier
-	tablespaceTable          pgx.Identifier
-	asmDiskgroupTable        pgx.Identifier
-	systemCounterTable       pgx.Identifier
-	waitClassTable           pgx.Identifier
-	systemMetricTable        pgx.Identifier
-	scrapeStatusTable        pgx.Identifier
-	latestScrapeStatusTable  pgx.Identifier
-	runtimeSamplesTable      pgx.Identifier
-	latestRuntimeStatusTable pgx.Identifier
-	repositoryIngestTable    pgx.Identifier
-	retentionMu              sync.Mutex
-	lastRetentionCleanup     time.Time
-	ingestMu                 sync.Mutex
-	ingestFlushMu            sync.Mutex
-	pendingIngest            map[repositoryIngestKey]repositoryIngestCounts
-	lastIngestFlushAttempt   time.Time
-	ingestFlushInterval      time.Duration
-	runtimeMu                sync.Mutex
-	runtimeFlushInterval     time.Duration
-	lastRuntimeFlushAttempt  time.Time
-	pendingRuntime           []collector.RuntimeSample
+	pool                      *pgxpool.Pool
+	logger                    *slog.Logger
+	retention                 time.Duration
+	samplesTable              pgx.Identifier
+	sqlSamplesTable           pgx.Identifier
+	sqlTextsTable             pgx.Identifier
+	sqlCursorMetadataTable    pgx.Identifier
+	sqlPlansTable             pgx.Identifier
+	sessionSamplesTable       pgx.Identifier
+	blockingSessionsTable     pgx.Identifier
+	databaseActivityTable     pgx.Identifier
+	databaseStatusTable       pgx.Identifier
+	instanceTable             pgx.Identifier
+	resourceLimitTable        pgx.Identifier
+	tablespaceTable           pgx.Identifier
+	asmDiskgroupTable         pgx.Identifier
+	systemCounterTable        pgx.Identifier
+	waitClassTable            pgx.Identifier
+	systemMetricTable         pgx.Identifier
+	dataGuardDestinationTable pgx.Identifier
+	dataGuardLagTable         pgx.Identifier
+	dataGuardProcessTable     pgx.Identifier
+	scrapeStatusTable         pgx.Identifier
+	latestScrapeStatusTable   pgx.Identifier
+	runtimeSamplesTable       pgx.Identifier
+	latestRuntimeStatusTable  pgx.Identifier
+	connectionStateTable      pgx.Identifier
+	repositoryIngestTable     pgx.Identifier
+	retentionMu               sync.Mutex
+	lastRetentionCleanup      time.Time
+	ingestMu                  sync.Mutex
+	ingestFlushMu             sync.Mutex
+	pendingIngest             map[repositoryIngestKey]repositoryIngestCounts
+	lastIngestFlushAttempt    time.Time
+	ingestFlushInterval       time.Duration
+	runtimeMu                 sync.Mutex
+	runtimeFlushInterval      time.Duration
+	lastRuntimeFlushAttempt   time.Time
+	pendingRuntime            []collector.RuntimeSample
 }
 
 const repositoryIngestFlushInterval = 5 * time.Minute
@@ -83,33 +87,37 @@ func New(ctx context.Context, logger *slog.Logger, cfg collector.PostgreSQLConfi
 
 	sqlSamplesTable := identifier(cfg.SQLSamplesTable, "oracle_sql_samples")
 	s := &Sink{
-		pool:                     pool,
-		logger:                   logger,
-		retention:                cfg.GetRetention(),
-		samplesTable:             identifier(cfg.SamplesTable, "oracle_metric_samples"),
-		sqlSamplesTable:          sqlSamplesTable,
-		sqlTextsTable:            siblingIdentifier(sqlSamplesTable, "oracle_sql_texts"),
-		sqlCursorMetadataTable:   siblingIdentifier(sqlSamplesTable, "oracle_sql_cursor_metadata"),
-		sqlPlansTable:            siblingIdentifier(sqlSamplesTable, "oracle_sql_plans"),
-		sessionSamplesTable:      identifier(cfg.SessionSamplesTable, "oracle_session_samples"),
-		blockingSessionsTable:    identifier(cfg.BlockingSessionsTable, "oracle_blocking_session_samples"),
-		databaseActivityTable:    identifier(cfg.DatabaseActivityTable, "oracle_database_activity_samples"),
-		databaseStatusTable:      siblingIdentifier(sqlSamplesTable, "oracle_database_status_samples"),
-		instanceTable:            siblingIdentifier(sqlSamplesTable, "oracle_instance_samples"),
-		resourceLimitTable:       siblingIdentifier(sqlSamplesTable, "oracle_resource_limit_samples"),
-		tablespaceTable:          siblingIdentifier(sqlSamplesTable, "oracle_tablespace_samples"),
-		asmDiskgroupTable:        siblingIdentifier(sqlSamplesTable, "oracle_asm_diskgroup_samples"),
-		systemCounterTable:       siblingIdentifier(sqlSamplesTable, "oracle_system_counter_samples"),
-		waitClassTable:           siblingIdentifier(sqlSamplesTable, "oracle_wait_class_samples"),
-		systemMetricTable:        siblingIdentifier(sqlSamplesTable, "oracle_system_metric_samples"),
-		scrapeStatusTable:        siblingIdentifier(sqlSamplesTable, "oracle_scrape_status"),
-		latestScrapeStatusTable:  siblingIdentifier(sqlSamplesTable, "oracle_latest_scrape_status"),
-		runtimeSamplesTable:      siblingIdentifier(sqlSamplesTable, "harry_runtime_samples"),
-		latestRuntimeStatusTable: siblingIdentifier(sqlSamplesTable, "harry_latest_runtime_status"),
-		repositoryIngestTable:    siblingIdentifier(sqlSamplesTable, "harry_repository_daily_ingest"),
-		pendingIngest:            make(map[repositoryIngestKey]repositoryIngestCounts),
-		ingestFlushInterval:      repositoryIngestFlushInterval,
-		runtimeFlushInterval:     runtimeTelemetryFlushInterval,
+		pool:                      pool,
+		logger:                    logger,
+		retention:                 cfg.GetRetention(),
+		samplesTable:              identifier(cfg.SamplesTable, "oracle_metric_samples"),
+		sqlSamplesTable:           sqlSamplesTable,
+		sqlTextsTable:             siblingIdentifier(sqlSamplesTable, "oracle_sql_texts"),
+		sqlCursorMetadataTable:    siblingIdentifier(sqlSamplesTable, "oracle_sql_cursor_metadata"),
+		sqlPlansTable:             siblingIdentifier(sqlSamplesTable, "oracle_sql_plans"),
+		sessionSamplesTable:       identifier(cfg.SessionSamplesTable, "oracle_session_samples"),
+		blockingSessionsTable:     identifier(cfg.BlockingSessionsTable, "oracle_blocking_session_samples"),
+		databaseActivityTable:     identifier(cfg.DatabaseActivityTable, "oracle_database_activity_samples"),
+		databaseStatusTable:       siblingIdentifier(sqlSamplesTable, "oracle_database_status_samples"),
+		instanceTable:             siblingIdentifier(sqlSamplesTable, "oracle_instance_samples"),
+		resourceLimitTable:        siblingIdentifier(sqlSamplesTable, "oracle_resource_limit_samples"),
+		tablespaceTable:           siblingIdentifier(sqlSamplesTable, "oracle_tablespace_samples"),
+		asmDiskgroupTable:         siblingIdentifier(sqlSamplesTable, "oracle_asm_diskgroup_samples"),
+		systemCounterTable:        siblingIdentifier(sqlSamplesTable, "oracle_system_counter_samples"),
+		waitClassTable:            siblingIdentifier(sqlSamplesTable, "oracle_wait_class_samples"),
+		systemMetricTable:         siblingIdentifier(sqlSamplesTable, "oracle_system_metric_samples"),
+		dataGuardDestinationTable: siblingIdentifier(sqlSamplesTable, "oracle_dataguard_destination_samples"),
+		dataGuardLagTable:         siblingIdentifier(sqlSamplesTable, "oracle_dataguard_lag_samples"),
+		dataGuardProcessTable:     siblingIdentifier(sqlSamplesTable, "oracle_dataguard_process_samples"),
+		scrapeStatusTable:         siblingIdentifier(sqlSamplesTable, "oracle_scrape_status"),
+		latestScrapeStatusTable:   siblingIdentifier(sqlSamplesTable, "oracle_latest_scrape_status"),
+		runtimeSamplesTable:       siblingIdentifier(sqlSamplesTable, "harry_runtime_samples"),
+		latestRuntimeStatusTable:  siblingIdentifier(sqlSamplesTable, "harry_latest_runtime_status"),
+		connectionStateTable:      siblingIdentifier(sqlSamplesTable, "harry_database_connection_state"),
+		repositoryIngestTable:     siblingIdentifier(sqlSamplesTable, "harry_repository_daily_ingest"),
+		pendingIngest:             make(map[repositoryIngestKey]repositoryIngestCounts),
+		ingestFlushInterval:       repositoryIngestFlushInterval,
+		runtimeFlushInterval:      runtimeTelemetryFlushInterval,
 	}
 
 	if err := pool.Ping(ctx); err != nil {
@@ -419,7 +427,39 @@ create index if not exists oracle_database_activity_samples_source_idx on %s (so
 	if err := s.migrateOperationalSchema(ctx); err != nil {
 		return err
 	}
-	return s.migrateRuntimeSchema(ctx)
+	if err := s.migrateRuntimeSchema(ctx); err != nil {
+		return err
+	}
+	return s.migrateConnectionStateSchema(ctx)
+}
+
+func (s *Sink) migrateConnectionStateSchema(ctx context.Context) error {
+	if _, err := s.pool.Exec(ctx, s.connectionStateSchemaDDL()); err != nil {
+		return fmt.Errorf("migrate PostgreSQL database connection state schema: %w", err)
+	}
+	return nil
+}
+
+func (s *Sink) connectionStateSchemaDDL() string {
+	return fmt.Sprintf(`
+create table if not exists %s (
+	source_database text primary key,
+	observed_at timestamptz not null,
+	state text not null,
+	queued_at timestamptz,
+	last_failure_at timestamptz,
+	last_failure text,
+	last_probe_at timestamptz,
+	last_probe_duration_seconds double precision,
+	last_probe_error text,
+	probe_attempts bigint not null,
+	recovered_at timestamptz,
+	scraper_instance text not null
+);
+
+create index if not exists harry_database_connection_state_state_idx
+	on %s (state, observed_at desc);
+`, s.connectionStateTable.Sanitize(), s.connectionStateTable.Sanitize())
 }
 
 func (s *Sink) migrateRuntimeSchema(ctx context.Context) error {
@@ -515,6 +555,9 @@ create table if not exists %s (
 	system_counter_sample_rows bigint not null default 0,
 	wait_class_sample_rows bigint not null default 0,
 	system_metric_sample_rows bigint not null default 0,
+	dataguard_destination_rows bigint not null default 0,
+	dataguard_lag_rows bigint not null default 0,
+	dataguard_process_rows bigint not null default 0,
 	scrape_status_rows bigint not null default 0,
 	first_sample_at timestamptz,
 	last_sample_at timestamptz,
@@ -526,7 +569,11 @@ create table if not exists %s (
 ) partition by range (sample_day);
 
 alter table %s add column if not exists sql_cursor_metadata_writes bigint not null default 0;
-`, s.repositoryIngestTable.Sanitize(), s.repositoryIngestTable.Sanitize())
+alter table %s add column if not exists dataguard_destination_rows bigint not null default 0;
+alter table %s add column if not exists dataguard_lag_rows bigint not null default 0;
+alter table %s add column if not exists dataguard_process_rows bigint not null default 0;
+`, s.repositoryIngestTable.Sanitize(), s.repositoryIngestTable.Sanitize(),
+		s.repositoryIngestTable.Sanitize(), s.repositoryIngestTable.Sanitize(), s.repositoryIngestTable.Sanitize())
 }
 
 func (s *Sink) migrateOperationalSchema(ctx context.Context) error {
@@ -540,7 +587,7 @@ func (s *Sink) migrateOperationalSchema(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	ddl := s.operationalSchemaDDL()
+	ddl := s.operationalSchemaDDL() + s.dataGuardSchemaDDL()
 	if _, err := tx.Exec(ctx, ddl); err != nil {
 		return fmt.Errorf("migrate PostgreSQL operational schema: %w", err)
 	}
@@ -556,6 +603,107 @@ func (s *Sink) migrateOperationalSchema(ctx context.Context) error {
 		return fmt.Errorf("commit PostgreSQL operational schema migration: %w", err)
 	}
 	return nil
+}
+
+func (s *Sink) dataGuardSchemaDDL() string {
+	destinations := s.dataGuardDestinationTable.Sanitize()
+	lag := s.dataGuardLagTable.Sanitize()
+	processes := s.dataGuardProcessTable.Sanitize()
+	latestStatus := s.latestScrapeStatusTable.Sanitize()
+	return fmt.Sprintf(`
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	inst_id bigint not null,
+	dest_id bigint not null,
+	destination_name text,
+	target text,
+	destination text,
+	status text,
+	transmit_mode text,
+	affirm text,
+	valid_now text,
+	db_unique_name text,
+	destination_type text,
+	database_mode text,
+	recovery_mode text,
+	protection_mode text,
+	synchronized text,
+	synchronization_status text,
+	gap_status text,
+	archived_thread bigint,
+	archived_sequence bigint,
+	applied_thread bigint,
+	applied_sequence bigint,
+	applied_scn bigint,
+	error_message text
+) partition by range (collected_at);
+create index if not exists oracle_dataguard_destination_database_time_idx
+	on %s (source_database, inst_id, dest_id, collected_at desc);
+
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	database_role text not null,
+	transport_lag_seconds double precision,
+	apply_lag_seconds double precision,
+	apply_finish_time_seconds double precision,
+	estimated_startup_seconds double precision,
+	time_computed text,
+	datum_time text,
+	datum_age_seconds double precision
+) partition by range (collected_at);
+create index if not exists oracle_dataguard_lag_database_time_idx
+	on %s (source_database, collected_at desc);
+
+create table if not exists %s (
+	collected_at timestamptz not null,
+	source_database text not null,
+	inst_id bigint not null,
+	database_role text not null,
+	apply_processes bigint not null,
+	transport_processes bigint not null,
+	apply_status text,
+	thread_number bigint,
+	sequence_number bigint
+) partition by range (collected_at);
+create index if not exists oracle_dataguard_process_database_time_idx
+	on %s (source_database, inst_id, collected_at desc);
+
+create or replace view %s as
+	select samples.*
+	from %s samples
+	join %s status
+		on status.source_database = samples.source_database
+		and status.collector = 'operational.dataguard'
+		and status.collected_at = samples.collected_at
+	where samples.collected_at >= current_timestamp - interval '1 day';
+
+create or replace view %s as
+	select samples.*
+	from %s samples
+	join %s status
+		on status.source_database = samples.source_database
+		and status.collector = 'operational.dataguard'
+		and status.collected_at = samples.collected_at
+	where samples.collected_at >= current_timestamp - interval '1 day';
+
+create or replace view %s as
+	select samples.*
+	from %s samples
+	join %s status
+		on status.source_database = samples.source_database
+		and status.collector = 'operational.dataguard'
+		and status.collected_at = samples.collected_at
+	where samples.collected_at >= current_timestamp - interval '1 day';
+`,
+		destinations, destinations,
+		lag, lag,
+		processes, processes,
+		siblingIdentifier(s.dataGuardDestinationTable, "oracle_latest_dataguard_destination_samples").Sanitize(), destinations, latestStatus,
+		siblingIdentifier(s.dataGuardLagTable, "oracle_latest_dataguard_lag_samples").Sanitize(), lag, latestStatus,
+		siblingIdentifier(s.dataGuardProcessTable, "oracle_latest_dataguard_process_samples").Sanitize(), processes, latestStatus,
+	)
 }
 
 type relationGrant struct {
@@ -986,6 +1134,9 @@ func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, su
 	if err := s.writeScrapeStatuses(ctx, tx, batch.ScrapeStatuses); err != nil {
 		return err
 	}
+	if err := s.writeConnectionStates(ctx, tx, batch.ConnectionStates, batch.ConnectionStatesComplete); err != nil {
+		return err
+	}
 	if err := s.writeRuntimeSamples(ctx, tx, pendingRuntime); err != nil {
 		return err
 	}
@@ -1013,11 +1164,73 @@ func (s *Sink) WriteSamples(ctx context.Context, batch collector.SampleBatch, su
 		"database_activity_samples", len(batch.Performance.DatabaseActivity),
 		"operational_samples", batch.Operational.Count(),
 		"scrape_statuses", len(batch.ScrapeStatuses),
+		"connection_states", len(batch.ConnectionStates),
 		"errors", summary.TotalErrors,
 		"duration", summary.DurationSeconds)
 	s.cleanupRetention(ctx)
 	s.recordRuntimeResult(batch.Runtime, writeStartedAt, nil)
 	runtimeRecorded = true
+	return nil
+}
+
+func (s *Sink) writeConnectionStates(ctx context.Context, tx pgx.Tx, samples []collector.DatabaseConnectionStateSample, complete bool) error {
+	if len(samples) == 0 {
+		if complete {
+			query := fmt.Sprintf("delete from %s", s.connectionStateTable.Sanitize())
+			if _, err := tx.Exec(ctx, query); err != nil {
+				return fmt.Errorf("remove unconfigured database connection state: %w", err)
+			}
+		}
+		return nil
+	}
+	query := fmt.Sprintf(`insert into %s as existing (
+		source_database, observed_at, state, queued_at, last_failure_at, last_failure,
+		last_probe_at, last_probe_duration_seconds, last_probe_error, probe_attempts,
+		recovered_at, scraper_instance
+	) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	on conflict (source_database) do update set
+		observed_at = excluded.observed_at,
+		state = excluded.state,
+		queued_at = excluded.queued_at,
+		last_failure_at = excluded.last_failure_at,
+		last_failure = excluded.last_failure,
+		last_probe_at = excluded.last_probe_at,
+		last_probe_duration_seconds = excluded.last_probe_duration_seconds,
+		last_probe_error = excluded.last_probe_error,
+		probe_attempts = excluded.probe_attempts,
+		recovered_at = excluded.recovered_at,
+		scraper_instance = excluded.scraper_instance
+	where excluded.observed_at >= existing.observed_at`, s.connectionStateTable.Sanitize())
+
+	batch := &pgx.Batch{}
+	for _, sample := range samples {
+		batch.Queue(query,
+			sample.Database, sample.ObservedAt, sample.State, sample.QueuedAt,
+			sample.LastFailureAt, sample.LastFailure, sample.LastProbeAt,
+			sample.LastProbeDurationSeconds, sample.LastProbeError, sample.ProbeAttempts,
+			sample.RecoveredAt, sample.ScraperInstance,
+		)
+	}
+	results := tx.SendBatch(ctx, batch)
+	for range samples {
+		if _, err := results.Exec(); err != nil {
+			_ = results.Close()
+			return fmt.Errorf("upsert database connection state: %w", err)
+		}
+	}
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("close database connection state batch: %w", err)
+	}
+	if complete {
+		databases := make([]string, 0, len(samples))
+		for _, sample := range samples {
+			databases = append(databases, sample.Database)
+		}
+		query := fmt.Sprintf("delete from %s where not (source_database = any($1))", s.connectionStateTable.Sanitize())
+		if _, err := tx.Exec(ctx, query, databases); err != nil {
+			return fmt.Errorf("remove unconfigured database connection state: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -1200,6 +1413,9 @@ type repositoryIngestCounts struct {
 	systemCounterSampleRows      int64
 	waitClassSampleRows          int64
 	systemMetricSampleRows       int64
+	dataGuardDestinationRows     int64
+	dataGuardLagRows             int64
+	dataGuardProcessRows         int64
 	scrapeStatusRows             int64
 	firstSampleAt                time.Time
 	lastSampleAt                 time.Time
@@ -1237,6 +1453,9 @@ func (c *repositoryIngestCounts) add(other repositoryIngestCounts) {
 	c.systemCounterSampleRows += other.systemCounterSampleRows
 	c.waitClassSampleRows += other.waitClassSampleRows
 	c.systemMetricSampleRows += other.systemMetricSampleRows
+	c.dataGuardDestinationRows += other.dataGuardDestinationRows
+	c.dataGuardLagRows += other.dataGuardLagRows
+	c.dataGuardProcessRows += other.dataGuardProcessRows
 	c.scrapeStatusRows += other.scrapeStatusRows
 	if c.firstSampleAt.IsZero() || (!other.firstSampleAt.IsZero() && other.firstSampleAt.Before(c.firstSampleAt)) {
 		c.firstSampleAt = other.firstSampleAt
@@ -1339,6 +1558,15 @@ func collectRepositoryIngest(batch collector.SampleBatch) map[repositoryIngestKe
 	addRepositoryIngestValues(counts, batch.Operational.SystemMetrics,
 		func(v collector.SystemMetricSample) (time.Time, string) { return v.CollectedAt, v.Database },
 		func(c *repositoryIngestCounts, _ time.Time) { c.systemMetricSampleRows++ })
+	addRepositoryIngestValues(counts, batch.Operational.DataGuardDestinations,
+		func(v collector.DataGuardDestinationSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.dataGuardDestinationRows++ })
+	addRepositoryIngestValues(counts, batch.Operational.DataGuardLag,
+		func(v collector.DataGuardLagSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.dataGuardLagRows++ })
+	addRepositoryIngestValues(counts, batch.Operational.DataGuardProcesses,
+		func(v collector.DataGuardProcessSample) (time.Time, string) { return v.CollectedAt, v.Database },
+		func(c *repositoryIngestCounts, _ time.Time) { c.dataGuardProcessRows++ })
 	addRepositoryIngestValues(counts, batch.ScrapeStatuses,
 		func(v collector.ScrapeStatusSample) (time.Time, string) { return v.CollectedAt, v.Database },
 		func(c *repositoryIngestCounts, _ time.Time) { c.scrapeStatusRows++ })
@@ -1429,13 +1657,15 @@ insert into %s (
 	blocking_session_sample_rows, database_activity_sample_rows,
 	database_status_sample_rows, instance_sample_rows, resource_limit_sample_rows,
 	tablespace_sample_rows, asm_diskgroup_sample_rows, system_counter_sample_rows,
-	wait_class_sample_rows, system_metric_sample_rows, scrape_status_rows,
+	wait_class_sample_rows, system_metric_sample_rows, dataguard_destination_rows,
+	dataguard_lag_rows, dataguard_process_rows, scrape_status_rows,
 	first_sample_at, last_sample_at, last_sql_sample_at, last_session_sample_at,
 	last_database_activity_sample_at, last_flushed_at
 )
 values (
 	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-	$13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+	$13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24,
+	$25, $26, $27, $28
 )
 on conflict (sample_day, source_database) do update set
 	additional_metric_rows = %s.additional_metric_rows + excluded.additional_metric_rows,
@@ -1454,6 +1684,9 @@ on conflict (sample_day, source_database) do update set
 	system_counter_sample_rows = %s.system_counter_sample_rows + excluded.system_counter_sample_rows,
 	wait_class_sample_rows = %s.wait_class_sample_rows + excluded.wait_class_sample_rows,
 	system_metric_sample_rows = %s.system_metric_sample_rows + excluded.system_metric_sample_rows,
+	dataguard_destination_rows = %s.dataguard_destination_rows + excluded.dataguard_destination_rows,
+	dataguard_lag_rows = %s.dataguard_lag_rows + excluded.dataguard_lag_rows,
+	dataguard_process_rows = %s.dataguard_process_rows + excluded.dataguard_process_rows,
 	scrape_status_rows = %s.scrape_status_rows + excluded.scrape_status_rows,
 	first_sample_at = least(%s.first_sample_at, excluded.first_sample_at),
 	last_sample_at = greatest(%s.last_sample_at, excluded.last_sample_at),
@@ -1461,9 +1694,9 @@ on conflict (sample_day, source_database) do update set
 	last_session_sample_at = greatest(%s.last_session_sample_at, excluded.last_session_sample_at),
 	last_database_activity_sample_at = greatest(%s.last_database_activity_sample_at, excluded.last_database_activity_sample_at),
 	last_flushed_at = greatest(%s.last_flushed_at, excluded.last_flushed_at)`,
-		table, table, table, table, table, table, table, table, table, table, table, table,
-		table,
-		table, table, table, table, table, table, table, table, table, table, table)
+		table, table, table, table, table, table, table, table, table,
+		table, table, table, table, table, table, table, table, table,
+		table, table, table, table, table, table, table, table, table)
 	batch := &pgx.Batch{}
 	for _, key := range keys {
 		value := counts[key]
@@ -1473,7 +1706,8 @@ on conflict (sample_day, source_database) do update set
 			value.blockingSessionSampleRows, value.databaseActivitySampleRows,
 			value.databaseStatusSampleRows, value.instanceSampleRows, value.resourceLimitSampleRows,
 			value.tablespaceSampleRows, value.asmDiskgroupSampleRows, value.systemCounterSampleRows,
-			value.waitClassSampleRows, value.systemMetricSampleRows, value.scrapeStatusRows,
+			value.waitClassSampleRows, value.systemMetricSampleRows, value.dataGuardDestinationRows,
+			value.dataGuardLagRows, value.dataGuardProcessRows, value.scrapeStatusRows,
 			nullableTime(value.firstSampleAt), nullableTime(value.lastSampleAt), nullableTime(value.lastSQLSampleAt),
 			nullableTime(value.lastSessionSampleAt), nullableTime(value.lastDatabaseActivitySampleAt), flushedAt)
 	}
@@ -2202,9 +2436,64 @@ func (s *Sink) writeOperationalSamples(ctx context.Context, tx pgx.Tx, samples c
 			sample.MetricName, sample.Value, sample.Unit,
 		})
 	}
-	return copyRows(ctx, tx, s.systemMetricTable, []string{
+	if err := copyRows(ctx, tx, s.systemMetricTable, []string{
 		"collected_at", "source_database", "inst_id", "con_id", "metric_name", "value", "unit",
-	}, rows, "system metric samples")
+	}, rows, "system metric samples"); err != nil {
+		return err
+	}
+
+	rows = make([][]any, 0, len(samples.DataGuardDestinations))
+	for _, sample := range samples.DataGuardDestinations {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.InstID, sample.DestID,
+			sample.DestinationName, sample.Target, sample.Destination, sample.Status,
+			sample.TransmitMode, sample.Affirm, sample.ValidNow, sample.DBUniqueName,
+			sample.DestinationType, sample.DatabaseMode, sample.RecoveryMode,
+			sample.ProtectionMode, sample.Synchronized, sample.SynchronizationStatus,
+			sample.GapStatus, sample.ArchivedThread, sample.ArchivedSequence,
+			sample.AppliedThread, sample.AppliedSequence, sample.AppliedSCN, sample.Error,
+		})
+	}
+	if err := copyRows(ctx, tx, s.dataGuardDestinationTable, []string{
+		"collected_at", "source_database", "inst_id", "dest_id", "destination_name",
+		"target", "destination", "status", "transmit_mode", "affirm", "valid_now",
+		"db_unique_name", "destination_type", "database_mode", "recovery_mode",
+		"protection_mode", "synchronized", "synchronization_status", "gap_status",
+		"archived_thread", "archived_sequence", "applied_thread", "applied_sequence",
+		"applied_scn", "error_message",
+	}, rows, "Data Guard destination samples"); err != nil {
+		return err
+	}
+
+	rows = make([][]any, 0, len(samples.DataGuardLag))
+	for _, sample := range samples.DataGuardLag {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.DatabaseRole,
+			sample.TransportLagSeconds, sample.ApplyLagSeconds, sample.ApplyFinishTimeSeconds,
+			sample.EstimatedStartupSeconds, sample.TimeComputed, sample.DatumTime,
+			sample.DatumAgeSeconds,
+		})
+	}
+	if err := copyRows(ctx, tx, s.dataGuardLagTable, []string{
+		"collected_at", "source_database", "database_role", "transport_lag_seconds",
+		"apply_lag_seconds", "apply_finish_time_seconds", "estimated_startup_seconds",
+		"time_computed", "datum_time", "datum_age_seconds",
+	}, rows, "Data Guard lag samples"); err != nil {
+		return err
+	}
+
+	rows = make([][]any, 0, len(samples.DataGuardProcesses))
+	for _, sample := range samples.DataGuardProcesses {
+		rows = append(rows, []any{
+			sample.CollectedAt, sample.Database, sample.InstID, sample.DatabaseRole,
+			sample.ApplyProcesses, sample.TransportProcesses, sample.ApplyStatus,
+			sample.ThreadNumber, sample.SequenceNumber,
+		})
+	}
+	return copyRows(ctx, tx, s.dataGuardProcessTable, []string{
+		"collected_at", "source_database", "inst_id", "database_role", "apply_processes",
+		"transport_processes", "apply_status", "thread_number", "sequence_number",
+	}, rows, "Data Guard process samples")
 }
 
 func (s *Sink) writeScrapeStatuses(ctx context.Context, tx pgx.Tx, statuses []collector.ScrapeStatusSample) error {
@@ -2312,6 +2601,9 @@ func (s *Sink) ensureWritePartitions(ctx context.Context, tx pgx.Tx, batch colle
 		{table: s.systemCounterTable, times: collectedTimes(batch.Operational.SystemCounters, func(v collector.SystemCounterSample) time.Time { return v.CollectedAt })},
 		{table: s.waitClassTable, times: collectedTimes(batch.Operational.WaitClasses, func(v collector.WaitClassSample) time.Time { return v.CollectedAt })},
 		{table: s.systemMetricTable, times: collectedTimes(batch.Operational.SystemMetrics, func(v collector.SystemMetricSample) time.Time { return v.CollectedAt })},
+		{table: s.dataGuardDestinationTable, times: collectedTimes(batch.Operational.DataGuardDestinations, func(v collector.DataGuardDestinationSample) time.Time { return v.CollectedAt })},
+		{table: s.dataGuardLagTable, times: collectedTimes(batch.Operational.DataGuardLag, func(v collector.DataGuardLagSample) time.Time { return v.CollectedAt })},
+		{table: s.dataGuardProcessTable, times: collectedTimes(batch.Operational.DataGuardProcesses, func(v collector.DataGuardProcessSample) time.Time { return v.CollectedAt })},
 		{table: s.scrapeStatusTable, times: collectedTimes(batch.ScrapeStatuses, func(v collector.ScrapeStatusSample) time.Time { return v.CollectedAt })},
 	}
 	for _, operationalTable := range operationalTables {
@@ -2566,6 +2858,9 @@ func (s *Sink) partitionedTables() []pgx.Identifier {
 		s.systemCounterTable,
 		s.waitClassTable,
 		s.systemMetricTable,
+		s.dataGuardDestinationTable,
+		s.dataGuardLagTable,
+		s.dataGuardProcessTable,
 		s.scrapeStatusTable,
 		s.runtimeSamplesTable,
 		s.repositoryIngestTable,

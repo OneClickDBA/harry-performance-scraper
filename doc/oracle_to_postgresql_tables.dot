@@ -106,6 +106,21 @@ digraph oracle_to_postgresql_tables {
     >
   ];
 
+  oracle_dataguard_sources [
+    shape=plain,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
+        <TR><TD BGCOLOR="#f3d99b"><B>Automatic Data Guard monitoring</B></TD></TR>
+        <TR><TD ALIGN="LEFT">V$DATABASE</TD></TR>
+        <TR><TD ALIGN="LEFT">V$ARCHIVE_DEST</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$ARCHIVE_DEST</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$ARCHIVE_DEST_STATUS</TD></TR>
+        <TR><TD ALIGN="LEFT">V$DATAGUARD_STATS</TD></TR>
+        <TR><TD ALIGN="LEFT">GV$DATAGUARD_PROCESS</TD></TR>
+      </TABLE>
+    >
+  ];
+
   scraper_status_sources [
     shape=plain,
     label=<
@@ -134,6 +149,17 @@ digraph oracle_to_postgresql_tables {
         <TR><TD BGCOLOR="#cfe8cf"><B>Harry scheduler and repository timing</B></TD></TR>
         <TR><TD ALIGN="LEFT">Activity and scheduled-cycle timing</TD></TR>
         <TR><TD ALIGN="LEFT">PostgreSQL write and commit results</TD></TR>
+      </TABLE>
+    >
+  ];
+
+  dcd_connection_sources [
+    shape=plain,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
+        <TR><TD BGCOLOR="#dff2df"><B>Harry database connection state</B></TD></TR>
+        <TR><TD ALIGN="LEFT">Oracle connection and pool initialization</TD></TR>
+        <TR><TD ALIGN="LEFT">Serialized DCD recovery probes</TD></TR>
       </TABLE>
     >
   ];
@@ -251,10 +277,14 @@ digraph oracle_to_postgresql_tables {
     pg_oracle_system_counter_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_system_counter_samples"];
     pg_oracle_wait_class_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_wait_class_samples"];
     pg_oracle_system_metric_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_system_metric_samples"];
+    pg_oracle_dataguard_destination_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_dataguard_destination_samples"];
+    pg_oracle_dataguard_lag_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_dataguard_lag_samples"];
+    pg_oracle_dataguard_process_samples [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_dataguard_process_samples"];
     pg_oracle_scrape_status [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_scrape_status"];
     pg_oracle_latest_scrape_status [shape=box, style="rounded,filled", fillcolor="#e8f1ff", label="oracle_latest_scrape_status"];
     pg_harry_runtime_samples [shape=box, style="rounded,filled", fillcolor="#dff2df", label="harry_runtime_samples"];
     pg_harry_latest_runtime_status [shape=box, style="rounded,filled", fillcolor="#dff2df", label="harry_latest_runtime_status"];
+    pg_harry_database_connection_state [shape=box, style="rounded,filled", fillcolor="#dff2df", label="harry_database_connection_state"];
     pg_harry_repository_daily_ingest [shape=box, style="rounded,filled", fillcolor="#dff2df", label="harry_repository_daily_ingest"];
   }
 
@@ -274,9 +304,13 @@ digraph oracle_to_postgresql_tables {
   oracle_operational_counter_sources -> pg_oracle_system_counter_samples [label="selected counters plus deltas"];
   oracle_operational_counter_sources -> pg_oracle_wait_class_samples [label="wait time plus deltas"];
   oracle_operational_counter_sources -> pg_oracle_system_metric_samples [label="selected bounded metrics"];
+  oracle_dataguard_sources -> pg_oracle_dataguard_destination_samples [label="destination and configuration state"];
+  oracle_dataguard_sources -> pg_oracle_dataguard_lag_samples [label="standby lag and telemetry freshness"];
+  oracle_dataguard_sources -> pg_oracle_dataguard_process_samples [label="physical standby recovery state"];
   scraper_status_sources -> pg_oracle_scrape_status [label="all collector outcomes"];
   scraper_status_sources -> pg_oracle_latest_scrape_status [label="latest outcome per collector"];
   scraper_runtime_sources -> pg_harry_runtime_samples [label="one row per scheduler cycle"];
   scraper_runtime_sources -> pg_harry_latest_runtime_status [label="latest cycle per HA scope and scheduler"];
+  dcd_connection_sources -> pg_harry_database_connection_state [label="latest state per configured database"];
   scraper_ingest_accounting_sources -> pg_harry_repository_daily_ingest [label="UTC daily typed counters"];
 }
