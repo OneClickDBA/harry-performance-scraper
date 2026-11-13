@@ -4,6 +4,15 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    groups:
+      go-module-version-updates:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      go-module-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"

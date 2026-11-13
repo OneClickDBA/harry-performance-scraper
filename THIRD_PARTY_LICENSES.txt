@@ -65,9 +65,12 @@ packages compiled into each supported release variant. Test-only dependencies
 are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
 
+Dependency versions and integrity hashes remain authoritative in go.mod and
+go.sum. This inventory intentionally records stable legal identity and license
+text, and changes when dependency membership or applicable license terms
+change.
+
 Generator: github.com/google/go-licenses/v2@v2.0.1
-go.mod SHA-256: 89d64d2c2dae98c1aae71e61aecb46cedc5253441b7fe921769e769617689f61
-go.sum SHA-256: 66ad6abf5bea0b10151df0daf23a6dcee48ad87a2e52ffe475ed5de9af3c84aa
 
 ===============================================================================
 DEPENDENCY INVENTORY: ALL RELEASE VARIANTS
@@ -81,9 +84,7 @@ Covered builds:
 
 -------------------------------------------------------------------------------
 Dependency: github.com/Azure/azure-sdk-for-go/sdk/azcore
-Version: v1.23.3
 License: MIT
-Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/azcore/v1.23.3/sdk/azcore/LICENSE.txt
 -------------------------------------------------------------------------------
 MIT License
 
@@ -110,9 +111,7 @@ SOFTWARE
 
 -------------------------------------------------------------------------------
 Dependency: github.com/Azure/azure-sdk-for-go/sdk/azidentity
-Version: v1.15.0
 License: MIT
-Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/azidentity/v1.15.0/sdk/azidentity/LICENSE.txt
 -------------------------------------------------------------------------------
 MIT License
 
@@ -139,9 +138,7 @@ SOFTWARE
 
 -------------------------------------------------------------------------------
 Dependency: github.com/Azure/azure-sdk-for-go/sdk/internal
-Version: v1.13.0
 License: MIT
-Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/internal/v1.13.0/sdk/internal/LICENSE.txt
 -------------------------------------------------------------------------------
 MIT License
 
@@ -168,9 +165,7 @@ SOFTWARE
 
 -------------------------------------------------------------------------------
 Dependency: github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets
-Version: v1.5.0
 License: MIT
-Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/security/keyvault/azsecrets/v1.5.0/sdk/security/keyvault/azsecrets/LICENSE.txt
 -------------------------------------------------------------------------------
     MIT License
 
@@ -196,9 +191,7 @@ Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/security/keyvault/azs
 
 -------------------------------------------------------------------------------
 Dependency: github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal
-Version: v1.2.0
 License: MIT
-Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/security/keyvault/internal/v1.2.0/sdk/security/keyvault/internal/LICENSE.txt
 -------------------------------------------------------------------------------
     MIT License
 
@@ -224,9 +217,7 @@ Source: https://github.com/Azure/azure-sdk-for-go/blob/sdk/security/keyvault/int
 
 -------------------------------------------------------------------------------
 Dependency: github.com/AzureAD/microsoft-authentication-library-for-go/apps
-Version: v1.10.1
 License: MIT
-Source: https://github.com/AzureAD/microsoft-authentication-library-for-go/blob/v1.10.1/LICENSE
 -------------------------------------------------------------------------------
     MIT License
 
@@ -253,9 +244,7 @@ Source: https://github.com/AzureAD/microsoft-authentication-library-for-go/blob/
 
 -------------------------------------------------------------------------------
 Dependency: github.com/BurntSushi/toml
-Version: v1.6.0
 License: MIT
-Source: https://github.com/BurntSushi/toml/blob/v1.6.0/COPYING
 -------------------------------------------------------------------------------
 The MIT License (MIT)
 
@@ -282,9 +271,7 @@ THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/VictoriaMetrics/easyproto
-Version: v1.2.0
 License: Apache-2.0
-Source: https://github.com/VictoriaMetrics/easyproto/blob/v1.2.0/LICENSE
 -------------------------------------------------------------------------------
  Apache License
                            Version 2.0, January 2004
@@ -480,9 +467,7 @@ Source: https://github.com/VictoriaMetrics/easyproto/blob/v1.2.0/LICENSE
 
 -------------------------------------------------------------------------------
 Dependency: github.com/cenkalti/backoff/v4
-Version: v4.3.0
 License: MIT
-Source: https://github.com/cenkalti/backoff/blob/v4.3.0/LICENSE
 -------------------------------------------------------------------------------
 The MIT License (MIT)
 
@@ -508,9 +493,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/go-jose/go-jose/v4
-Version: v4.1.4
 License: Apache-2.0
-Source: https://github.com/go-jose/go-jose/blob/v4.1.4/LICENSE
 -------------------------------------------------------------------------------
 
                                  Apache License
@@ -718,9 +701,7 @@ Source: https://github.com/go-jose/go-jose/blob/v4.1.4/LICENSE
 
 -------------------------------------------------------------------------------
 Dependency: github.com/go-jose/go-jose/v4/json
-Version: v4.1.4
 License: BSD-3-Clause
-Source: https://github.com/go-jose/go-jose/blob/v4.1.4/json/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2012 The Go Authors. All rights reserved.
 
@@ -753,9 +734,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/go-logfmt/logfmt
-Version: v0.6.1
 License: MIT
-Source: https://github.com/go-logfmt/logfmt/blob/v0.6.1/LICENSE
 -------------------------------------------------------------------------------
 The MIT License (MIT)
 
@@ -783,9 +762,7 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.5
 License: Apache-2.0
-Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1111,9 +1088,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.5
 License: MIT
-Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1439,9 +1414,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.5
 License: BSD-3-Clause
-Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -1767,9 +1740,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/godror
-Version: v0.51.5
 License: UPL-1.0
-Source: https://github.com/godror/godror/blob/v0.51.5/LICENSE.md
 -------------------------------------------------------------------------------
 godror
 ========
@@ -2095,9 +2066,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/godror/knownpb
-Version: v0.3.0
 License: Apache-2.0
-Source: https://github.com/godror/knownpb/blob/v0.3.0/LICENSE
 -------------------------------------------------------------------------------
                                  Apache License
                            Version 2.0, January 2004
@@ -2304,9 +2273,7 @@ Source: https://github.com/godror/knownpb/blob/v0.3.0/LICENSE
 
 -------------------------------------------------------------------------------
 Dependency: github.com/gofrs/flock
-Version: v0.13.0
 License: BSD-3-Clause
-Source: https://github.com/gofrs/flock/blob/v0.13.0/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2018-2025, The Gofrs
 Copyright (c) 2015-2020, Tim Heckman
@@ -2340,9 +2307,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/golang-jwt/jwt/v5
-Version: v5.3.1
 License: MIT
-Source: https://github.com/golang-jwt/jwt/blob/v5.3.1/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2012 Dave Grijalva
 Copyright (c) 2021 golang-jwt maintainers
@@ -2357,9 +2322,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 -------------------------------------------------------------------------------
 Dependency: github.com/google/uuid
-Version: v1.6.0
 License: BSD-3-Clause
-Source: https://github.com/google/uuid/blob/v1.6.0/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2009,2014 Google Inc. All rights reserved.
 
@@ -2392,9 +2355,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/hashicorp/errwrap
-Version: v1.1.0
 License: MPL-2.0
-Source: https://github.com/hashicorp/errwrap/blob/v1.1.0/LICENSE
 -------------------------------------------------------------------------------
 Mozilla Public License, version 2.0
 
@@ -2754,9 +2715,7 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 
 -------------------------------------------------------------------------------
 Dependency: github.com/hashicorp/go-cleanhttp
-Version: v0.5.2
 License: MPL-2.0
-Source: https://github.com/hashicorp/go-cleanhttp/blob/v0.5.2/LICENSE
 -------------------------------------------------------------------------------
 Mozilla Public License, version 2.0
 
@@ -3125,9 +3084,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 -------------------------------------------------------------------------------
 Dependency: github.com/hashicorp/go-multierror
-Version: v1.1.1
 License: MPL-2.0
-Source: https://github.com/hashicorp/go-multierror/blob/v1.1.1/LICENSE
 -------------------------------------------------------------------------------
 Mozilla Public License, version 2.0
 
@@ -3486,9 +3443,7 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 
 -------------------------------------------------------------------------------
 Dependency: github.com/hashicorp/go-retryablehttp
-Version: v0.7.8
 License: MPL-2.0
-Source: https://github.com/hashicorp/go-retryablehttp/blob/v0.7.8/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2015 HashiCorp, Inc.
 
@@ -3859,9 +3814,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 -------------------------------------------------------------------------------
 Dependency: github.com/hashicorp/go-rootcerts
-Version: v1.0.2
 License: MPL-2.0
-Source: https://github.com/hashicorp/go-rootcerts/blob/v1.0.2/LICENSE
 -------------------------------------------------------------------------------
 Mozilla Public License, version 2.0
 
@@ -4230,9 +4183,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 -------------------------------------------------------------------------------
 Dependency: github.com/hashicorp/go-secure-stdlib/parseutil
-Version: v0.2.0
 License: MPL-2.0
-Source: https://github.com/hashicorp/go-secure-stdlib/blob/parseutil/v0.2.0/parseutil/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2020 HashiCorp, Inc.
 
@@ -4603,9 +4554,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 -------------------------------------------------------------------------------
 Dependency: github.com/hashicorp/go-secure-stdlib/strutil
-Version: v0.1.2
 License: MPL-2.0
-Source: https://github.com/hashicorp/go-secure-stdlib/blob/strutil/v0.1.2/strutil/LICENSE
 -------------------------------------------------------------------------------
 Mozilla Public License, version 2.0
 
@@ -4974,9 +4923,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 -------------------------------------------------------------------------------
 Dependency: github.com/hashicorp/go-sockaddr
-Version: v1.0.7
 License: MPL-2.0
-Source: https://github.com/hashicorp/go-sockaddr/blob/v1.0.7/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2016 HashiCorp, Inc.
 
@@ -5357,9 +5304,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 -------------------------------------------------------------------------------
 Dependency: github.com/hashicorp/hcl
-Version: v1.0.1-vault-7
 License: MPL-2.0
-Source: https://github.com/hashicorp/hcl/blob/v1.0.1-vault-7/LICENSE
 -------------------------------------------------------------------------------
 Mozilla Public License, version 2.0
 
@@ -5719,9 +5664,7 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 
 -------------------------------------------------------------------------------
 Dependency: github.com/hashicorp/vault/api
-Version: v1.23.0
 License: MPL-2.0
-Source: https://github.com/hashicorp/vault/blob/api/v1.23.0/api/LICENSE
 -------------------------------------------------------------------------------
 Copyright IBM Corp. 2016, 2025
 
@@ -6092,9 +6035,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 -------------------------------------------------------------------------------
 Dependency: github.com/jackc/pgpassfile
-Version: v1.0.0
 License: MIT
-Source: https://github.com/jackc/pgpassfile/blob/v1.0.0/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2019 Jack Christensen
 
@@ -6122,9 +6063,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/jackc/pgservicefile
-Version: v0.0.0-20240606120523-5a60cdf6a761
 License: MIT
-Source: https://github.com/jackc/pgservicefile/blob/5a60cdf6a761/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2020 Jack Christensen
 
@@ -6152,9 +6091,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/jackc/pgx/v5
-Version: v5.11.0
 License: MIT
-Source: https://github.com/jackc/pgx/blob/v5.11.0/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2013-2021 Jack Christensen
 
@@ -6182,9 +6119,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/jackc/puddle/v2
-Version: v2.2.2
 License: MIT
-Source: https://github.com/jackc/puddle/blob/v2.2.2/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2018 Jack Christensen
 
@@ -6212,9 +6147,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/kylelemons/godebug
-Version: v1.1.0
 License: Apache-2.0
-Source: https://github.com/kylelemons/godebug/blob/v1.1.0/LICENSE
 -------------------------------------------------------------------------------
 
                                  Apache License
@@ -6422,9 +6355,7 @@ Source: https://github.com/kylelemons/godebug/blob/v1.1.0/LICENSE
 
 -------------------------------------------------------------------------------
 Dependency: github.com/mitchellh/mapstructure
-Version: v1.5.0
 License: MIT
-Source: https://github.com/mitchellh/mapstructure/blob/v1.5.0/LICENSE
 -------------------------------------------------------------------------------
 The MIT License (MIT)
 
@@ -6451,9 +6382,7 @@ THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/oracle/oci-go-sdk/v65
-Version: v65.126.2
 License: Apache-2.0
-Source: https://github.com/oracle/oci-go-sdk/blob/v65.126.2/LICENSE.txt
 -------------------------------------------------------------------------------
 Copyright (c) 2016, 2026, Oracle and/or its affiliates.  All rights reserved.
 This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
@@ -6561,9 +6490,7 @@ END OF TERMS AND CONDITIONS
 
 -------------------------------------------------------------------------------
 Dependency: github.com/oracle/oci-go-sdk/v65
-Version: v65.126.2
 License: UPL-1.0
-Source: https://github.com/oracle/oci-go-sdk/blob/v65.126.2/LICENSE.txt
 -------------------------------------------------------------------------------
 Copyright (c) 2016, 2026, Oracle and/or its affiliates.  All rights reserved.
 This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
@@ -6671,9 +6598,7 @@ END OF TERMS AND CONDITIONS
 
 -------------------------------------------------------------------------------
 Dependency: github.com/pkg/browser
-Version: v0.0.0-20240102092130-5ac0b6a4141c
 License: BSD-2-Clause
-Source: https://github.com/pkg/browser/blob/5ac0b6a4141c/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2014, Dave Cheney <dave@cheney.net>
 All rights reserved.
@@ -6702,9 +6627,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/ryanuber/go-glob
-Version: v1.0.0
 License: MIT
-Source: https://github.com/ryanuber/go-glob/blob/v1.0.0/LICENSE
 -------------------------------------------------------------------------------
 The MIT License (MIT)
 
@@ -6731,9 +6654,7 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/sony/gobreaker/v2
-Version: v2.4.0
 License: MIT
-Source: https://github.com/sony/gobreaker/blob/v2.4.0/v2/LICENSE
 -------------------------------------------------------------------------------
 The MIT License (MIT)
 
@@ -6760,9 +6681,7 @@ THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/youmark/pkcs8
-Version: v0.0.0-20240726163527-a2c0da244d78
 License: MIT
-Source: https://github.com/youmark/pkcs8/blob/a2c0da244d78/LICENSE
 -------------------------------------------------------------------------------
 The MIT License (MIT)
 
@@ -6788,9 +6707,7 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: go.yaml.in/yaml/v2
-Version: v2.4.4
 License: Apache-2.0
-Source: https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE
 -------------------------------------------------------------------------------
                                  Apache License
                            Version 2.0, January 2004
@@ -6997,9 +6914,7 @@ Source: https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/crypto
-Version: v0.55.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/crypto/+/v0.55.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7032,9 +6947,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/net
-Version: v0.58.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/net/+/v0.58.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7067,9 +6980,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/sync
-Version: v0.22.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/sync/+/v0.22.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7102,9 +7013,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/sys/unix
-Version: v0.47.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/sys/+/v0.47.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7137,9 +7046,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/text
-Version: v0.41.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/text/+/v0.41.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7172,9 +7079,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/time/rate
-Version: v0.15.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/time/+/v0.15.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7207,9 +7112,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: google.golang.org/protobuf
-Version: v1.36.11
 License: BSD-3-Clause
-Source: https://github.com/protocolbuffers/protobuf-go/blob/v1.36.11/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2018 The Go Authors. All rights reserved.
 
@@ -7242,9 +7145,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/sijms/go-ora/v2
-Version: v2.9.0
 License: MIT
-Source: https://github.com/sijms/go-ora/blob/v2.9.0/v2/LICENSE
 -------------------------------------------------------------------------------
 MIT License
 
@@ -7271,9 +7172,7 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: golang.org/x/sys/windows
-Version: v0.47.0
 License: BSD-3-Clause
-Source: https://cs.opensource.google/go/x/sys/+/v0.47.0:LICENSE
 -------------------------------------------------------------------------------
 Copyright 2009 The Go Authors.
 
@@ -7306,9 +7205,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/mitchellh/go-homedir
-Version: v1.1.0
 License: MIT
-Source: https://github.com/mitchellh/go-homedir/blob/v1.1.0/LICENSE
 -------------------------------------------------------------------------------
 The MIT License (MIT)
 

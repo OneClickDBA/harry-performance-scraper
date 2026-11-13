@@ -64,3 +64,8 @@ The dependency inventories and license texts below are generated from the Go
 packages compiled into each supported release variant. Test-only dependencies
 are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
+
+Dependency versions and integrity hashes remain authoritative in go.mod and
+go.sum. This inventory intentionally records stable legal identity and license
+text, and changes when dependency membership or applicable license terms
+change.

@@ -71,24 +71,11 @@ generate_variant() {
       --template "${TEMPLATE_FILE}" >"${output_file}"
 }
 
-sha256_file() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print $1}'
-  elif command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$1" | awk '{print $1}'
-  else
-    echo "Neither sha256sum nor shasum is available." >&2
-    return 1
-  fi
-}
-
 cd "${REPO_ROOT}"
 cat "${HEADER_FILE}" >"${candidate}"
 cat >>"${candidate}" <<EOF
 
 Generator: github.com/google/go-licenses/v2@${GO_LICENSES_VERSION}
-go.mod SHA-256: $(sha256_file go.mod)
-go.sum SHA-256: $(sha256_file go.sum)
 EOF
 
 # Architectures have identical external dependency inventories for each of
@@ -131,9 +118,9 @@ perl -pi -e 's/\r$//' "${candidate}"
 perl -0pi -e 's/\n+\z/\n/' "${candidate}"
 chmod 0644 "${candidate}"
 
-if grep -Eq '^License: Unknown$|^Source: Unknown$' "${candidate}"; then
+if grep -Eq '^License: Unknown$' "${candidate}"; then
   echo "The generated inventory contains unresolved license metadata:" >&2
-  grep -En '^License: Unknown$|^Source: Unknown$' "${candidate}" >&2
+  grep -En '^License: Unknown$' "${candidate}" >&2
   exit 1
 fi
 
