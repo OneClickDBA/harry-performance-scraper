@@ -66,8 +66,8 @@ are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
 
 Generator: github.com/google/go-licenses/v2@v2.0.1
-go.mod SHA-256: 83b418da5f45f678661542188c00b375f5b3f319499d4a32a59217517cea0d96
-go.sum SHA-256: 35272a4c3c1f298f99973d236b73cbdc6ba496c48d3b41acd10318544ccc6a69
+go.mod SHA-256: 5b0d211865eb9ab3f4b4c64a9c01458aad4a16e8161597201ab53f3de7a311b7
+go.sum SHA-256: 7df59bff3fcb9aecae67db9ec47423d58f89096407578c6a1a4c6f91e6ae835c
 
 ===============================================================================
 DEPENDENCY INVENTORY: ALL RELEASE VARIANTS
@@ -6152,9 +6152,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/jackc/pgx/v5
-Version: v5.11.0
+Version: v5.12.0
 License: MIT
-Source: https://github.com/jackc/pgx/blob/v5.11.0/LICENSE
+Source: https://github.com/jackc/pgx/blob/v5.12.0/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2013-2021 Jack Christensen
 
@@ -6182,9 +6182,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: github.com/jackc/puddle/v2
-Version: v2.2.2
+Version: v2.2.3
 License: MIT
-Source: https://github.com/jackc/puddle/blob/v2.2.2/LICENSE
+Source: https://github.com/jackc/puddle/blob/v2.2.3/LICENSE
 -------------------------------------------------------------------------------
 Copyright (c) 2018 Jack Christensen
 

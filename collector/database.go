@@ -379,8 +379,8 @@ func cloneTimePointer(value *time.Time) *time.Time {
 	if value == nil {
 		return nil
 	}
-	copy := *value
-	return &copy
+	cloned := *value
+	return &cloned
 }
 
 func (d *Database) getUp() float64 {
