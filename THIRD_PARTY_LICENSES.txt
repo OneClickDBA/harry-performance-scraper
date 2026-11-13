@@ -66,8 +66,8 @@ are excluded. Regenerating this inventory must not remove the project-specific
 notices above.
 
 Generator: github.com/google/go-licenses/v2@v2.0.1
-go.mod SHA-256: 83b418da5f45f678661542188c00b375f5b3f319499d4a32a59217517cea0d96
-go.sum SHA-256: 35272a4c3c1f298f99973d236b73cbdc6ba496c48d3b41acd10318544ccc6a69
+go.mod SHA-256: 24fe6edd8ea1390c88631f67a5891f210353257d3e6ed1fcb85498cfd72b846d
+go.sum SHA-256: 87efb8046db7a633f6451c99d23dcc4794cc629666c3762bbb47c0789c5de6e6
 
 ===============================================================================
 DEPENDENCY INVENTORY: ALL RELEASE VARIANTS
@@ -6788,9 +6788,9 @@ SOFTWARE.
 
 -------------------------------------------------------------------------------
 Dependency: go.yaml.in/yaml/v2
-Version: v2.4.4
+Version: v2.4.5
 License: Apache-2.0
-Source: https://github.com/yaml/go-yaml/blob/v2.4.4/LICENSE
+Source: https://github.com/yaml/go-yaml/blob/v2.4.5/LICENSE
 -------------------------------------------------------------------------------
                                  Apache License
                            Version 2.0, January 2004
