@@ -9,7 +9,7 @@ require (
 	github.com/godror/godror v0.52.0
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/jackc/pgx/v5 v5.13.0
-	github.com/oracle/oci-go-sdk/v65 v65.130.0
+	github.com/oracle/oci-go-sdk/v65 v65.131.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	go.yaml.in/yaml/v2 v2.4.5
 )
